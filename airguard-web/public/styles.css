@@ -239,9 +239,14 @@ p {
   color: var(--text-muted);
 }
 
-.chart-card canvas {
-  width: 100%;
+.chart-canvas {
+  position: relative;
   height: 260px;
+}
+
+.chart-canvas canvas {
+  width: 100%;
+  height: 100%;
 }
 
 .page-footer {

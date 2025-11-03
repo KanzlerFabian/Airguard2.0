@@ -231,11 +231,16 @@ function buildChartGrid() {
 
     header.append(title, unit);
 
+    const canvasWrapper = document.createElement('div');
+    canvasWrapper.className = 'chart-canvas';
+
     const canvas = document.createElement('canvas');
     canvas.width = 400;
     canvas.height = 240;
 
-    card.append(header, canvas);
+    canvasWrapper.append(canvas);
+
+    card.append(header, canvasWrapper);
     ui.chartGrid.append(card);
 
     const context = canvas.getContext('2d');
