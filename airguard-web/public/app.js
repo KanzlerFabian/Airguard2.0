@@ -1,4 +1,4 @@
-import { Chart, registerables } from '/lib/chart.esm.js';
+import { Chart, registerables } from '/lib/chart.js';
 import '/lib/chartjs-adapter-date-fns.js';
 
 Chart.register(...registerables);

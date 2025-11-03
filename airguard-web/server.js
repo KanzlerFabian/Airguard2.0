@@ -29,6 +29,19 @@ const PROM_URL = (process.env.PROM_URL || 'http://127.0.0.1:9090').replace(/\/+$
 const PROM_TIMEOUT_MS = Number.parseInt(process.env.PROM_TIMEOUT_MS || '', 10) || 8000;
 const MAX_RANGE_SECONDS = Number.parseInt(process.env.MAX_RANGE_SECONDS || '', 10) || 30 * 24 * 60 * 60;
 
+const cspDirectives = {
+  defaultSrc: ["'self'"],
+  scriptSrc: ["'self'", "'unsafe-eval'"],
+  styleSrc: ["'self'"],
+  imgSrc: ["'self'", 'data:'],
+  fontSrc: ["'self'"],
+  connectSrc: ["'self'"],
+  objectSrc: ["'none'"],
+  baseUri: ["'self'"],
+  frameAncestors: ["'none'"]
+};
+
+
 const app = express();
 app.set('trust proxy', true);
 app.disable('x-powered-by');
@@ -42,7 +55,9 @@ app.use((req, res, next) => {
 
 app.use(
   helmet({
-    contentSecurityPolicy: false
+    contentSecurityPolicy: {
+      directives: cspDirectives
+    }
   })
 );
 app.use(compression());
