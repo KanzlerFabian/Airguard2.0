@@ -29,24 +29,11 @@ const PROM_URL = (process.env.PROM_URL || 'http://127.0.0.1:9090').replace(/\/+$
 const PROM_TIMEOUT_MS = Number.parseInt(process.env.PROM_TIMEOUT_MS || '', 10) || 8000;
 const MAX_RANGE_SECONDS = Number.parseInt(process.env.MAX_RANGE_SECONDS || '', 10) || 30 * 24 * 60 * 60;
 
-const CSP_HEADER = [
-  "default-src 'self'",
-  "script-src 'self'",
-  "style-src 'self'",
-  "img-src 'self' data:",
-  "font-src 'self'",
-  "connect-src 'self'",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "frame-ancestors 'none'"
-].join('; ');
-
 const app = express();
 app.set('trust proxy', true);
 app.disable('x-powered-by');
 
 app.use((req, res, next) => {
-  res.setHeader('Content-Security-Policy', CSP_HEADER);
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
   res.setHeader('X-Frame-Options', 'DENY');
