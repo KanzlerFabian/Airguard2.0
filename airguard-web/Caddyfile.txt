@@ -1,0 +1,23 @@
+airguardpi.local {
+    encode gzip zstd
+    tls internal
+
+    @dashboard path /dashboard* /assets/* /styles.css /app.js /lib/*
+    handle @dashboard {
+        header {
+            Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+            Referrer-Policy "no-referrer"
+            Permissions-Policy "geolocation=(), camera=(), microphone=()"
+            X-Frame-Options "DENY"
+        }
+        reverse_proxy 127.0.0.1:8088
+    }
+
+    handle {
+        respond "Not found" 404
+    }
+
+    log {
+        output file /var/log/caddy/airguardpi.log
+    }
+}

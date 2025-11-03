@@ -1,0 +1,28 @@
+{
+  "name": "airguard-web",
+  "version": "1.0.0",
+  "description": "Lokales AirGuard Dashboard (Node/Express + Prometheus Backend).",
+  "private": true,
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "start:dev": "nodemon server.js --watch server.js --watch public"
+  },
+  "dependencies": {
+    "chart.js": "^4.4.4",
+    "chartjs-adapter-date-fns": "^3.0.0",
+    "compression": "^1.7.4",
+    "date-fns": "^3.3.1",
+    "express": "^4.19.2",
+    "helmet": "^7.1.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "AirGuard",
+  "license": "MIT"
+}

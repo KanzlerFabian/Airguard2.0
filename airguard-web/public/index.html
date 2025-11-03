@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AirGuard Dashboard</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="icon" type="image/png" href="/assets/logo.png">
+  <script type="module" src="/app.js" defer></script>
+</head>
+<body>
+  <header class="page-header">
+    <div class="header-content">
+      <div class="brand">
+        <span class="brand-logo" aria-hidden="true">AG</span>
+        <div class="brand-text">
+          <h1>AirGuard Dashboard</h1>
+          <p>Live-Metriken vom AirGuard Sensor (ESPHome &amp; Prometheus)</p>
+        </div>
+      </div>
+      <div class="update-info">
+        <span>Letzte Aktualisierung:</span>
+        <time id="last-updated">—</time>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-main">
+    <section class="range-section">
+      <h2>Zeitraum</h2>
+      <div id="range-buttons" class="range-buttons" role="group" aria-label="Zeitraum"></div>
+    </section>
+
+    <section class="summary-section">
+      <h2>Live-Werte</h2>
+      <div id="summary-grid" class="summary-grid"></div>
+    </section>
+
+    <section class="charts-section">
+      <h2>Verlauf</h2>
+      <div id="chart-grid" class="chart-grid"></div>
+    </section>
+  </main>
+
+  <footer class="page-footer">
+    <p>AirGuard • Node/Express Backend • Prometheus @ 127.0.0.1:9090</p>
+  </footer>
+
+  <div id="status-bar" class="status-bar" role="status" aria-live="polite">
+    <span id="status-text" data-state="ok">Bereit</span>
+  </div>
+</body>
+</html>
