@@ -1,7 +1,15 @@
-import { Chart, registerables } from '/lib/chart.js';
-import '/lib/chartjs-adapter-date-fns.js';
+'use strict';
 
-Chart.register(...registerables);
+const chartExport = window.Chart;
+const ChartJS = chartExport && chartExport.Chart ? chartExport.Chart : chartExport;
+
+if (!ChartJS || typeof ChartJS.register !== 'function') {
+  throw new Error('Chart.js konnte nicht geladen werden.');
+}
+
+if (Array.isArray(ChartJS.registerables) && ChartJS.registerables.length > 0) {
+  ChartJS.register(...ChartJS.registerables);
+}
 
 const METRICS = [
   { key: 'CO2', label: 'CO\u2082', unit: 'ppm', decimals: 0, color: '#d3524d' },
@@ -231,7 +239,7 @@ function buildChartGrid() {
     ui.chartGrid.append(card);
 
     const context = canvas.getContext('2d');
-    const chart = new Chart(context, {
+    const chart = new ChartJS(context, {
       type: 'line',
       data: {
         datasets: [

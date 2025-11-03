@@ -31,7 +31,7 @@ const MAX_RANGE_SECONDS = Number.parseInt(process.env.MAX_RANGE_SECONDS || '', 1
 
 const cspDirectives = {
   defaultSrc: ["'self'"],
-  scriptSrc: ["'self'", "'unsafe-eval'"],
+  scriptSrc: ["'self'"],
   styleSrc: ["'self'"],
   imgSrc: ["'self'", 'data:'],
   fontSrc: ["'self'"],
