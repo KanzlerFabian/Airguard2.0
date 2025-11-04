@@ -29,10 +29,6 @@
     '30d': { label: '30 Tage', range: '30d', step: '3h', win: '6h', samples: 45 }
   };
 
-  const METRIC_API_NAMES = {
-    Temperatur: 'temperatur__bme_kalibriert_'
-  };
-
   const METRIC_CONFIG = {
     CO2: { unit: 'ppm', decimals: 0, label: 'CO₂' },
     'PM2.5': { unit: 'µg/m³', decimals: 1, label: 'PM2.5' },
@@ -50,37 +46,43 @@
       key: 'CO2',
       metrics: ['CO2'],
       colors: ['#ef4444'],
-      yTitle: 'ppm'
+      yTitle: 'ppm',
+      yBounds: { min: 0, max: 2500 }
     },
     {
       key: 'PM',
       metrics: ['PM1.0', 'PM2.5', 'PM10'],
       colors: ['#22d3ee', '#2563eb', '#0f766e'],
-      yTitle: 'µg/m³'
+      yTitle: 'µg/m³',
+      yBounds: { min: 0, max: 100 }
     },
     {
       key: 'Temperatur',
       metrics: ['Temperatur'],
       colors: ['#fb923c'],
-      yTitle: '°C'
+      yTitle: '°C',
+      yBounds: { min: -10, max: 40 }
     },
     {
       key: 'rel. Feuchte',
       metrics: ['rel. Feuchte'],
       colors: ['#0ea5e9'],
-      yTitle: '%'
+      yTitle: '%',
+      yBounds: { min: 0, max: 100 }
     },
     {
       key: 'TVOC',
       metrics: ['TVOC'],
       colors: ['#8b5cf6'],
-      yTitle: 'ppb'
+      yTitle: 'ppb',
+      yBounds: { min: 0, max: 1000 }
     },
     {
       key: 'Luftdruck',
       metrics: ['Luftdruck'],
       colors: ['#a855f7'],
       yTitle: 'hPa',
+      yBounds: { min: 950, max: 1050 },
       optional: true
     }
   ];
@@ -241,9 +243,6 @@
     for (const [key, value] of Object.entries(raw)) {
       if (!value) continue;
       mapped[key] = value;
-    }
-    if (!mapped.Temperatur && mapped[METRIC_API_NAMES.Temperatur]) {
-      mapped.Temperatur = mapped[METRIC_API_NAMES.Temperatur];
     }
     return mapped;
   }
@@ -553,12 +552,16 @@
             type: 'time',
             time: { unit: 'hour', tooltipFormat: 'dd.MM.yyyy HH:mm' },
             ticks: { maxRotation: 0, maxTicksLimit: 6, color: '#9ca3af' },
-            grid: { color: 'rgba(148, 163, 184, 0.25)' }
+            grid: { display: false, drawBorder: false },
+            border: { display: false }
           },
           y: {
             title: { display: true, text: definition.yTitle, color: '#9ca3af' },
             ticks: { color: '#9ca3af' },
-            grid: { color: 'rgba(148, 163, 184, 0.18)' }
+            grid: { display: false, drawBorder: false },
+            border: { display: false },
+            suggestedMin: definition.yBounds?.min,
+            suggestedMax: definition.yBounds?.max
           }
         }
       }
@@ -600,9 +603,8 @@
 
   async function fetchSeries(metrics) {
     const promises = metrics.map(async (metric) => {
-      const apiName = METRIC_API_NAMES[metric] || metric;
       const params = new URLSearchParams({
-        name: apiName,
+        name: metric,
         range: state.range.range,
         step: state.range.step,
         win: state.range.win
@@ -615,7 +617,7 @@
       if (!payload || !payload.ok) {
         throw new Error(payload?.error || `Serie ${metric} ungültig`);
       }
-      const values = Array.isArray(payload.data?.values) ? payload.data.values : [];
+      const values = normalizeSeriesValues(payload.data);
       const points = values
         .map((row) => ({ x: row[0] * 1000, y: Number(row[1]) }))
         .filter((point) => Number.isFinite(point.y));
@@ -624,6 +626,33 @@
 
     const entries = await Promise.all(promises);
     return Object.fromEntries(entries);
+  }
+
+  function normalizeSeriesValues(raw) {
+    if (!raw) return [];
+    const values = Array.isArray(raw?.values) ? raw.values : raw;
+    if (!Array.isArray(values)) return [];
+
+    const normalized = values
+      .map((entry) => {
+        if (!entry) return null;
+        if (Array.isArray(entry) && entry.length >= 2) {
+          return [Number(entry[0]), Number(entry[1])];
+        }
+        if (typeof entry === 'object') {
+          const ts = 'x' in entry ? Number(entry.x) : Number(entry.ts);
+          const val = 'y' in entry ? Number(entry.y) : Number(entry.value);
+          if (Number.isFinite(ts) && Number.isFinite(val)) {
+            return [ts, val];
+          }
+        }
+        return null;
+      })
+      .filter((entry) => Array.isArray(entry) && Number.isFinite(entry[0]) && Number.isFinite(entry[1]));
+    const containsMilliseconds = normalized.some((entry) => entry[0] > 1e11);
+    return containsMilliseconds
+      ? normalized.map(([ts, val]) => [ts / 1000, val])
+      : normalized;
   }
 
   function smoothSeries(series) {
@@ -650,10 +679,45 @@
   }
 
   function applyChartData(chart, definition, data) {
+    let maxY = Number.NEGATIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
     definition.metrics.forEach((metric, index) => {
-      chart.data.datasets[index].data = data[metric] || [];
+      const points = data[metric] || [];
+      chart.data.datasets[index].data = points;
       chart.data.datasets[index].decimation.samples = state.range.samples;
+      points.forEach((point) => {
+        if (!point) return;
+        const value = Number(point.y);
+        if (!Number.isFinite(value)) return;
+        if (value > maxY) maxY = value;
+        if (value < minY) minY = value;
+      });
     });
+    const yScale = chart.options?.scales?.y;
+    if (yScale) {
+      const bounds = definition.yBounds || {};
+      if (typeof bounds.min === 'number') {
+        yScale.min = bounds.min;
+        yScale.suggestedMin = bounds.min;
+      } else if (Number.isFinite(minY)) {
+        yScale.min = minY;
+      } else {
+        delete yScale.min;
+        delete yScale.suggestedMin;
+      }
+
+      if (typeof bounds.max === 'number') {
+        const safeMax = Number.isFinite(maxY) ? Math.max(bounds.max, maxY * 1.05) : bounds.max;
+        yScale.max = safeMax;
+        yScale.suggestedMax = bounds.max;
+      } else if (Number.isFinite(maxY)) {
+        yScale.max = maxY * 1.05;
+        delete yScale.suggestedMax;
+      } else {
+        delete yScale.max;
+        delete yScale.suggestedMax;
+      }
+    }
     chart.update('none');
   }
 
@@ -666,7 +730,7 @@
       const response = await fetch(`./api/series?${params.toString()}`);
       if (!response.ok) return;
       const payload = await response.json();
-      const values = Array.isArray(payload?.data?.values) ? payload.data.values : [];
+      const values = normalizeSeriesValues(payload?.data);
       if (values.length >= 2) {
         const first = Number(values[0][1]);
         const last = Number(values[values.length - 1][1]);

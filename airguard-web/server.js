@@ -215,8 +215,8 @@ app.get('/api/series', async (req, res, next) => {
 
     const endSeconds = Math.floor(Date.now() / 1000);
     const startSeconds = Math.max(0, endSeconds - rangeSeconds);
-    const promName = escapePromString(name);
-    const baseQuery = `esphome_sensor_value{name="${promName}"}`;
+    const promNameEscaped = escapePromString(metric.key);
+    const baseQuery = `esphome_sensor_value{name="${promNameEscaped}"}`;
     const seriesQuery = `avg_over_time(${baseQuery}[${windowLiteral}])`;
 
     const payload = await fetchPrometheus('query_range', {
