@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AirGuard Dashboard</title>
+  <title>AirGuard AnalytiX</title>
   <link rel="stylesheet" href="/styles.css">
   <link rel="icon" type="image/png" href="/assets/logo.png">
   <script defer src="/lib/chart.umd.min.js"></script>
@@ -11,40 +11,52 @@
   <script defer src="/app.js"></script>
 </head>
 <body>
-  <header class="page-header">
-    <div class="header-content">
-      <div class="brand">
-        <span class="brand-logo" aria-hidden="true">AG</span>
-        <div class="brand-text">
-          <h1>AirGuard Dashboard</h1>
-          <p>Live-Metriken vom AirGuard Sensor (ESPHome &amp; Prometheus)</p>
+  <header class="app-header">
+    <div class="header-bar">
+      <div class="brand" aria-label="AirGuard AnalytiX">
+        <span class="brand-mark" aria-hidden="true">AG</span>
+        <div class="brand-copy">
+          <h1>AirGuard AnalytiX</h1>
+          <p>Innenraum-Luftqualität live überwachen</p>
         </div>
       </div>
-      <div class="update-info">
-        <span>Letzte Aktualisierung:</span>
-        <time id="last-updated">—</time>
+      <div class="header-center">
+        <div id="aqi-badge" class="aqi-badge badge badge--neutral" role="status" aria-live="polite" aria-label="Air Quality Index: nicht verfügbar">
+          <span class="badge-label">AQI</span>
+          <div class="badge-main">
+            <span id="aqi-score" class="badge-score">—</span>
+            <span id="aqi-text" class="badge-text">—</span>
+          </div>
+          <div class="badge-sparkline" aria-hidden="true">
+            <canvas id="aqi-sparkline" width="160" height="36"></canvas>
+          </div>
+        </div>
       </div>
+      <nav id="range-tabs" class="range-tabs" role="tablist" aria-label="Zeitraum"></nav>
     </div>
+    <p class="updated-label">Letzte Aktualisierung <time id="last-updated">—</time></p>
   </header>
 
-  <main class="page-main">
-    <section class="range-section">
-      <h2>Zeitraum</h2>
-      <div id="range-buttons" class="range-buttons" role="group" aria-label="Zeitraum"></div>
+  <main class="app-main">
+    <section class="metric-strip" aria-labelledby="metric-strip-title">
+      <h2 id="metric-strip-title" class="visually-hidden">Live-Metriken</h2>
+      <div id="metric-grid" class="metric-grid" role="list"></div>
     </section>
 
-    <section class="summary-section">
-      <h2>Live-Werte</h2>
-      <div id="summary-grid" class="summary-grid"></div>
-    </section>
-
-    <section class="charts-section">
-      <h2>Verlauf</h2>
-      <div id="chart-grid" class="chart-grid"></div>
+    <section class="charts-section" aria-labelledby="charts-title">
+      <div class="section-heading">
+        <h2 id="charts-title">Verlauf</h2>
+        <p>Entwicklung der wichtigsten Raumluft-Kennzahlen</p>
+      </div>
+      <div id="chart-grid" class="chart-grid" role="list"></div>
+      <details class="chart-more" id="more-charts">
+        <summary>Weitere Charts</summary>
+        <div id="more-chart-grid" class="chart-grid" role="list"></div>
+      </details>
     </section>
   </main>
 
-  <footer class="page-footer">
+  <footer class="app-footer">
     <p>AirGuard • Node/Express Backend • Prometheus @ 127.0.0.1:9090</p>
   </footer>
 
