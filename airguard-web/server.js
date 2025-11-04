@@ -32,7 +32,7 @@ const MAX_RANGE_SECONDS = Number.parseInt(process.env.MAX_RANGE_SECONDS || '', 1
 const cspDirectives = {
   defaultSrc: ["'self'"],
   scriptSrc: ["'self'"],
-  styleSrc: ["'self'"],
+  styleSrc: ["'self'", "'unsafe-inline'"],
   imgSrc: ["'self'", 'data:'],
   fontSrc: ["'self'"],
   connectSrc: ["'self'"],
@@ -45,6 +45,8 @@ const cspDirectives = {
 const app = express();
 app.set('trust proxy', true);
 app.disable('x-powered-by');
+
+const pushSubscriptions = new Map();
 
 app.use((req, res, next) => {
   res.setHeader('Referrer-Policy', 'no-referrer');
@@ -61,6 +63,7 @@ app.use(
   })
 );
 app.use(compression());
+app.use(express.json({ limit: '64kb' }));
 
 app.use(
   '/lib',
@@ -92,6 +95,35 @@ app.use(
 
 app.get(['/', '/dashboard', '/dashboard/'], (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.post('/push/subscribe', (req, res) => {
+  const subscription = req.body;
+
+  if (!subscription || typeof subscription !== 'object') {
+    return sendJSON(res, { ok: false, error: 'Ungültiges Subscription-Objekt' }, 400);
+  }
+
+  const endpoint = typeof subscription.endpoint === 'string' ? subscription.endpoint : null;
+  if (!endpoint) {
+    return sendJSON(res, { ok: false, error: 'Subscription ohne Endpoint' }, 400);
+  }
+
+  pushSubscriptions.set(endpoint, subscription);
+
+  sendJSON(res, { ok: true, message: 'Subscription gespeichert', count: pushSubscriptions.size });
+});
+
+app.post('/push/test', (req, res) => {
+  const list = Array.from(pushSubscriptions.values());
+  sendJSON(
+    res,
+    {
+      ok: true,
+      message: 'Push-Teststub – Implementierung eines Push-Dienstes erforderlich.',
+      subscriptions: list
+    }
+  );
 });
 
 app.get('/api/now', async (req, res, next) => {
