@@ -3,65 +3,215 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AirGuard AnalytiX</title>
-  <link rel="stylesheet" href="/styles.css">
-  <link rel="icon" type="image/png" href="/assets/logo.png">
-  <script defer src="/lib/chart.umd.min.js"></script>
-  <script defer src="/lib/chartjs-adapter-date-fns.bundle.min.js"></script>
-  <script defer src="/app.js"></script>
+  <meta name="theme-color" content="#ffffff">
+  <title>AirGuard Dashboard</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" type="image/png" href="./assets/logo.png">
+  <link rel="stylesheet" href="./styles.css">
+  <script defer src="./lib/chart.umd.min.js"></script>
+  <script defer src="./lib/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <script defer src="./app.js"></script>
 </head>
 <body>
-  <header class="app-header">
-    <div class="header-bar">
-      <div class="brand" aria-label="AirGuard AnalytiX">
-        <span class="brand-mark" aria-hidden="true">AG</span>
-        <div class="brand-copy">
-          <h1>AirGuard AnalytiX</h1>
-          <p>Innenraum-Luftqualität live überwachen</p>
+  <div class="app-shell">
+    <header class="hero" aria-labelledby="hero-title">
+      <div class="hero-left">
+        <h1 id="hero-title">AirGuard Innenraum-Qualität</h1>
+        <p class="hero-sub">Live-Überblick für gesunde Luft & Wohlbefinden</p>
+        <div class="health-card" role="status" aria-live="polite">
+          <div class="health-ring" aria-hidden="true">
+            <svg viewBox="0 0 120 120">
+              <circle class="health-bg" cx="60" cy="60" r="54"></circle>
+              <circle class="health-progress" cx="60" cy="60" r="54" stroke-dasharray="339.292" stroke-dashoffset="339.292"></circle>
+            </svg>
+            <div class="health-value">
+              <span id="health-score" class="health-score">—</span>
+              <span id="health-label" class="health-label">Nicht verfügbar</span>
+            </div>
+          </div>
+          <p id="health-detail" class="health-detail">Werte werden geladen …</p>
+        </div>
+        <div class="hero-actions">
+          <button id="install-btn" type="button" class="ghost-btn" hidden>App installieren</button>
+          <button id="notify-btn" type="button" class="ghost-btn" hidden>Benachrichtigungen aktivieren</button>
         </div>
       </div>
-      <div class="header-center">
-        <div id="aqi-badge" class="aqi-badge badge badge--neutral" role="status" aria-live="polite" aria-label="Air Quality Index: nicht verfügbar">
-          <span class="badge-label">AQI</span>
-          <div class="badge-main">
-            <span id="aqi-score" class="badge-score">—</span>
-            <span id="aqi-text" class="badge-text">—</span>
-          </div>
-          <div class="badge-sparkline" aria-hidden="true">
-            <canvas id="aqi-sparkline" width="160" height="36"></canvas>
-          </div>
+      <div class="hero-right" aria-labelledby="hero-metrics-title">
+        <h2 id="hero-metrics-title" class="section-title">Kernwerte</h2>
+        <div class="mini-metric-grid">
+          <article class="mini-card skeleton" data-metric="CO2">
+            <h3>CO₂</h3>
+            <p class="mini-value">—</p>
+            <span class="mini-unit">ppm</span>
+          </article>
+          <article class="mini-card skeleton" data-metric="PM2.5">
+            <h3>PM2.5</h3>
+            <p class="mini-value">—</p>
+            <span class="mini-unit">µg/m³</span>
+          </article>
+          <article class="mini-card skeleton" data-metric="TVOC">
+            <h3>TVOC</h3>
+            <p class="mini-value">—</p>
+            <span class="mini-unit">ppb</span>
+          </article>
+          <article class="mini-card skeleton" data-metric="rel. Feuchte">
+            <h3>rel. Feuchte</h3>
+            <p class="mini-value">—</p>
+            <span class="mini-unit">%</span>
+          </article>
         </div>
+        <p class="hero-update">Letzte Aktualisierung: <time id="last-updated">—</time></p>
       </div>
-      <nav id="range-tabs" class="range-tabs" role="tablist" aria-label="Zeitraum"></nav>
-    </div>
-    <p class="updated-label">Letzte Aktualisierung <time id="last-updated">—</time></p>
-  </header>
+    </header>
 
-  <main class="app-main">
-    <section class="metric-strip" aria-labelledby="metric-strip-title">
-      <h2 id="metric-strip-title" class="visually-hidden">Live-Metriken</h2>
-      <div id="metric-grid" class="metric-grid" role="list"></div>
-    </section>
+    <main class="main-content">
+      <section class="status-section" aria-labelledby="status-heading">
+        <div class="section-heading">
+          <h2 id="status-heading">Statusübersicht</h2>
+          <p>Aktuelle Werte mit Komfort- und Qualitätsbewertung</p>
+        </div>
+        <div class="status-grid">
+          <article class="status-card skeleton" data-metric="CO2">
+            <header>
+              <h3>CO₂</h3>
+              <span class="badge" data-tone="neutral">Lädt …</span>
+            </header>
+            <p class="status-value">— <span class="unit">ppm</span></p>
+            <p class="status-note">—</p>
+          </article>
+          <article class="status-card skeleton" data-metric="PM2.5">
+            <header>
+              <h3>PM2.5</h3>
+              <span class="badge" data-tone="neutral">Lädt …</span>
+            </header>
+            <p class="status-value">— <span class="unit">µg/m³</span></p>
+            <p class="status-note">—</p>
+          </article>
+          <article class="status-card skeleton" data-metric="TVOC">
+            <header>
+              <h3>TVOC</h3>
+              <span class="badge" data-tone="neutral">Lädt …</span>
+            </header>
+            <p class="status-value">— <span class="unit">ppb</span></p>
+            <p class="status-note">—</p>
+          </article>
+          <article class="status-card skeleton" data-metric="Temperatur">
+            <header>
+              <h3>Temperatur</h3>
+              <span class="badge" data-tone="neutral">Lädt …</span>
+            </header>
+            <p class="status-value">— <span class="unit">°C</span></p>
+            <p class="status-note">—</p>
+          </article>
+          <article class="status-card skeleton" data-metric="rel. Feuchte">
+            <header>
+              <h3>rel. Feuchte</h3>
+              <span class="badge" data-tone="neutral">Lädt …</span>
+            </header>
+            <p class="status-value">— <span class="unit">%</span></p>
+            <p class="status-note">—</p>
+          </article>
+          <article class="status-card skeleton optional" data-metric="Luftdruck">
+            <header>
+              <h3>Luftdruck</h3>
+              <span class="trend" aria-live="polite">Trend wird ermittelt …</span>
+            </header>
+            <p class="status-value">— <span class="unit">hPa</span></p>
+            <p class="status-note">—</p>
+          </article>
+        </div>
+      </section>
 
-    <section class="charts-section" aria-labelledby="charts-title">
-      <div class="section-heading">
-        <h2 id="charts-title">Verlauf</h2>
-        <p>Entwicklung der wichtigsten Raumluft-Kennzahlen</p>
-      </div>
-      <div id="chart-grid" class="chart-grid" role="list"></div>
-      <details class="chart-more" id="more-charts">
-        <summary>Weitere Charts</summary>
-        <div id="more-chart-grid" class="chart-grid" role="list"></div>
-      </details>
-    </section>
-  </main>
+      <section class="circadian-section" aria-labelledby="circadian-heading">
+        <div class="section-heading">
+          <h2 id="circadian-heading">Circadian Light</h2>
+          <p>Optimierte Beleuchtung nach Tageszeit</p>
+        </div>
+        <article class="circadian-card skeleton">
+          <div class="circadian-main">
+            <div>
+              <p class="circadian-phase">Phase wird geladen …</p>
+              <h3 class="circadian-status">—</h3>
+              <p class="circadian-tip">—</p>
+            </div>
+          </div>
+          <dl class="circadian-meta">
+            <div>
+              <dt>Aktuell</dt>
+              <dd id="lux-now">— lx</dd>
+            </div>
+            <div>
+              <dt>Zielbereich</dt>
+              <dd id="lux-target">—</dd>
+            </div>
+            <div>
+              <dt>Bewertung</dt>
+              <dd><span id="lux-eval" class="badge" data-tone="neutral">—</span></dd>
+            </div>
+          </dl>
+        </article>
+      </section>
 
-  <footer class="app-footer">
-    <p>AirGuard • Node/Express Backend • Prometheus @ 127.0.0.1:9090</p>
-  </footer>
+      <section class="charts-section" aria-labelledby="charts-heading">
+        <div class="section-heading">
+          <h2 id="charts-heading">Verläufe</h2>
+          <p>Sanft geglättete Trends der wichtigsten Metriken</p>
+        </div>
+        <nav class="range-tabs" role="tablist" aria-label="Zeiträume">
+          <button type="button" role="tab" aria-selected="true" class="tab" data-range="24h">24 h</button>
+          <button type="button" role="tab" aria-selected="false" class="tab" data-range="7d">7 Tage</button>
+          <button type="button" role="tab" aria-selected="false" class="tab" data-range="30d">30 Tage</button>
+        </nav>
+        <div class="chart-grid">
+          <article class="chart-card skeleton" data-chart="CO2">
+            <header>
+              <h3>CO₂</h3>
+            </header>
+            <canvas></canvas>
+          </article>
+          <article class="chart-card skeleton" data-chart="PM">
+            <header>
+              <h3>Feinstaub</h3>
+              <p class="chart-sub">PM1.0 / PM2.5 / PM10</p>
+            </header>
+            <canvas></canvas>
+          </article>
+          <article class="chart-card skeleton" data-chart="Temperatur">
+            <header>
+              <h3>Temperatur</h3>
+            </header>
+            <canvas></canvas>
+          </article>
+          <article class="chart-card skeleton" data-chart="rel. Feuchte">
+            <header>
+              <h3>rel. Feuchte</h3>
+            </header>
+            <canvas></canvas>
+          </article>
+          <article class="chart-card skeleton" data-chart="TVOC">
+            <header>
+              <h3>TVOC</h3>
+            </header>
+            <canvas></canvas>
+          </article>
+          <article class="chart-card skeleton optional" data-chart="Luftdruck">
+            <header>
+              <h3>Luftdruck</h3>
+            </header>
+            <canvas></canvas>
+          </article>
+        </div>
+      </section>
+    </main>
 
-  <div id="status-bar" class="status-bar" role="status" aria-live="polite">
-    <span id="status-text" data-state="ok">Bereit</span>
+    <footer class="app-footer">
+      <p>Bereit für Offline & Push – AirGuard Dashboard</p>
+    </footer>
+  </div>
+
+  <div class="toast" role="status" aria-live="polite" hidden>
+    <span class="toast-text"></span>
+    <button type="button" class="toast-close" aria-label="Schließen">×</button>
   </div>
 </body>
 </html>

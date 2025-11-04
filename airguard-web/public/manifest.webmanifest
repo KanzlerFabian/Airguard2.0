@@ -1,0 +1,17 @@
+{
+  "name": "AirGuard Dashboard",
+  "short_name": "AirGuard",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#00bcd4",
+  "description": "Installierbares Dashboard zur Überwachung der Innenraum-Luftqualität.",
+  "icons": [
+    {
+      "src": "./assets/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
