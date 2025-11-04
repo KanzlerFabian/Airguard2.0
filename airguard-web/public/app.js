@@ -8,7 +8,9 @@
     return;
   }
 
-  Chart.register(...Chart.registerables);
+  if (Array.isArray(Chart.registerables)) {
+    Chart.register(...Chart.registerables);
+  }
   Chart.defaults.font.family = "'Inter','Segoe UI',system-ui,sans-serif";
   Chart.defaults.color = '#6b7280';
   Chart.defaults.plugins.legend.labels.usePointStyle = true;
