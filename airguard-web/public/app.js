@@ -613,10 +613,35 @@
       if (!payload || !payload.ok) {
         throw new Error(payload?.error || `Serie ${metric} ungültig`);
       }
-      const values = Array.isArray(payload.data?.values) ? payload.data.values : [];
-      const points = values
-        .map((row) => ({ x: row[0] * 1000, y: Number(row[1]) }))
-        .filter((point) => Number.isFinite(point.y));
+      const rawEntries = Array.isArray(payload.data?.values)
+        ? payload.data.values
+        : Array.isArray(payload.data)
+          ? payload.data
+          : [];
+      const points = rawEntries
+        .map((entry) => {
+          if (Array.isArray(entry)) {
+            const [ts, rawValue] = entry;
+            const timestamp = Number(ts);
+            const value = Number(rawValue);
+            if (!Number.isFinite(timestamp) || !Number.isFinite(value)) {
+              return null;
+            }
+            const x = timestamp > 1e12 ? timestamp : timestamp * 1000;
+            return { x, y: value };
+          }
+          if (entry && typeof entry === 'object') {
+            const timestamp = Number(entry.x);
+            const value = Number(entry.y);
+            if (!Number.isFinite(timestamp) || !Number.isFinite(value)) {
+              return null;
+            }
+            const x = timestamp > 1e12 ? timestamp : timestamp * 1000;
+            return { x, y: value };
+          }
+          return null;
+        })
+        .filter((point) => point && Number.isFinite(point.y));
       return [metric, points];
     });
 
