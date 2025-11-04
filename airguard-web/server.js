@@ -14,7 +14,13 @@ const METRICS = [
   { key: 'PM1.0', label: 'PM1.0', unit: '\u00b5g/m\u00b3', decimals: 1 },
   { key: 'PM2.5', label: 'PM2.5', unit: '\u00b5g/m\u00b3', decimals: 1 },
   { key: 'PM10', label: 'PM10', unit: '\u00b5g/m\u00b3', decimals: 1 },
-  { key: 'Temperatur', label: 'Temperatur', unit: '\u00b0C', decimals: 1 },
+  {
+    key: 'Temperatur',
+    label: 'Temperatur',
+    unit: '\u00b0C',
+    decimals: 1,
+    promName: 'temperatur__bme_kalibriert_'
+  },
   { key: 'rel. Feuchte', label: 'rel. Feuchte', unit: '%', decimals: 1 },
   { key: 'Luftdruck', label: 'Luftdruck', unit: 'hPa', decimals: 1 },
   { key: 'TVOC', label: 'TVOC', unit: 'ppb', decimals: 0 },
@@ -22,7 +28,13 @@ const METRICS = [
   { key: 'Farbtemperatur', label: 'Farbtemperatur', unit: 'K', decimals: 0 }
 ];
 
-const METRIC_LOOKUP = new Map(METRICS.map((metric) => [metric.key, metric]));
+const METRIC_LOOKUP = new Map();
+for (const metric of METRICS) {
+  METRIC_LOOKUP.set(metric.key, metric);
+  if (metric.promName && metric.promName !== metric.key) {
+    METRIC_LOOKUP.set(metric.promName, metric);
+  }
+}
 
 const PORT = Number.parseInt(process.env.PORT || '', 10) || 8088;
 const PROM_URL = (process.env.PROM_URL || 'http://127.0.0.1:9090').replace(/\/+$/, '');
@@ -133,7 +145,8 @@ app.get('/api/now', async (req, res, next) => {
     const data = {};
 
     for (const metric of METRICS) {
-      const match = results.find((entry) => entry?.metric?.name === metric.key);
+      const promName = metric.promName || metric.key;
+      const match = results.find((entry) => entry?.metric?.name === promName);
       if (!match || !Array.isArray(match.value) || match.value.length < 2) {
         data[metric.key] = null;
         continue;
@@ -215,8 +228,9 @@ app.get('/api/series', async (req, res, next) => {
 
     const endSeconds = Math.floor(Date.now() / 1000);
     const startSeconds = Math.max(0, endSeconds - rangeSeconds);
-    const promName = escapePromString(name);
-    const baseQuery = `esphome_sensor_value{name="${promName}"}`;
+    const promMetricName = metric.promName || metric.key;
+    const promNameEscaped = escapePromString(promMetricName);
+    const baseQuery = `esphome_sensor_value{name="${promNameEscaped}"}`;
     const seriesQuery = `avg_over_time(${baseQuery}[${windowLiteral}])`;
 
     const payload = await fetchPrometheus('query_range', {
