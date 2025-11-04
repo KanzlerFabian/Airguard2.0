@@ -3,7 +3,6 @@
 const path = require('path');
 const express = require('express');
 const compression = require('compression');
-const helmet = require('helmet');
 
 if (typeof fetch !== 'function') {
   throw new Error('Global fetch API not available. Please run with Node.js v18 or newer.');
@@ -29,18 +28,6 @@ const PROM_URL = (process.env.PROM_URL || 'http://127.0.0.1:9090').replace(/\/+$
 const PROM_TIMEOUT_MS = Number.parseInt(process.env.PROM_TIMEOUT_MS || '', 10) || 8000;
 const MAX_RANGE_SECONDS = Number.parseInt(process.env.MAX_RANGE_SECONDS || '', 10) || 30 * 24 * 60 * 60;
 
-const cspDirectives = {
-  defaultSrc: ["'self'"],
-  scriptSrc: ["'self'"],
-  styleSrc: ["'self'"],
-  imgSrc: ["'self'", 'data:'],
-  fontSrc: ["'self'"],
-  connectSrc: ["'self'"],
-  objectSrc: ["'none'"],
-  baseUri: ["'self'"],
-  frameAncestors: ["'none'"]
-};
-
 
 const app = express();
 app.set('trust proxy', true);
@@ -53,13 +40,6 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(
-  helmet({
-    contentSecurityPolicy: {
-      directives: cspDirectives
-    }
-  })
-);
 app.use(compression());
 
 app.use(
