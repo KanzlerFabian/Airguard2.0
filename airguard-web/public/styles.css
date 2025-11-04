@@ -426,7 +426,7 @@ a {
   padding: var(--space-4);
   display: grid;
   gap: var(--space-3);
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto minmax(0, 1fr);
   box-shadow: 0 12px 32px rgba(15, 23, 42, 0.07);
   min-width: 0;
   overflow: hidden;
@@ -437,10 +437,23 @@ a {
   gap: var(--space-1);
 }
 
-.chart-card canvas {
+.chart-canvas {
+  position: relative;
   width: 100%;
+  min-height: 220px;
   max-width: 100%;
   height: clamp(220px, 35vw, 320px);
+  max-height: 320px;
+  display: flex;
+}
+
+.chart-card canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100%;
+  border-radius: inherit;
+  flex: 1;
 }
 
 .chart-sub {
