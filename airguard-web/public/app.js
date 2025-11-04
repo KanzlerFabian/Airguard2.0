@@ -615,7 +615,7 @@
       if (!payload || !payload.ok) {
         throw new Error(payload?.error || `Serie ${metric} ungültig`);
       }
-      const values = Array.isArray(payload.data?.values) ? payload.data.values : [];
+      const values = normalizeSeriesValues(payload.data);
       const points = values
         .map((row) => ({ x: row[0] * 1000, y: Number(row[1]) }))
         .filter((point) => Number.isFinite(point.y));
@@ -624,6 +624,33 @@
 
     const entries = await Promise.all(promises);
     return Object.fromEntries(entries);
+  }
+
+  function normalizeSeriesValues(raw) {
+    if (!raw) return [];
+    const values = Array.isArray(raw?.values) ? raw.values : raw;
+    if (!Array.isArray(values)) return [];
+
+    const normalized = values
+      .map((entry) => {
+        if (!entry) return null;
+        if (Array.isArray(entry) && entry.length >= 2) {
+          return [Number(entry[0]), Number(entry[1])];
+        }
+        if (typeof entry === 'object') {
+          const ts = 'x' in entry ? Number(entry.x) : Number(entry.ts);
+          const val = 'y' in entry ? Number(entry.y) : Number(entry.value);
+          if (Number.isFinite(ts) && Number.isFinite(val)) {
+            return [ts, val];
+          }
+        }
+        return null;
+      })
+      .filter((entry) => Array.isArray(entry) && Number.isFinite(entry[0]) && Number.isFinite(entry[1]));
+    const containsMilliseconds = normalized.some((entry) => entry[0] > 1e11);
+    return containsMilliseconds
+      ? normalized.map(([ts, val]) => [ts / 1000, val])
+      : normalized;
   }
 
   function smoothSeries(series) {
@@ -666,7 +693,7 @@
       const response = await fetch(`./api/series?${params.toString()}`);
       if (!response.ok) return;
       const payload = await response.json();
-      const values = Array.isArray(payload?.data?.values) ? payload.data.values : [];
+      const values = normalizeSeriesValues(payload?.data);
       if (values.length >= 2) {
         const first = Number(values[0][1]);
         const last = Number(values[values.length - 1][1]);
