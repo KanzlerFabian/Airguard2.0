@@ -228,8 +228,7 @@ app.get('/api/series', async (req, res, next) => {
 
     const endSeconds = Math.floor(Date.now() / 1000);
     const startSeconds = Math.max(0, endSeconds - rangeSeconds);
-    const promMetricName = metric.promName || metric.key;
-    const promNameEscaped = escapePromString(promMetricName);
+    const promNameEscaped = escapePromString(metric.key);
     const baseQuery = `esphome_sensor_value{name="${promNameEscaped}"}`;
     const seriesQuery = `avg_over_time(${baseQuery}[${windowLiteral}])`;
 
