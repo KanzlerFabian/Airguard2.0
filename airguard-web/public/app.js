@@ -57,7 +57,7 @@ const METRICS = [
   },
   {
     key: 'Temperatur',
-    label: 'Temp',
+    label: 'room_temp',
     unit: '\u00b0C',
     decimals: 1,
     summary: true,
