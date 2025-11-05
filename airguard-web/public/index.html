@@ -12,7 +12,45 @@
   <script defer src="./lib/chartjs-adapter-date-fns.bundle.min.js"></script>
   <script defer src="./app.js"></script>
 </head>
-<body>
+  <body>
+  <svg class="icon-sprite" aria-hidden="true">
+    <symbol id="icon-cloud" viewBox="0 0 24 24">
+      <path d="M7.5 19a4.5 4.5 0 0 1 0-9 5.5 5.5 0 0 1 10.8-1.6A4 4 0 0 1 18 19z" fill="currentColor" />
+    </symbol>
+    <symbol id="icon-dots" viewBox="0 0 24 24">
+      <circle cx="6" cy="6" r="2.4" fill="currentColor" />
+      <circle cx="12" cy="6" r="2.4" fill="currentColor" />
+      <circle cx="18" cy="6" r="2.4" fill="currentColor" />
+      <circle cx="6" cy="12" r="2.4" fill="currentColor" />
+      <circle cx="12" cy="12" r="2.4" fill="currentColor" />
+      <circle cx="18" cy="12" r="2.4" fill="currentColor" />
+      <circle cx="6" cy="18" r="2.4" fill="currentColor" />
+      <circle cx="12" cy="18" r="2.4" fill="currentColor" />
+      <circle cx="18" cy="18" r="2.4" fill="currentColor" />
+    </symbol>
+    <symbol id="icon-flask" viewBox="0 0 24 24">
+      <path d="M9 3.5h6v1.6l-1.6 2.4v4.2l4.6 7a1.6 1.6 0 0 1-1.3 2.6H7.3A1.6 1.6 0 0 1 6 18.7l4.6-7V7.5L9 5.1z" fill="currentColor" />
+    </symbol>
+    <symbol id="icon-thermometer" viewBox="0 0 24 24">
+      <path d="M13.2 14.9V5.6a1.2 1.2 0 0 0-2.4 0v9.3a3.5 3.5 0 1 0 2.4 0z" fill="currentColor" />
+      <path d="M10.8 6h2.4v2.2h-2.4z" fill="currentColor" />
+    </symbol>
+    <symbol id="icon-droplet" viewBox="0 0 24 24">
+      <path d="M12 3.2C9.2 7 6 10.5 6 14a6 6 0 0 0 12 0c0-3.5-3.2-7-6-10.8z" fill="currentColor" />
+    </symbol>
+    <symbol id="icon-gauge" viewBox="0 0 24 24">
+      <path d="M12 4a9 9 0 1 0 9 9h-3a6 6 0 1 1-12 0H3a9 9 0 0 0 9-9z" fill="currentColor" />
+      <path d="M12 7a1 1 0 0 0-1 1v5.4l-2.1 2.1a1 1 0 1 0 1.4 1.4l2.5-2.5a1 1 0 0 0 .3-.7V8a1 1 0 0 0-1-1z" fill="#fff" />
+    </symbol>
+    <symbol id="icon-sun" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="4.5" fill="currentColor" />
+      <path d="M12 2.5a1.2 1.2 0 0 1 1.2 1.2v1.2A1.2 1.2 0 0 1 12 6a1.2 1.2 0 0 1-1.2-1.2V3.7A1.2 1.2 0 0 1 12 2.5zm0 16.5a1.2 1.2 0 0 1 1.2 1.2v1.1a1.2 1.2 0 1 1-2.4 0v-1.1A1.2 1.2 0 0 1 12 19zm9.5-7a1.2 1.2 0 0 1-1.2 1.2h-1.1a1.2 1.2 0 0 1 0-2.4h1.1a1.2 1.2 0 0 1 1.2 1.2zm-16.5 0a1.2 1.2 0 0 1-1.2 1.2H2.7a1.2 1.2 0 0 1 0-2.4h1.1a1.2 1.2 0 0 1 1.2 1.2zm13.9 5.3a1.2 1.2 0 0 1 0 1.7l-.8.8a1.2 1.2 0 0 1-1.7-1.7l.8-.8a1.2 1.2 0 0 1 1.7 0zM7.6 6.5a1.2 1.2 0 0 1 0 1.7l-.8.8A1.2 1.2 0 0 1 5 7.3l.8-.8a1.2 1.2 0 0 1 1.7 0zm0 10.9-1 .9a1.2 1.2 0 0 1-1.7-1.7l.9-1a1.2 1.2 0 1 1 1.7 1.7zm10.9-10.9a1.2 1.2 0 0 1-1.7 0l-.8-.8a1.2 1.2 0 0 1 1.7-1.7l.8.8a1.2 1.2 0 0 1 0 1.7z" fill="currentColor" />
+    </symbol>
+    <symbol id="icon-gradient-sun" viewBox="0 0 24 24">
+      <path d="M12 4a8 8 0 1 1-7.7 6.1h6.6V4.3A8 8 0 0 1 12 4z" fill="currentColor" />
+      <path d="M13 4.2v5.9h5.9A8 8 0 0 0 13 4.2z" fill="currentColor" opacity="0.65" />
+    </symbol>
+  </svg>
   <div class="app-shell">
     <header class="hero" aria-labelledby="hero-title">
       <div class="hero-left">
@@ -21,6 +59,12 @@
         <div class="health-card" role="status" aria-live="polite">
           <div class="health-ring" aria-hidden="true">
             <svg viewBox="0 0 120 120">
+              <defs>
+                <linearGradient id="health-gradient" x1="0" y1="1" x2="1" y2="0">
+                  <stop offset="0%" stop-color="#06b6d4" />
+                  <stop offset="100%" stop-color="#10b981" />
+                </linearGradient>
+              </defs>
               <circle class="health-bg" cx="60" cy="60" r="54"></circle>
               <circle class="health-progress" cx="60" cy="60" r="54" stroke-dasharray="339.292" stroke-dashoffset="339.292"></circle>
             </svg>
@@ -30,6 +74,7 @@
             </div>
           </div>
           <p id="health-detail" class="health-detail">Werte werden geladen …</p>
+          <p id="offline-indicator" class="offline-indicator" hidden>Offline – letzte Daten unbekannt</p>
         </div>
         <div class="hero-actions">
           <button id="install-btn" type="button" class="ghost-btn" hidden>App installieren</button>
@@ -39,25 +84,37 @@
       <div class="hero-right" aria-labelledby="hero-metrics-title">
         <h2 id="hero-metrics-title" class="section-title">Kernwerte</h2>
         <div class="mini-metric-grid">
-          <article class="mini-card skeleton" data-metric="CO2">
-            <h3>CO₂</h3>
-            <p class="mini-value">—</p>
-            <span class="mini-unit">ppm</span>
+          <article class="mini-card skeleton" data-metric="CO2" data-chart-target="CO2">
+            <span class="mini-icon" aria-hidden="true"><svg><use href="#icon-cloud" /></svg></span>
+            <div class="mini-meta">
+              <h3>CO₂</h3>
+              <p class="mini-value">—</p>
+              <span class="mini-unit">ppm</span>
+            </div>
           </article>
-          <article class="mini-card skeleton" data-metric="PM2.5">
-            <h3>PM2.5</h3>
-            <p class="mini-value">—</p>
-            <span class="mini-unit">µg/m³</span>
+          <article class="mini-card skeleton" data-metric="PM2.5" data-chart-target="PM">
+            <span class="mini-icon" aria-hidden="true"><svg><use href="#icon-dots" /></svg></span>
+            <div class="mini-meta">
+              <h3>PM2.5</h3>
+              <p class="mini-value">—</p>
+              <span class="mini-unit">µg/m³</span>
+            </div>
           </article>
-          <article class="mini-card skeleton" data-metric="TVOC">
-            <h3>TVOC</h3>
-            <p class="mini-value">—</p>
-            <span class="mini-unit">ppb</span>
+          <article class="mini-card skeleton" data-metric="TVOC" data-chart-target="TVOC">
+            <span class="mini-icon" aria-hidden="true"><svg><use href="#icon-flask" /></svg></span>
+            <div class="mini-meta">
+              <h3>TVOC</h3>
+              <p class="mini-value">—</p>
+              <span class="mini-unit">ppb</span>
+            </div>
           </article>
-          <article class="mini-card skeleton" data-metric="rel. Feuchte">
-            <h3>rel. Feuchte</h3>
-            <p class="mini-value">—</p>
-            <span class="mini-unit">%</span>
+          <article class="mini-card skeleton" data-metric="rel. Feuchte" data-chart-target="rel. Feuchte">
+            <span class="mini-icon" aria-hidden="true"><svg><use href="#icon-droplet" /></svg></span>
+            <div class="mini-meta">
+              <h3>rel. Feuchte</h3>
+              <p class="mini-value">—</p>
+              <span class="mini-unit">%</span>
+            </div>
           </article>
         </div>
         <p class="hero-update">Letzte Aktualisierung: <time id="last-updated">—</time></p>
@@ -71,53 +128,83 @@
           <p>Aktuelle Werte mit Komfort- und Qualitätsbewertung</p>
         </div>
         <div class="status-grid">
-          <article class="status-card skeleton" data-metric="CO2">
+          <article class="status-card skeleton" data-metric="CO2" data-chart-target="CO2">
             <header>
-              <h3>CO₂</h3>
-              <span class="badge" data-tone="neutral">Lädt …</span>
+              <span class="metric-icon" aria-hidden="true"><svg><use href="#icon-cloud" /></svg></span>
+              <div class="metric-head">
+                <h3>CO₂</h3>
+                <span class="badge" data-tone="neutral">Lädt …</span>
+              </div>
+              <span class="trend" aria-live="polite">—</span>
             </header>
-            <p class="status-value">— <span class="unit">ppm</span></p>
+            <p class="status-value"><span class="value">—</span> <span class="unit">ppm</span></p>
             <p class="status-note">—</p>
+            <p class="status-tip">—</p>
           </article>
-          <article class="status-card skeleton" data-metric="PM2.5">
+          <article class="status-card skeleton" data-metric="PM2.5" data-chart-target="PM">
             <header>
-              <h3>PM2.5</h3>
-              <span class="badge" data-tone="neutral">Lädt …</span>
+              <span class="metric-icon" aria-hidden="true"><svg><use href="#icon-dots" /></svg></span>
+              <div class="metric-head">
+                <h3>PM2.5</h3>
+                <span class="badge" data-tone="neutral">Lädt …</span>
+              </div>
+              <span class="trend" aria-live="polite">—</span>
             </header>
-            <p class="status-value">— <span class="unit">µg/m³</span></p>
+            <p class="status-value"><span class="value">—</span> <span class="unit">µg/m³</span></p>
             <p class="status-note">—</p>
+            <p class="status-tip">—</p>
           </article>
-          <article class="status-card skeleton" data-metric="TVOC">
+          <article class="status-card skeleton" data-metric="TVOC" data-chart-target="TVOC">
             <header>
-              <h3>TVOC</h3>
-              <span class="badge" data-tone="neutral">Lädt …</span>
+              <span class="metric-icon" aria-hidden="true"><svg><use href="#icon-flask" /></svg></span>
+              <div class="metric-head">
+                <h3>TVOC</h3>
+                <span class="badge" data-tone="neutral">Lädt …</span>
+              </div>
+              <span class="trend" aria-live="polite">—</span>
             </header>
-            <p class="status-value">— <span class="unit">ppb</span></p>
+            <p class="status-value"><span class="value">—</span> <span class="unit">ppb</span></p>
             <p class="status-note">—</p>
+            <p class="status-tip">—</p>
           </article>
-          <article class="status-card skeleton" data-metric="Temperatur">
+          <article class="status-card skeleton" data-metric="Temperatur" data-chart-target="Temperatur">
             <header>
-              <h3>Temperatur</h3>
-              <span class="badge" data-tone="neutral">Lädt …</span>
+              <span class="metric-icon" aria-hidden="true"><svg><use href="#icon-thermometer" /></svg></span>
+              <div class="metric-head">
+                <h3>Temperatur</h3>
+                <span class="badge" data-tone="neutral">Lädt …</span>
+              </div>
+              <span class="trend" aria-live="polite">—</span>
             </header>
-            <p class="status-value">— <span class="unit">°C</span></p>
+            <p class="status-value"><span class="value">—</span> <span class="unit">°C</span></p>
             <p class="status-note">—</p>
+            <p class="status-tip">—</p>
           </article>
-          <article class="status-card skeleton" data-metric="rel. Feuchte">
+          <article class="status-card skeleton" data-metric="rel. Feuchte" data-chart-target="rel. Feuchte">
             <header>
-              <h3>rel. Feuchte</h3>
-              <span class="badge" data-tone="neutral">Lädt …</span>
+              <span class="metric-icon" aria-hidden="true"><svg><use href="#icon-droplet" /></svg></span>
+              <div class="metric-head">
+                <h3>rel. Feuchte</h3>
+                <span class="badge" data-tone="neutral">Lädt …</span>
+              </div>
+              <span class="trend" aria-live="polite">—</span>
             </header>
-            <p class="status-value">— <span class="unit">%</span></p>
+            <p class="status-value"><span class="value">—</span> <span class="unit">%</span></p>
             <p class="status-note">—</p>
+            <p class="status-tip">—</p>
           </article>
-          <article class="status-card skeleton optional" data-metric="Luftdruck">
+          <article class="status-card skeleton optional" data-metric="Luftdruck" data-chart-target="Luftdruck">
             <header>
-              <h3>Luftdruck</h3>
+              <span class="metric-icon" aria-hidden="true"><svg><use href="#icon-gauge" /></svg></span>
+              <div class="metric-head">
+                <h3>Luftdruck</h3>
+                <span class="badge" data-tone="neutral">Trend</span>
+              </div>
               <span class="trend" aria-live="polite">Trend wird ermittelt …</span>
             </header>
-            <p class="status-value">— <span class="unit">hPa</span></p>
+            <p class="status-value"><span class="value">—</span> <span class="unit">hPa</span></p>
             <p class="status-note">—</p>
+            <p class="status-tip">—</p>
           </article>
         </div>
       </section>
@@ -127,28 +214,41 @@
           <h2 id="circadian-heading">Circadian Light</h2>
           <p>Optimierte Beleuchtung nach Tageszeit</p>
         </div>
-        <article class="circadian-card skeleton">
+        <article class="circadian-card skeleton" data-chart-target="Circadian">
           <div class="circadian-main">
-            <div>
+            <span class="circadian-icon" aria-hidden="true"><svg><use href="#icon-gradient-sun" /></svg></span>
+            <div class="circadian-copy">
               <p class="circadian-phase">Phase wird geladen …</p>
               <h3 class="circadian-status">—</h3>
               <p class="circadian-tip">—</p>
             </div>
           </div>
-          <dl class="circadian-meta">
-            <div>
-              <dt>Aktuell</dt>
-              <dd id="lux-now">— lx</dd>
+          <div class="circadian-bars">
+            <div class="bar-group">
+              <div class="bar-label">CCT</div>
+              <div class="bar-track" data-kind="cct">
+                <span class="bar-range"></span>
+                <span class="bar-marker"></span>
+              </div>
+              <div class="bar-meta">
+                <span id="cct-now">— K</span>
+                <span id="cct-target">Ziel —</span>
+                <span><span id="cct-eval" class="badge" data-tone="neutral">—</span></span>
+              </div>
             </div>
-            <div>
-              <dt>Zielbereich</dt>
-              <dd id="lux-target">—</dd>
+            <div class="bar-group">
+              <div class="bar-label">Lux</div>
+              <div class="bar-track" data-kind="lux">
+                <span class="bar-range"></span>
+                <span class="bar-marker"></span>
+              </div>
+              <div class="bar-meta">
+                <span id="lux-now">— lx</span>
+                <span id="lux-target">Ziel —</span>
+                <span><span id="lux-eval" class="badge" data-tone="neutral">—</span></span>
+              </div>
             </div>
-            <div>
-              <dt>Bewertung</dt>
-              <dd><span id="lux-eval" class="badge" data-tone="neutral">—</span></dd>
-            </div>
-          </dl>
+          </div>
         </article>
       </section>
 
@@ -163,7 +263,7 @@
           <button type="button" role="tab" aria-selected="false" class="tab" data-range="30d">30 Tage</button>
         </nav>
         <div class="chart-grid">
-          <article class="chart-card skeleton" data-chart="CO2">
+          <article class="chart-card skeleton" id="chart-CO2" data-chart="CO2">
             <header>
               <h3>CO₂</h3>
             </header>
@@ -171,7 +271,7 @@
               <canvas></canvas>
             </div>
           </article>
-          <article class="chart-card skeleton" data-chart="PM">
+          <article class="chart-card skeleton" id="chart-PM" data-chart="PM">
             <header>
               <h3>Feinstaub</h3>
               <p class="chart-sub">PM1.0 / PM2.5 / PM10</p>
@@ -180,7 +280,7 @@
               <canvas></canvas>
             </div>
           </article>
-          <article class="chart-card skeleton" data-chart="Temperatur">
+          <article class="chart-card skeleton" id="chart-Temperatur" data-chart="Temperatur">
             <header>
               <h3>Temperatur</h3>
             </header>
@@ -188,7 +288,7 @@
               <canvas></canvas>
             </div>
           </article>
-          <article class="chart-card skeleton" data-chart="rel. Feuchte">
+          <article class="chart-card skeleton" id="chart-rel.-Feuchte" data-chart="rel. Feuchte">
             <header>
               <h3>rel. Feuchte</h3>
             </header>
@@ -196,7 +296,7 @@
               <canvas></canvas>
             </div>
           </article>
-          <article class="chart-card skeleton" data-chart="TVOC">
+          <article class="chart-card skeleton" id="chart-TVOC" data-chart="TVOC">
             <header>
               <h3>TVOC</h3>
             </header>
@@ -204,7 +304,7 @@
               <canvas></canvas>
             </div>
           </article>
-          <article class="chart-card skeleton optional" data-chart="Luftdruck">
+          <article class="chart-card skeleton optional" id="chart-Luftdruck" data-chart="Luftdruck">
             <header>
               <h3>Luftdruck</h3>
             </header>

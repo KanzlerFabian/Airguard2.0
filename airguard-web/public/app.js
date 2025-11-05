@@ -22,6 +22,62 @@
   const NOW_REFRESH_MS = 60_000;
   const CHART_REFRESH_MS = 300_000;
   const PRESSURE_REFRESH_MS = 600_000;
+  const MAX_POINTS = 600;
+  const CCT_RANGE = { min: 1800, max: 7000 };
+  const LUX_RANGE = { min: 0, max: 1100 };
+
+  const CHART_ANCHORS = {
+    CO2: 'chart-CO2',
+    PM: 'chart-PM',
+    'PM2.5': 'chart-PM',
+    Temperatur: 'chart-Temperatur',
+    'rel. Feuchte': 'chart-rel.-Feuchte',
+    TVOC: 'chart-TVOC',
+    Luftdruck: 'chart-Luftdruck'
+  };
+
+  const CIRCADIAN_PHASES = [
+    {
+      key: 'wake',
+      title: 'Aufwachen',
+      window: '06–09 Uhr',
+      context: 'Morgen',
+      cctRange: [4500, 6500],
+      luxRange: [250, 500]
+    },
+    {
+      key: 'work',
+      title: 'Arbeiten',
+      window: '09–17 Uhr',
+      context: 'Fokus',
+      cctRange: [5000, 6500],
+      luxRange: [500, 1000]
+    },
+    {
+      key: 'winddown',
+      title: 'Wind-down',
+      window: '17–20 Uhr',
+      context: 'Abend',
+      cctRange: [3000, 4000],
+      luxRange: [100, 300]
+    },
+    {
+      key: 'pre-sleep',
+      title: 'Vor Schlaf',
+      window: '20–23 Uhr',
+      context: 'Vor dem Schlafen',
+      cctRange: [2200, 3200],
+      luxRange: [0, 100]
+    },
+    {
+      key: 'sleep',
+      title: 'Schlaf',
+      window: '23–06 Uhr',
+      context: 'Nacht',
+      cctRange: [2000, 2700],
+      luxRange: [0, 10]
+    }
+  ];
 
   const TIME_RANGES = {
     '24h': { label: '24 h', range: '24h', step: '120s', win: '5m', samples: 28 },
@@ -37,6 +93,7 @@
     'rel. Feuchte': { unit: '%', decimals: 0, label: 'rel. Feuchte' },
     Lux: { unit: 'lx', decimals: 0, label: 'Lux' },
     Luftdruck: { unit: 'hPa', decimals: 1, label: 'Luftdruck' },
+    Farbtemperatur: { unit: 'K', decimals: 0, label: 'CCT' },
     'PM1.0': { unit: 'µg/m³', decimals: 1, label: 'PM1.0' },
     PM10: { unit: 'µg/m³', decimals: 1, label: 'PM10' }
   };
@@ -45,35 +102,35 @@
     {
       key: 'CO2',
       metrics: ['CO2'],
-      colors: ['#ef4444'],
+      colors: ['#10b981'],
       yTitle: 'ppm',
       yBounds: { min: 0, max: 2500 }
     },
     {
       key: 'PM',
       metrics: ['PM1.0', 'PM2.5', 'PM10'],
-      colors: ['#22d3ee', '#2563eb', '#0f766e'],
+      colors: ['#06b6d4', '#3b82f6', '#0f766e'],
       yTitle: 'µg/m³',
       yBounds: { min: 0, max: 100 }
     },
     {
       key: 'Temperatur',
       metrics: ['Temperatur'],
-      colors: ['#fb923c'],
+      colors: ['#f97316'],
       yTitle: '°C',
       yBounds: { min: -10, max: 40 }
     },
     {
       key: 'rel. Feuchte',
       metrics: ['rel. Feuchte'],
-      colors: ['#0ea5e9'],
+      colors: ['#06b6d4'],
       yTitle: '%',
       yBounds: { min: 0, max: 100 }
     },
     {
       key: 'TVOC',
       metrics: ['TVOC'],
-      colors: ['#8b5cf6'],
+      colors: ['#3b82f6'],
       yTitle: 'ppb',
       yBounds: { min: 0, max: 1000 }
     },
@@ -97,7 +154,9 @@
     pressureTrend: null,
     deferredPrompt: null,
     notifyReady: supportsNotification && Notification.permission !== 'granted',
-    alertFired: false
+    alertFired: false,
+    offline: !navigator.onLine,
+    lastUpdatedTs: null
   };
 
   const ui = {
@@ -110,13 +169,19 @@
     healthLabel: null,
     healthDetail: null,
     healthProgress: null,
+    offlineIndicator: null,
     circadianCard: null,
     circadianPhase: null,
     circadianStatus: null,
     circadianTip: null,
+    cctNow: null,
+    cctTarget: null,
+    cctEval: null,
+    barCct: null,
     luxNow: null,
     luxTarget: null,
     luxEval: null,
+    barLux: null,
     rangeTabs: [],
     installBtn: null,
     notifyBtn: null,
@@ -130,6 +195,9 @@
     registerServiceWorker();
     setupInstallPrompt();
     setupNotifications();
+    updateOfflineState();
+    window.addEventListener('online', updateOfflineState);
+    window.addEventListener('offline', updateOfflineState);
     buildChartShells();
     refreshAll(true).catch(handleError);
     setupTimers();
@@ -146,13 +214,19 @@
     ui.healthLabel = document.getElementById('health-label');
     ui.healthDetail = document.getElementById('health-detail');
     ui.healthProgress = document.querySelector('.health-progress');
+    ui.offlineIndicator = document.getElementById('offline-indicator');
     ui.circadianCard = document.querySelector('.circadian-card');
     ui.circadianPhase = document.querySelector('.circadian-phase');
     ui.circadianStatus = document.querySelector('.circadian-status');
     ui.circadianTip = document.querySelector('.circadian-tip');
+    ui.cctNow = document.getElementById('cct-now');
+    ui.cctTarget = document.getElementById('cct-target');
+    ui.cctEval = document.getElementById('cct-eval');
+    ui.barCct = document.querySelector('.bar-track[data-kind="cct"]');
     ui.luxNow = document.getElementById('lux-now');
     ui.luxTarget = document.getElementById('lux-target');
     ui.luxEval = document.getElementById('lux-eval');
+    ui.barLux = document.querySelector('.bar-track[data-kind="lux"]');
     ui.installBtn = document.getElementById('install-btn');
     ui.notifyBtn = document.getElementById('notify-btn');
     ui.toast = document.querySelector('.toast');
@@ -163,12 +237,14 @@
     miniCards.forEach((card) => {
       const metric = card.getAttribute('data-metric');
       ui.heroCards.set(metric, card);
+      attachCardScroll(card);
     });
 
     const statusCards = document.querySelectorAll('.status-card');
     statusCards.forEach((card) => {
       const metric = card.getAttribute('data-metric');
       ui.statusCards.set(metric, card);
+      attachCardScroll(card);
     });
 
     const chartCards = document.querySelectorAll('.chart-card');
@@ -177,6 +253,10 @@
       ui.chartCards.set(key, card);
       ui.chartCanvases.set(key, card.querySelector('canvas'));
     });
+
+    if (ui.circadianCard) {
+      attachCardScroll(ui.circadianCard, 'Circadian');
+    }
 
     ui.rangeTabs = Array.from(document.querySelectorAll('.range-tabs .tab'));
     ui.rangeTabs.forEach((tab) => {
@@ -195,12 +275,41 @@
     }
   }
 
-  function ensureTextNode(container) {
-    if (!container) return null;
-    if (!container.firstChild || container.firstChild.nodeType !== Node.TEXT_NODE) {
-      container.insertBefore(document.createTextNode(''), container.firstChild || null);
+  function updateOfflineState() {
+    state.offline = !navigator.onLine;
+    if (!ui.offlineIndicator) return;
+    if (state.offline) {
+      const ts = state.lastUpdatedTs;
+      const text = ts ? new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'unbekannt';
+      ui.offlineIndicator.textContent = `Offline – letzte Daten von ${text}`;
+      ui.offlineIndicator.hidden = false;
+    } else {
+      ui.offlineIndicator.hidden = true;
     }
-    return container.firstChild;
+  }
+
+  function attachCardScroll(card, explicitKey) {
+    if (!card) return;
+    const key = explicitKey || card.getAttribute('data-chart-target') || card.getAttribute('data-metric');
+    if (!key) return;
+    const anchorId = CHART_ANCHORS[key] || CHART_ANCHORS[key?.trim?.()] || null;
+    const section = key === 'Circadian' ? document.querySelector('.circadian-section') : null;
+    if (!anchorId && !section) return;
+    card.tabIndex = 0;
+    card.setAttribute('role', 'button');
+    card.addEventListener('click', () => scrollToTarget(anchorId, section));
+    card.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        scrollToTarget(anchorId, section);
+      }
+    });
+  }
+
+  function scrollToTarget(anchorId, section) {
+    const target = anchorId ? document.getElementById(anchorId) : section;
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function setupTimers() {
@@ -241,7 +350,7 @@
   function normalizeNowData(raw) {
     const mapped = {};
     for (const [key, value] of Object.entries(raw)) {
-      if (!value) continue;
+      if (value == null) continue;
       mapped[key] = value;
     }
     return mapped;
@@ -253,6 +362,10 @@
     ui.lastUpdated.textContent = isNaN(date.getTime())
       ? '—'
       : `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
+    if (!isNaN(date.getTime())) {
+      state.lastUpdatedTs = date.getTime();
+    }
+    updateOfflineState();
   }
 
   function updateHero(data) {
@@ -267,12 +380,15 @@
         card.querySelector('.mini-value').textContent = '—';
         card.querySelector('.mini-unit').textContent = config.unit;
         card.classList.add('ready');
+        card.dataset.intent = 'neutral';
         return;
       }
+      const status = determineStatus(metric, sample.value);
       card.querySelector('.mini-value').textContent = formatNumber(sample.value, config.decimals);
       card.querySelector('.mini-unit').textContent = config.unit;
       card.classList.add('ready');
-      statuses[metric] = determineStatus(metric, sample.value);
+      card.dataset.intent = status.intent || status.tone || 'neutral';
+      statuses[metric] = status;
     });
 
     updateHealthCard(statuses);
@@ -280,45 +396,85 @@
 
   function determineStatus(metric, value) {
     if (!isFinite(value)) {
-      return { tone: 'neutral', label: 'n/v', note: '' };
+      return { tone: 'neutral', intent: 'neutral', label: 'n/v', note: '', tip: '' };
     }
 
     switch (metric) {
       case 'CO2':
-        if (value <= 800) return { tone: 'good', label: 'Hervorragend', note: 'Luft sehr frisch.' };
-        if (value <= 1000) return { tone: 'good', label: 'Gut', note: 'Alles im grünen Bereich.' };
-        if (value <= 1500) return { tone: 'mid', label: 'Mittel', note: 'Lüften empfohlen.' };
-        return { tone: 'bad', label: 'Schlecht', note: 'Bitte sofort lüften.' };
+        if (value <= 800) {
+          return buildStatus('excellent', 'Hervorragend', 'Luft sehr frisch.', 'Kein Handlungsbedarf.');
+        }
+        if (value <= 1000) {
+          return buildStatus('good', 'Gut', 'Werte stabil.', 'Regelmäßig weiter lüften.');
+        }
+        if (value <= 1500) {
+          return buildStatus('elevated', 'Erhöht', 'Konzentration nimmt ab.', 'Jetzt lüften empfohlen.');
+        }
+        return buildStatus('poor', 'Schlecht', 'Sehr hohe CO₂-Belastung.', 'Fenster öffnen oder Lüftung aktivieren.');
       case 'PM2.5':
-        if (value <= 15) return { tone: 'good', label: 'Gut', note: 'Feinstaub unkritisch.' };
-        if (value <= 35) return { tone: 'ok', label: 'Mittel', note: 'Leichte Belastung.' };
-        if (value <= 55) return { tone: 'mid', label: 'Warnung', note: 'Belastung steigt.' };
-        return { tone: 'bad', label: 'Schlecht', note: 'Hohe Feinstaubbelastung.' };
+        if (value <= 10) {
+          return buildStatus('excellent', 'Hervorragend', 'Partikel kaum messbar.', 'Saubere Luft – weiter so.');
+        }
+        if (value <= 15) {
+          return buildStatus('good', 'Gut', 'Feinstaub niedrig.', 'Sanft lüften, um es so zu halten.');
+        }
+        if (value <= 35) {
+          return buildStatus('elevated', 'Mittel', 'Belastung steigt leicht.', 'Luftreiniger prüfen & lüften.');
+        }
+        return buildStatus('poor', 'Schlecht', 'Hohe Partikelbelastung.', 'Sofort lüften oder Filter aktivieren.');
       case 'TVOC':
-        if (value <= 150) return { tone: 'good', label: 'Hervorragend', note: 'Kaum VOC-Belastung.' };
-        if (value <= 300) return { tone: 'good', label: 'Gut', note: 'Alles ok.' };
-        if (value <= 1000) return { tone: 'mid', label: 'Mittel', note: 'Lüften sinnvoll.' };
-        return { tone: 'bad', label: 'Schlecht', note: 'Starke VOC-Belastung.' };
+        if (value <= 200) {
+          return buildStatus('excellent', 'Hervorragend', 'Kaum VOC-Belastung.', 'Keine Aktion nötig.');
+        }
+        if (value <= 400) {
+          return buildStatus('good', 'Gut', 'Werte unkritisch.', 'Regelmäßig lüften hält die Luft frisch.');
+        }
+        if (value <= 1000) {
+          return buildStatus('elevated', 'Erhöht', 'Flüchtige Stoffe nehmen zu.', 'Quellen prüfen & lüften.');
+        }
+        return buildStatus('poor', 'Schlecht', 'Hohe VOC-Belastung.', 'Sofort lüften und Quellen entfernen.');
       case 'Temperatur':
-        if (value < 19) return { tone: 'mid', label: 'kühl', note: 'Etwas wärmer stellen.' };
-        if (value <= 24) return { tone: 'good', label: 'ok', note: 'Komfortbereich.' };
-        if (value <= 27) return { tone: 'ok', label: 'warm', note: 'Leicht erhöht.' };
-        return { tone: 'bad', label: 'zu heiß', note: 'Abkühlen empfohlen.' };
+        if (value < 18) {
+          return buildStatus('cool', 'Kühl', 'Raumtemperatur niedrig.', 'Heizung leicht erhöhen.');
+        }
+        if (value < 20) {
+          return buildStatus('cool', 'Frisch', 'Etwas kühl.', 'Sanft nachheizen möglich.');
+        }
+        if (value <= 23) {
+          return buildStatus('good', 'Komfort', 'Wohlfühlbereich erreicht.', 'Perfekt für Alltag & Fokus.');
+        }
+        if (value <= 26) {
+          return buildStatus('elevated', 'Warm', 'Leicht erhöht.', 'Leicht abkühlen oder lüften.');
+        }
+        return buildStatus('warm', 'Sehr warm', 'Hitze belastet den Schlaf.', 'Aktiv kühlen oder beschatten.');
       case 'rel. Feuchte':
-        if (value < 30) return { tone: 'mid', label: 'trocken', note: 'Luft zu trocken.' };
-        if (value <= 60) return { tone: 'good', label: 'ok', note: 'Optimale Luftfeuchte.' };
-        return { tone: 'mid', label: 'feucht', note: 'Luftfeuchte senken.' };
+        if (value < 30) {
+          return buildStatus('dry', 'Trocken', 'Luft zu trocken.', 'Luft befeuchten oder Pflanzen gießen.');
+        }
+        if (value <= 60) {
+          return buildStatus('good', 'Ok', 'Optimale Luftfeuchte.', 'Weiter regelmäßig lüften.');
+        }
+        if (value <= 70) {
+          return buildStatus('humid', 'Feucht', 'Leicht erhöht.', 'Stoßlüften und trocknen.');
+        }
+        return buildStatus('poor', 'Sehr feucht', 'Schimmelrisiko steigt.', 'Entfeuchten oder stärker lüften.');
       default:
-        return { tone: 'neutral', label: '', note: '' };
+        return { tone: 'neutral', intent: 'neutral', label: '', note: '', tip: '' };
     }
+  }
+
+  function buildStatus(intent, label, note, tip) {
+    return { intent, tone: intent, label, note, tip };
   }
 
   function updateHealthCard(statuses) {
     if (!ui.healthScore || !ui.healthLabel || !ui.healthDetail || !ui.healthProgress) return;
-    const score = computeHealthScore(statuses);
-    const label = score >= 85 ? 'Ausgezeichnet' : score >= 70 ? 'Gut' : score >= 50 ? 'Mittel' : 'Schlecht';
+    const score = computeHealthScore();
+    const tone = score >= 80 ? 'excellent' : score >= 60 ? 'good' : score >= 30 ? 'elevated' : 'poor';
+    const label = score >= 80 ? 'Ausgezeichnet' : score >= 60 ? 'Gut' : score >= 30 ? 'Mittel' : 'Schlecht';
     ui.healthScore.textContent = String(score);
     ui.healthLabel.textContent = label;
+    ui.healthLabel.style.color = toneToColor(tone);
 
     const detail = ['CO2', 'PM2.5', 'TVOC', 'rel. Feuchte']
       .filter((metric) => statuses[metric])
@@ -328,72 +484,205 @@
 
     const dashoffset = CIRCUMFERENCE * (1 - score / 100);
     ui.healthProgress.setAttribute('stroke-dashoffset', dashoffset.toFixed(2));
+    ui.healthProgress.style.stroke = tone === 'excellent' ? 'url(#health-gradient)' : toneToColor(tone);
   }
 
   function metricLabel(metric) {
     return METRIC_CONFIG[metric]?.label || metric;
   }
 
-  function computeHealthScore(statuses) {
-    let score = 100;
-
-    const co2 = statuses.CO2 ? state.now?.CO2?.value : null;
-    if (isFinite(co2)) {
-      if (co2 > 2000) score -= 40;
-      else if (co2 > 1500) score -= 25;
-      else if (co2 > 1000) score -= 10;
+  function computeHealthScore() {
+    const weights = { CO2: 0.35, 'PM2.5': 0.3, 'rel. Feuchte': 0.2, TVOC: 0.15 };
+    let weightedScore = 0;
+    let weightSum = 0;
+    for (const [metric, weight] of Object.entries(weights)) {
+      const value = state.now?.[metric]?.value;
+      if (!isFinite(value)) continue;
+      const metricScore = evaluateMetricScore(metric, value);
+      weightedScore += metricScore * weight;
+      weightSum += weight;
     }
+    if (weightSum === 0) return 0;
+    return Math.max(0, Math.min(100, Math.round(weightedScore / weightSum)));
+  }
 
-    const pm = state.now?.['PM2.5']?.value;
-    if (isFinite(pm)) {
-      if (pm > 55) score -= 35;
-      else if (pm > 35) score -= 20;
-      else if (pm > 15) score -= 10;
+  function evaluateMetricScore(metric, value) {
+    switch (metric) {
+      case 'CO2':
+        if (value <= 800) return 100;
+        if (value <= 1000) return 85;
+        if (value <= 1500) return 55;
+        if (value <= 2000) return 35;
+        return 10;
+      case 'PM2.5':
+        if (value <= 10) return 100;
+        if (value <= 15) return 85;
+        if (value <= 35) return 55;
+        if (value <= 55) return 35;
+        return 10;
+      case 'TVOC':
+        if (value <= 200) return 100;
+        if (value <= 400) return 80;
+        if (value <= 1000) return 50;
+        if (value <= 1500) return 30;
+        return 10;
+      case 'rel. Feuchte': {
+        if (value >= 30 && value <= 60) return 100;
+        if ((value >= 27 && value < 30) || (value > 60 && value <= 65)) return 70;
+        if ((value >= 24 && value < 27) || (value > 65 && value <= 70)) return 45;
+        return 20;
+      }
+      default:
+        return 50;
     }
+  }
 
-    const tvoc = state.now?.TVOC?.value;
-    if (isFinite(tvoc)) {
-      if (tvoc > 1000) score -= 25;
-      else if (tvoc > 300) score -= 15;
-      else if (tvoc > 150) score -= 5;
+  function toneToColor(tone) {
+    const palette = {
+      excellent: '#10b981',
+      good: '#22c55e',
+      elevated: '#f59e0b',
+      dry: '#f59e0b',
+      humid: '#06b6d4',
+      poor: '#ef4444',
+      warm: '#f97316',
+      cool: '#3b82f6',
+      neutral: '#94a3b8'
+    };
+    return palette[tone] || '#06b6d4';
+  }
+
+  function computeTrend(metric) {
+    const mapping = getTrendMapping(metric);
+    if (!mapping) {
+      return null;
     }
-
-    const rh = state.now?.['rel. Feuchte']?.value;
-    if (isFinite(rh)) {
-      if (rh < 25 || rh > 65) score -= 15;
-      else if (rh < 30 || rh > 60) score -= 10;
+    const cacheKey = `${mapping.chartKey}_${state.range.range}`;
+    const cached = state.chartDataCache.get(cacheKey);
+    const series = cached?.[mapping.metricKey];
+    if (!Array.isArray(series) || series.length < 2) {
+      return { symbol: '→', text: '→ stabil' };
     }
+    const last = series[series.length - 1];
+    if (!last || !isFinite(last.y)) {
+      return { symbol: '→', text: '→ stabil' };
+    }
+    const thresholdMs = 30 * 60 * 1000;
+    let reference = series[0];
+    for (let index = series.length - 2; index >= 0; index--) {
+      const candidate = series[index];
+      if (!candidate) continue;
+      reference = candidate;
+      if (last.x - candidate.x >= thresholdMs) {
+        break;
+      }
+    }
+    if (!reference || !isFinite(reference.y)) {
+      return { symbol: '→', text: '→ stabil' };
+    }
+    const diff = last.y - reference.y;
+    const threshold = getTrendThreshold(metric);
+    let symbol = '→';
+    if (diff > threshold) symbol = '↑';
+    else if (diff < -threshold) symbol = '↓';
+    const diffText = formatTrendDiff(metric, diff);
+    return { symbol, text: `${symbol} ${diffText}` };
+  }
 
-    return Math.max(0, Math.min(100, Math.round(score)));
+  function getTrendMapping(metric) {
+    if (metric === 'PM2.5' || metric === 'PM1.0' || metric === 'PM10') {
+      return { chartKey: 'PM', metricKey: metric };
+    }
+    if (CHART_ANCHORS[metric]) {
+      return { chartKey: metric, metricKey: metric };
+    }
+    return null;
+  }
+
+  function getTrendThreshold(metric) {
+    const thresholds = {
+      CO2: 50,
+      'PM2.5': 3,
+      TVOC: 40,
+      Temperatur: 0.3,
+      'rel. Feuchte': 1.5
+    };
+    return thresholds[metric] ?? 0.1;
+  }
+
+  function formatTrendDiff(metric, diff) {
+    const config = METRIC_CONFIG[metric];
+    let decimals = config?.decimals ?? 1;
+    if (decimals === 0 && Math.abs(diff) < 1) {
+      decimals = 1;
+    }
+    const magnitude = Math.abs(diff);
+    const formatted = formatNumber(magnitude, decimals);
+    const prefix = diff > 0 ? '+' : diff < 0 ? '−' : '±';
+    const unit = config?.unit ? ` ${config.unit}` : '';
+    return `${prefix}${formatted}${unit} / 30 min`;
+  }
+
+  function colorWithAlpha(color, alpha) {
+    if (!color) return `rgba(6, 182, 212, ${alpha})`;
+    if (color.startsWith('#')) {
+      const hex = color.replace('#', '');
+      if (hex.length === 3) {
+        const r = parseInt(hex[0], 16) * 17;
+        const g = parseInt(hex[1], 16) * 17;
+        const b = parseInt(hex[2], 16) * 17;
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      }
+      if (hex.length === 6) {
+        const r = parseInt(hex.slice(0, 2), 16);
+        const g = parseInt(hex.slice(2, 4), 16);
+        const b = parseInt(hex.slice(4, 6), 16);
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      }
+    }
+    return color;
   }
 
   function updateStatusCards(data) {
     ui.statusCards.forEach((card, metric) => {
+      if (metric === 'Luftdruck') {
+        return;
+      }
       const sample = data[metric];
-      const valueEl = card.querySelector('.status-value');
+      const valueEl = card.querySelector('.status-value .value');
       const unitEl = card.querySelector('.unit');
       const noteEl = card.querySelector('.status-note');
+      const tipEl = card.querySelector('.status-tip');
       const badge = card.querySelector('.badge');
-      const textNode = ensureTextNode(valueEl);
+      const trendEl = card.querySelector('.trend');
       const config = METRIC_CONFIG[metric];
 
       if (!config) return;
       unitEl.textContent = config.unit;
 
       if (!sample || !isFinite(sample.value)) {
-        if (textNode) textNode.textContent = '— ';
+        if (valueEl) valueEl.textContent = '—';
         if (noteEl) noteEl.textContent = 'Keine Daten verfügbar.';
+        if (tipEl) tipEl.textContent = '';
         if (badge) {
           badge.dataset.tone = 'neutral';
           badge.textContent = 'Keine Daten';
         }
+        card.dataset.intent = 'neutral';
+        if (trendEl) trendEl.textContent = '—';
       } else {
         const status = determineStatus(metric, sample.value);
-        if (textNode) textNode.textContent = `${formatNumber(sample.value, config.decimals)} `;
+        if (valueEl) valueEl.textContent = formatNumber(sample.value, config.decimals);
         if (noteEl) noteEl.textContent = status.note;
+        if (tipEl) tipEl.textContent = status.tip;
         if (badge) {
           badge.dataset.tone = status.tone || 'neutral';
           badge.textContent = status.label;
+        }
+        card.dataset.intent = status.intent || status.tone || 'neutral';
+        const trend = computeTrend(metric);
+        if (trendEl) {
+          trendEl.textContent = trend?.text || '→ stabil';
         }
       }
       card.classList.add('ready');
@@ -411,78 +700,165 @@
       return;
     }
     card.hidden = false;
-    const valueEl = card.querySelector('.status-value');
+    const valueEl = card.querySelector('.status-value .value');
     const unitEl = card.querySelector('.unit');
     const noteEl = card.querySelector('.status-note');
     const trendEl = card.querySelector('.trend');
-    const textNode = ensureTextNode(valueEl);
-    if (textNode) {
-      textNode.textContent = `${formatNumber(sample.value, METRIC_CONFIG['Luftdruck'].decimals)} `;
+    const tipEl = card.querySelector('.status-tip');
+    const badge = card.querySelector('.badge');
+    if (valueEl) {
+      valueEl.textContent = formatNumber(sample.value, METRIC_CONFIG['Luftdruck'].decimals);
     }
     unitEl.textContent = METRIC_CONFIG['Luftdruck'].unit;
+    const trend = state.pressureTrend;
     if (trendEl) {
-      const trend = state.pressureTrend;
-      if (trend) {
-        trendEl.textContent = `${trend.symbol} ${trend.text}`;
-        if (noteEl) noteEl.textContent = trend.note;
-      } else {
-        trendEl.textContent = 'Trend wird ermittelt …';
-        if (noteEl) noteEl.textContent = 'Daten sammeln …';
-      }
+      trendEl.textContent = trend ? `${trend.symbol} ${trend.text}` : 'Trend wird ermittelt …';
     }
+    if (noteEl) {
+      noteEl.textContent = trend ? trend.note : 'Daten sammeln …';
+    }
+    if (tipEl) {
+      tipEl.textContent = trend ? 'Trend aktualisiert alle 3 h.' : '';
+    }
+    if (badge) {
+      badge.dataset.tone = 'neutral';
+      badge.textContent = 'Trend';
+    }
+    card.dataset.intent = 'neutral';
     card.classList.add('ready');
   }
 
   function updateCircadian(data) {
     if (!ui.circadianCard) return;
+    const cctSample = data.Farbtemperatur;
+    const cctValue = cctSample && isFinite(cctSample.value) ? cctSample.value : null;
     const luxSample = data.Lux;
     const luxValue = luxSample && isFinite(luxSample.value) ? luxSample.value : null;
     const phase = resolveCircadianPhase();
-    const evaluation = evaluateCircadian(luxValue, phase);
+    const evaluation = evaluateCircadian(cctValue, luxValue, phase);
 
-    ui.circadianPhase.textContent = phase.title;
-    ui.circadianStatus.textContent = evaluation.status;
+    ui.circadianPhase.textContent = `${phase.title} • ${phase.window}`;
+    ui.circadianStatus.textContent = evaluation.cctStatus;
     ui.circadianTip.textContent = evaluation.tip;
+    ui.cctNow.textContent = cctValue != null ? `${formatNumber(cctValue, 0)} K` : '— K';
+    ui.cctTarget.textContent = `Ziel ${phase.cctRange[0]}–${phase.cctRange[1]} K`;
+    ui.cctEval.dataset.tone = evaluation.cctTone;
+    ui.cctEval.textContent = evaluation.cctLabel;
     ui.luxNow.textContent = luxValue != null ? `${formatNumber(luxValue, 0)} lx` : '— lx';
-    ui.luxTarget.textContent = `${phase.range[0]}–${phase.range[1]} lx`;
-    ui.luxEval.dataset.tone = evaluation.tone;
-    ui.luxEval.textContent = evaluation.label;
+    ui.luxTarget.textContent = `Ziel ${phase.luxRange[0]}–${phase.luxRange[1]} lx`;
+    ui.luxEval.dataset.tone = evaluation.luxTone;
+    ui.luxEval.textContent = evaluation.luxLabel;
 
+    updateBarTrack(ui.barCct, cctValue, phase.cctRange, CCT_RANGE, evaluation.cctTone);
+    updateBarTrack(ui.barLux, luxValue, phase.luxRange, LUX_RANGE, evaluation.luxTone);
+
+    ui.circadianCard.dataset.intent = evaluation.cctTone;
     ui.circadianCard.classList.add('ready');
   }
 
   function resolveCircadianPhase() {
     const now = new Date();
     const hour = now.getHours() + now.getMinutes() / 60;
-    const phases = [
-      { start: 6, end: 9, title: 'Aufwachen', range: [250, 500], tip: 'Helles Licht hilft beim Wachwerden.' },
-      { start: 9, end: 17, title: 'Arbeiten', range: [500, 1000], tip: 'Klares, helles Licht unterstützt den Fokus.' },
-      { start: 17, end: 20, title: 'Wind-down', range: [100, 300], tip: 'Etwas dimmen für einen entspannten Abend.' },
-      { start: 20, end: 23, title: 'Vor Schlaf', range: [0, 100], tip: 'Nur noch sanftes Licht verwenden.' },
-      { start: 23, end: 24, title: 'Schlaf', range: [0, 10], tip: 'Dunkelheit fördert die Regeneration.' },
-      { start: 0, end: 6, title: 'Schlaf', range: [0, 10], tip: 'Lichtquellen minimieren.' }
-    ];
-
-    return phases.find((phase) => {
-      if (phase.start <= phase.end) {
-        return hour >= phase.start && hour < phase.end;
-      }
-      return hour >= phase.start || hour < phase.end;
-    }) || phases[0];
+    return (
+      CIRCADIAN_PHASES.find((phase, index) => {
+        const next = CIRCADIAN_PHASES[(index + 1) % CIRCADIAN_PHASES.length];
+        const start = parsePhaseStart(phase.window);
+        const end = parsePhaseStart(next.window);
+        if (start <= end) {
+          return hour >= start && hour < end;
+        }
+        return hour >= start || hour < end;
+      }) || CIRCADIAN_PHASES[0]
+    );
   }
 
-  function evaluateCircadian(lux, phase) {
+  function evaluateCircadian(cct, lux, phase) {
+    const [cctMin, cctMax] = phase.cctRange;
+    const [luxMin, luxMax] = phase.luxRange;
+    let cctLabel;
+    let cctTone;
+    let cctStatus;
+    let actionText;
+
+    if (cct == null) {
+      cctLabel = 'keine Daten';
+      cctTone = 'neutral';
+      cctStatus = 'CCT unbekannt';
+      actionText = 'CCT Sensor prüfen';
+    } else if (cct < cctMin) {
+      cctLabel = 'zu kalt';
+      cctTone = 'cool';
+      cctStatus = 'CCT zu kalt';
+      actionText = 'wärmer stellen';
+    } else if (cct > cctMax) {
+      cctLabel = 'zu warm';
+      cctTone = 'warm';
+      cctStatus = 'CCT zu warm';
+      actionText = 'kühler einstellen';
+    } else {
+      cctLabel = 'im Ziel';
+      cctTone = 'excellent';
+      cctStatus = 'CCT im Ziel';
+      actionText = 'Licht passt';
+    }
+
+    let luxLabel;
+    let luxTone;
     if (lux == null) {
-      return { tone: 'neutral', label: 'keine Daten', status: 'Lichtpegel unbekannt', tip: 'Sensor überprüfen.' };
+      luxLabel = 'keine Daten';
+      luxTone = 'neutral';
+    } else if (lux < luxMin) {
+      luxLabel = 'zu dunkel';
+      luxTone = 'cool';
+    } else if (lux > luxMax) {
+      luxLabel = 'zu hell';
+      luxTone = 'warm';
+    } else {
+      luxLabel = 'ok';
+      luxTone = 'excellent';
     }
-    const [min, max] = phase.range;
-    if (lux < min) {
-      return { tone: 'mid', label: 'zu dunkel', status: 'Mehr Licht empfohlen', tip: phase.tip };
+
+    const luxText = lux != null
+      ? `Lux ${formatNumber(lux, 0)} → Ziel ${luxMin}–${luxMax}`
+      : 'Lux Sensor prüfen';
+    const tip = `${phase.context}: ${actionText}${luxText ? `, ${luxText}` : ''}`;
+
+    return {
+      cctStatus,
+      cctLabel,
+      cctTone,
+      luxLabel,
+      luxTone,
+      tip
+    };
+  }
+
+  function updateBarTrack(track, value, targetRange, bounds, tone) {
+    if (!track) return;
+    const span = bounds.max - bounds.min;
+    const startPercent = ((targetRange[0] - bounds.min) / span) * 100;
+    const endPercent = ((targetRange[1] - bounds.min) / span) * 100;
+    track.style.setProperty('--target-start', `${clamp(startPercent, 0, 100)}%`);
+    track.style.setProperty('--target-end', `${clamp(endPercent, 0, 100)}%`);
+    if (value == null || !isFinite(value)) {
+      track.dataset.state = 'hidden';
+      track.style.setProperty('--marker-pos', '-999%');
+    } else {
+      const markerPercent = ((value - bounds.min) / span) * 100;
+      track.style.setProperty('--marker-pos', `${clamp(markerPercent, 0, 100)}%`);
+      track.dataset.state = 'visible';
     }
-    if (lux > max) {
-      return { tone: 'mid', label: 'zu hell', status: 'Licht reduzieren', tip: phase.tip };
-    }
-    return { tone: 'good', label: 'ok', status: 'Circadian im Ziel', tip: phase.tip };
+    track.dataset.intent = tone || 'neutral';
+  }
+
+  function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+  }
+
+  function parsePhaseStart(windowLabel) {
+    const match = windowLabel.match(/^(\d{2})/);
+    if (!match) return 0;
+    return Number(match[1]);
   }
 
   function formatNumber(value, decimals) {
@@ -511,9 +887,9 @@
       label: METRIC_CONFIG[metric]?.label || metric,
       data: [],
       borderColor: definition.colors[index % definition.colors.length],
-      backgroundColor: definition.colors[index % definition.colors.length],
+      backgroundColor: colorWithAlpha(definition.colors[index % definition.colors.length], 0.12),
       tension: 0.35,
-      fill: false,
+      fill: 'start',
       pointRadius: 0,
       borderWidth: 2,
       spanGaps: true,
@@ -523,7 +899,7 @@
       decimation: {
         enabled: true,
         algorithm: 'lttb',
-        samples: definition.samples || state.range.samples
+        samples: MAX_POINTS
       }
     }));
 
@@ -535,7 +911,7 @@
         maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
         plugins: {
-          legend: { labels: { color: '#374151' } },
+          legend: { labels: { color: '#475569', boxWidth: 12, boxHeight: 12 } },
           tooltip: {
             callbacks: {
               label(context) {
@@ -551,14 +927,14 @@
           x: {
             type: 'time',
             time: { unit: 'hour', tooltipFormat: 'dd.MM.yyyy HH:mm' },
-            ticks: { maxRotation: 0, maxTicksLimit: 6, color: '#9ca3af' },
+            ticks: { maxRotation: 0, maxTicksLimit: 6, color: '#94a3b8' },
             grid: { display: false, drawBorder: false },
             border: { display: false }
           },
           y: {
             title: { display: true, text: definition.yTitle, color: '#9ca3af' },
-            ticks: { color: '#9ca3af' },
-            grid: { display: false, drawBorder: false },
+            ticks: { color: '#94a3b8' },
+            grid: { color: 'rgba(148, 163, 184, 0.15)', drawBorder: false },
             border: { display: false },
             suggestedMin: definition.yBounds?.min,
             suggestedMax: definition.yBounds?.max
@@ -621,7 +997,7 @@
       const points = values
         .map((row) => ({ x: row[0] * 1000, y: Number(row[1]) }))
         .filter((point) => Number.isFinite(point.y));
-      return [metric, points];
+      return [metric, limitPoints(points)];
     });
 
     const entries = await Promise.all(promises);
@@ -658,10 +1034,32 @@
   function smoothSeries(series) {
     const result = {};
     for (const [metric, points] of Object.entries(series)) {
-      const windowSize = Math.max(3, Math.round(points.length / 30));
+      const windowSize = resolveWindowSize(points.length);
       result[metric] = movingAverage(points, windowSize);
     }
     return result;
+  }
+
+  function resolveWindowSize(length) {
+    if (length > 400) return 7;
+    if (length > 120) return 6;
+    return 5;
+  }
+
+  function limitPoints(points) {
+    if (!Array.isArray(points) || points.length <= MAX_POINTS) {
+      return points;
+    }
+    const step = Math.ceil(points.length / MAX_POINTS);
+    const limited = [];
+    for (let index = 0; index < points.length; index += step) {
+      limited.push(points[index]);
+    }
+    const lastPoint = points[points.length - 1];
+    if (limited[limited.length - 1] !== lastPoint) {
+      limited.push(lastPoint);
+    }
+    return limited;
   }
 
   function movingAverage(points, windowSize) {
@@ -684,7 +1082,7 @@
     definition.metrics.forEach((metric, index) => {
       const points = data[metric] || [];
       chart.data.datasets[index].data = points;
-      chart.data.datasets[index].decimation.samples = state.range.samples;
+      chart.data.datasets[index].decimation.samples = MAX_POINTS;
       points.forEach((point) => {
         if (!point) return;
         const value = Number(point.y);
