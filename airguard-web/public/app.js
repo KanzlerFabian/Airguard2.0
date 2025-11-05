@@ -26,16 +26,6 @@
   const CCT_RANGE = { min: 1800, max: 7000 };
   const LUX_RANGE = { min: 0, max: 1100 };
 
-  const CHART_ANCHORS = {
-    CO2: 'chart-CO2',
-    PM: 'chart-PM',
-    'PM2.5': 'chart-PM',
-    Temperatur: 'chart-Temperatur',
-    'rel. Feuchte': 'chart-rel.-Feuchte',
-    TVOC: 'chart-TVOC',
-    Luftdruck: 'chart-Luftdruck'
-  };
-
   const CIRCADIAN_PHASES = [
     {
       key: 'wake',
@@ -98,55 +88,92 @@
     PM10: { unit: 'µg/m³', decimals: 1, label: 'PM10' }
   };
 
-  const CHART_DEFINITIONS = [
-    {
+  const CHART_DEFINITIONS = {
+    CO2: {
       key: 'CO2',
+      title: 'CO₂',
       metrics: ['CO2'],
       colors: ['#10b981'],
       yTitle: 'ppm',
       yBounds: { min: 0, max: 2500 }
     },
-    {
+    PM: {
       key: 'PM',
+      title: 'Feinstaub',
+      sub: 'PM1.0 / PM2.5 / PM10',
       metrics: ['PM1.0', 'PM2.5', 'PM10'],
       colors: ['#06b6d4', '#3b82f6', '#0f766e'],
       yTitle: 'µg/m³',
       yBounds: { min: 0, max: 100 }
     },
-    {
+    Temperatur: {
       key: 'Temperatur',
+      title: 'Temperatur',
       metrics: ['Temperatur'],
       colors: ['#f97316'],
       yTitle: '°C',
       yBounds: { min: -10, max: 40 }
     },
-    {
+    'rel. Feuchte': {
       key: 'rel. Feuchte',
+      title: 'rel. Feuchte',
       metrics: ['rel. Feuchte'],
       colors: ['#06b6d4'],
       yTitle: '%',
       yBounds: { min: 0, max: 100 }
     },
-    {
+    TVOC: {
       key: 'TVOC',
+      title: 'TVOC',
       metrics: ['TVOC'],
       colors: ['#3b82f6'],
       yTitle: 'ppb',
       yBounds: { min: 0, max: 1000 }
     },
-    {
+    Lux: {
+      key: 'Lux',
+      title: 'Beleuchtungsstärke',
+      metrics: ['Lux'],
+      colors: ['#facc15'],
+      yTitle: 'lx',
+      yBounds: { min: 0, max: 1200 }
+    },
+    Farbtemperatur: {
+      key: 'Farbtemperatur',
+      title: 'Farbtemperatur',
+      metrics: ['Farbtemperatur'],
+      colors: ['#38bdf8'],
+      yTitle: 'K',
+      yBounds: { min: 1800, max: 7000 }
+    },
+    Luftdruck: {
       key: 'Luftdruck',
+      title: 'Luftdruck',
       metrics: ['Luftdruck'],
       colors: ['#a855f7'],
       yTitle: 'hPa',
       yBounds: { min: 950, max: 1050 },
       optional: true
     }
-  ];
+  };
+
+  const METRIC_TO_CHART_KEY = {
+    CO2: 'CO2',
+    'PM1.0': 'PM',
+    'PM2.5': 'PM',
+    PM10: 'PM',
+    TVOC: 'TVOC',
+    Temperatur: 'Temperatur',
+    'rel. Feuchte': 'rel. Feuchte',
+    Lux: 'Lux',
+    Farbtemperatur: 'Farbtemperatur',
+    Luftdruck: 'Luftdruck'
+  };
+
+  const HERO_METRICS = ['CO2', 'PM2.5', 'TVOC', 'rel. Feuchte'];
 
   const state = {
     range: TIME_RANGES['24h'],
-    charts: new Map(),
     chartDataCache: new Map(),
     timers: [],
     now: null,
@@ -156,14 +183,16 @@
     notifyReady: supportsNotification && Notification.permission !== 'granted',
     alertFired: false,
     offline: !navigator.onLine,
-    lastUpdatedTs: null
+    lastUpdatedTs: null,
+    sparklines: new Map(),
+    modalChart: null,
+    modalMetric: null,
+    modalRangeKey: '24h'
   };
 
   const ui = {
     heroCards: new Map(),
     statusCards: new Map(),
-    chartCards: new Map(),
-    chartCanvases: new Map(),
     lastUpdated: null,
     healthScore: null,
     healthLabel: null,
@@ -182,12 +211,17 @@
     luxTarget: null,
     luxEval: null,
     barLux: null,
-    rangeTabs: [],
     installBtn: null,
     notifyBtn: null,
     toast: null,
     toastText: null,
-    toastClose: null
+    toastClose: null,
+    modalRoot: null,
+    modalTitle: null,
+    modalSub: null,
+    modalCanvas: null,
+    modalTabs: [],
+    modalCloseButtons: []
   };
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -198,7 +232,6 @@
     updateOfflineState();
     window.addEventListener('online', updateOfflineState);
     window.addEventListener('offline', updateOfflineState);
-    buildChartShells();
     refreshAll(true).catch(handleError);
     setupTimers();
     document.addEventListener('visibilitychange', () => {
@@ -206,6 +239,7 @@
         refreshAll(false).catch(handleError);
       }
     });
+    document.addEventListener('keydown', handleGlobalKeydown);
   });
 
   function cacheElements() {
@@ -236,39 +270,51 @@
     const miniCards = document.querySelectorAll('.mini-card');
     miniCards.forEach((card) => {
       const metric = card.getAttribute('data-metric');
+      if (!metric) return;
       ui.heroCards.set(metric, card);
-      attachCardScroll(card);
+      createSparkline(metric, card);
+      setupCardModalTrigger(card, metric);
     });
 
     const statusCards = document.querySelectorAll('.status-card');
     statusCards.forEach((card) => {
       const metric = card.getAttribute('data-metric');
+      if (!metric) return;
       ui.statusCards.set(metric, card);
-      attachCardScroll(card);
+      setupCardModalTrigger(card, metric);
     });
 
-    const chartCards = document.querySelectorAll('.chart-card');
-    chartCards.forEach((card) => {
-      const key = card.getAttribute('data-chart');
-      ui.chartCards.set(key, card);
-      ui.chartCanvases.set(key, card.querySelector('canvas'));
-    });
+    ui.modalRoot = document.getElementById('chart-modal');
+    ui.modalTitle = document.getElementById('chart-modal-title');
+    ui.modalSub = document.getElementById('chart-modal-sub');
+    ui.modalCanvas = document.getElementById('chart-modal-canvas');
+    ui.modalTabs = Array.from(document.querySelectorAll('.modal-tab'));
+    ui.modalCloseButtons = Array.from(document.querySelectorAll('[data-close="true"]'));
 
-    if (ui.circadianCard) {
-      attachCardScroll(ui.circadianCard, 'Circadian');
-    }
-
-    ui.rangeTabs = Array.from(document.querySelectorAll('.range-tabs .tab'));
-    ui.rangeTabs.forEach((tab) => {
+    ui.modalTabs.forEach((tab) => {
       tab.addEventListener('click', () => {
         if (tab.getAttribute('aria-selected') === 'true') return;
-        ui.rangeTabs.forEach((other) => other.setAttribute('aria-selected', 'false'));
+        ui.modalTabs.forEach((other) => other.setAttribute('aria-selected', 'false'));
         tab.setAttribute('aria-selected', 'true');
         const key = tab.getAttribute('data-range');
-        state.range = TIME_RANGES[key] || TIME_RANGES['24h'];
-        refreshCharts(true).catch(handleError);
+        state.modalRangeKey = key in TIME_RANGES ? key : '24h';
+        if (state.modalMetric) {
+          loadModalChart(state.modalMetric, true).catch(handleError);
+        }
       });
     });
+
+    ui.modalCloseButtons.forEach((button) => {
+      button.addEventListener('click', closeChartModal);
+    });
+
+    if (ui.modalRoot) {
+      ui.modalRoot.addEventListener('click', (event) => {
+        if (event.target?.dataset?.close === 'true') {
+          closeChartModal();
+        }
+      });
+    }
 
     if (ui.toastClose) {
       ui.toastClose.addEventListener('click', hideToast);
@@ -288,33 +334,71 @@
     }
   }
 
-  function attachCardScroll(card, explicitKey) {
-    if (!card) return;
-    const key = explicitKey || card.getAttribute('data-chart-target') || card.getAttribute('data-metric');
-    if (!key) return;
-    const anchorId = CHART_ANCHORS[key] || CHART_ANCHORS[key?.trim?.()] || null;
-    const section = key === 'Circadian' ? document.querySelector('.circadian-section') : null;
-    if (!anchorId && !section) return;
+  function setupCardModalTrigger(card, metric) {
+    if (!card || !metric) return;
+    const definition = getDefinitionForMetric(metric);
+    if (!definition) return;
     card.tabIndex = 0;
     card.setAttribute('role', 'button');
-    card.addEventListener('click', () => scrollToTarget(anchorId, section));
+    card.addEventListener('click', () => openChartModal(metric));
     card.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
-        scrollToTarget(anchorId, section);
+        openChartModal(metric);
       }
     });
   }
 
-  function scrollToTarget(anchorId, section) {
-    const target = anchorId ? document.getElementById(anchorId) : section;
-    if (!target) return;
-    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  function createSparkline(metric, card) {
+    if (!card) return;
+    const canvas = card.querySelector('.mini-chart canvas');
+    if (!canvas) return;
+    const definition = getDefinitionForMetric(metric);
+    if (!definition) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const color = definition.colors?.[0] || '#0ea5e9';
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        datasets: [
+          {
+            data: [],
+            borderColor: color,
+            backgroundColor: colorWithAlpha(color, 0.2),
+            tension: 0.4,
+            fill: 'start',
+            pointRadius: 0,
+            borderWidth: 2,
+            spanGaps: true
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { enabled: false }
+        },
+        scales: {
+          x: {
+            type: 'time',
+            display: false
+          },
+          y: {
+            display: false
+          }
+        }
+      }
+    });
+    state.sparklines.set(metric, chart);
   }
 
   function setupTimers() {
     state.timers.push(setInterval(() => refreshNow().catch(handleError), NOW_REFRESH_MS));
-    state.timers.push(setInterval(() => refreshCharts(false).catch(handleError), CHART_REFRESH_MS));
+    state.timers.push(setInterval(() => preloadSeries(true).catch(handleError), CHART_REFRESH_MS));
     state.timers.push(setInterval(() => refreshPressureTrend().catch(handleError), PRESSURE_REFRESH_MS));
     window.addEventListener('beforeunload', () => {
       state.timers.forEach((timer) => clearInterval(timer));
@@ -322,7 +406,7 @@
   }
 
   async function refreshAll(initial) {
-    await Promise.all([refreshNow(), refreshCharts(initial), refreshPressureTrend()]);
+    await Promise.all([refreshNow(), preloadSeries(true), refreshPressureTrend()]);
   }
 
   async function refreshNow() {
@@ -458,6 +542,31 @@
           return buildStatus('humid', 'Feucht', 'Leicht erhöht.', 'Stoßlüften und trocknen.');
         }
         return buildStatus('poor', 'Sehr feucht', 'Schimmelrisiko steigt.', 'Entfeuchten oder stärker lüften.');
+      case 'Lux':
+        if (value < 50) {
+          return buildStatus('cool', 'Sehr dunkel', 'Kaum Beleuchtung vorhanden.', 'Licht erhöhen oder Vorhänge öffnen.');
+        }
+        if (value <= 400) {
+          return buildStatus('good', 'Angenehm', 'Helles, aber sanftes Licht.', 'Beleuchtung beibehalten.');
+        }
+        if (value <= 800) {
+          return buildStatus('elevated', 'Hell', 'Sehr kräftiges Licht.', 'Blendungen reduzieren oder dimmen.');
+        }
+        return buildStatus('warm', 'Sehr hell', 'Extrem helle Umgebung.', 'Dimmen oder indirektes Licht nutzen.');
+      case 'Farbtemperatur':
+        if (value < 2600) {
+          return buildStatus('warm', 'Sehr warm', 'Licht wirkt stark warm.', 'Etwas kühler einstellen für Fokus.');
+        }
+        if (value < 3200) {
+          return buildStatus('warm', 'Warm', 'Gemütliches Warmweiß.', 'Ideal für Abend & Entspannung.');
+        }
+        if (value <= 5000) {
+          return buildStatus('good', 'Neutral', 'Ausgeglichenes Weißlicht.', 'Perfekt für Alltag & Arbeit.');
+        }
+        if (value <= 6500) {
+          return buildStatus('cool', 'Frisch', 'Kühles, aktivierendes Licht.', 'Gut für konzentriertes Arbeiten.');
+        }
+        return buildStatus('cool', 'Sehr kühl', 'Licht wirkt sehr kalt.', 'Für Wohlbefinden etwas wärmer stellen.');
       default:
         return { tone: 'neutral', intent: 'neutral', label: '', note: '', tip: '' };
     }
@@ -590,13 +699,9 @@
   }
 
   function getTrendMapping(metric) {
-    if (metric === 'PM2.5' || metric === 'PM1.0' || metric === 'PM10') {
-      return { chartKey: 'PM', metricKey: metric };
-    }
-    if (CHART_ANCHORS[metric]) {
-      return { chartKey: metric, metricKey: metric };
-    }
-    return null;
+    const chartKey = METRIC_TO_CHART_KEY[metric];
+    if (!chartKey) return null;
+    return { chartKey, metricKey: metric };
   }
 
   function getTrendThreshold(metric) {
@@ -605,7 +710,9 @@
       'PM2.5': 3,
       TVOC: 40,
       Temperatur: 0.3,
-      'rel. Feuchte': 1.5
+      'rel. Feuchte': 1.5,
+      Lux: 40,
+      Farbtemperatur: 120
     };
     return thresholds[metric] ?? 0.1;
   }
@@ -868,122 +975,33 @@
     });
   }
 
-  function buildChartShells() {
-    CHART_DEFINITIONS.forEach((definition) => {
-      const card = ui.chartCards.get(definition.key);
-      const canvas = ui.chartCanvases.get(definition.key);
-      if (!card || !canvas) return;
-      if (definition.optional) {
-        card.hidden = true;
-      }
-      const ctx = canvas.getContext('2d');
-      const chart = new Chart(ctx, createChartConfig(definition));
-      state.charts.set(definition.key, { chart, definition, card });
-    });
-  }
-
-  function createChartConfig(definition) {
-    const datasets = definition.metrics.map((metric, index) => ({
-      label: METRIC_CONFIG[metric]?.label || metric,
-      data: [],
-      borderColor: definition.colors[index % definition.colors.length],
-      backgroundColor: colorWithAlpha(definition.colors[index % definition.colors.length], 0.12),
-      tension: 0.35,
-      fill: 'start',
-      pointRadius: 0,
-      borderWidth: 2,
-      spanGaps: true,
-      segment: {
-        borderDash: () => []
-      },
-      decimation: {
-        enabled: true,
-        algorithm: 'lttb',
-        samples: MAX_POINTS
-      }
-    }));
-
-    return {
-      type: 'line',
-      data: { datasets },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: { labels: { color: '#475569', boxWidth: 12, boxHeight: 12 } },
-          tooltip: {
-            callbacks: {
-              label(context) {
-                const metric = definition.metrics[context.datasetIndex];
-                const cfg = METRIC_CONFIG[metric];
-                const formatted = formatNumber(context.parsed.y, cfg?.decimals || 0);
-                return `${context.dataset.label}: ${formatted} ${cfg?.unit || ''}`.trim();
-              }
-            }
-          }
-        },
-        scales: {
-          x: {
-            type: 'time',
-            time: { unit: 'hour', tooltipFormat: 'dd.MM.yyyy HH:mm' },
-            ticks: { maxRotation: 0, maxTicksLimit: 6, color: '#94a3b8' },
-            grid: { display: false, drawBorder: false },
-            border: { display: false }
-          },
-          y: {
-            title: { display: true, text: definition.yTitle, color: '#9ca3af' },
-            ticks: { color: '#94a3b8' },
-            grid: { color: 'rgba(148, 163, 184, 0.15)', drawBorder: false },
-            border: { display: false },
-            suggestedMin: definition.yBounds?.min,
-            suggestedMax: definition.yBounds?.max
-          }
-        }
-      }
-    };
-  }
-
-  async function refreshCharts(force) {
-    const tasks = [];
-    state.charts.forEach((entry) => {
-      tasks.push(loadChartData(entry, force));
-    });
-    await Promise.all(tasks);
-  }
-
-  async function loadChartData(entry, force) {
-    const { chart, definition, card } = entry;
-    const cacheKey = `${definition.key}_${state.range.range}`;
-    if (!force && state.chartDataCache.has(cacheKey)) {
-      const cached = state.chartDataCache.get(cacheKey);
-      applyChartData(chart, definition, cached);
-      const hasData = definition.metrics.some((metric) => (cached[metric] || []).length > 0);
-      card.hidden = definition.optional && !hasData;
-      if (!card.hidden) {
-        card.classList.add('ready');
-      }
-      return;
+  async function preloadSeries(force) {
+    const definitions = Object.values(CHART_DEFINITIONS).filter((definition) => !definition.optional);
+    await Promise.all(definitions.map((definition) => ensureSeries(definition, state.range, force)));
+    updateSparklines();
+    if (state.now) {
+      updateStatusCards(state.now);
     }
+  }
 
-    const series = await fetchSeries(definition.metrics);
+  async function ensureSeries(definition, range, force) {
+    const cacheKey = `${definition.key}_${range.range}`;
+    if (!force && state.chartDataCache.has(cacheKey)) {
+      return state.chartDataCache.get(cacheKey);
+    }
+    const series = await fetchSeries(definition.metrics, range);
     const smoothed = smoothSeries(series);
     state.chartDataCache.set(cacheKey, smoothed);
-    applyChartData(chart, definition, smoothed);
-    const hasData = definition.metrics.some((metric) => (smoothed[metric] || []).length > 0);
-    card.hidden = definition.optional && !hasData;
-    if (!card.hidden) {
-      card.classList.add('ready');
-    }
+    return smoothed;
   }
 
-  async function fetchSeries(metrics) {
+  async function fetchSeries(metrics, range = state.range) {
     const promises = metrics.map(async (metric) => {
       const params = new URLSearchParams({
         name: metric,
-        range: state.range.range,
-        step: state.range.step,
-        win: state.range.win
+        range: range.range,
+        step: range.step,
+        win: range.win
       });
       const response = await fetch(`./api/series?${params.toString()}`);
       if (!response.ok) {
@@ -1002,6 +1020,153 @@
 
     const entries = await Promise.all(promises);
     return Object.fromEntries(entries);
+  }
+
+  function updateSparklines() {
+    HERO_METRICS.forEach((metric) => {
+      const sparkline = state.sparklines.get(metric);
+      if (!sparkline) return;
+      const definition = getDefinitionForMetric(metric);
+      if (!definition) return;
+      const cacheKey = `${definition.key}_${state.range.range}`;
+      const cached = state.chartDataCache.get(cacheKey);
+      if (!cached) return;
+      const data = cached[metric] || [];
+      sparkline.data.datasets[0].data = data;
+      sparkline.update('none');
+      const tone = ui.heroCards.get(metric)?.dataset?.intent || 'neutral';
+      const color = definition.colors?.[0];
+      if (color) {
+        sparkline.data.datasets[0].borderColor = color;
+        sparkline.data.datasets[0].backgroundColor = colorWithAlpha(color, 0.2);
+      }
+      if (tone === 'warm') {
+        sparkline.data.datasets[0].borderColor = '#f97316';
+      }
+    });
+  }
+
+  function updateModalTabs(activeKey) {
+    const key = activeKey in TIME_RANGES ? activeKey : '24h';
+    ui.modalTabs.forEach((tab) => {
+      tab.setAttribute('aria-selected', tab.getAttribute('data-range') === key ? 'true' : 'false');
+    });
+  }
+
+  function getDefinitionForMetric(metric) {
+    const chartKey = METRIC_TO_CHART_KEY[metric];
+    if (!chartKey) return null;
+    return CHART_DEFINITIONS[chartKey] || null;
+  }
+
+  function openChartModal(metric) {
+    const definition = getDefinitionForMetric(metric);
+    if (!definition || !ui.modalRoot || !ui.modalCanvas) return;
+    state.modalMetric = metric;
+    updateModalTabs(state.modalRangeKey);
+    ui.modalTitle.textContent = definition.title || metricLabel(metric);
+    ui.modalSub.textContent = 'Lade Daten …';
+    ui.modalRoot.hidden = false;
+    document.body.style.overflow = 'hidden';
+    loadModalChart(metric, false).catch(handleError);
+  }
+
+  function closeChartModal() {
+    if (!ui.modalRoot) return;
+    ui.modalRoot.hidden = true;
+    document.body.style.overflow = '';
+    if (state.modalChart) {
+      state.modalChart.destroy();
+      state.modalChart = null;
+    }
+    state.modalMetric = null;
+  }
+
+  async function loadModalChart(metric, force) {
+    const definition = getDefinitionForMetric(metric);
+    if (!definition || !ui.modalCanvas) return;
+    const rangeKey = state.modalRangeKey in TIME_RANGES ? state.modalRangeKey : '24h';
+    const range = TIME_RANGES[rangeKey];
+    const data = await ensureSeries(definition, range, force);
+    renderModalChart(definition, data, range);
+  }
+
+  function renderModalChart(definition, data, range) {
+    if (!ui.modalCanvas) return;
+    const ctx = ui.modalCanvas.getContext('2d');
+    if (!ctx) return;
+    if (state.modalChart) {
+      state.modalChart.destroy();
+    }
+    const datasets = definition.metrics.map((metric, index) => ({
+      label: METRIC_CONFIG[metric]?.label || metric,
+      data: data[metric] || [],
+      borderColor: definition.colors[index % definition.colors.length],
+      backgroundColor: colorWithAlpha(definition.colors[index % definition.colors.length], 0.12),
+      tension: 0.35,
+      fill: 'start',
+      pointRadius: 0,
+      borderWidth: 2,
+      spanGaps: true
+    }));
+
+    const timeUnit = range.range === '24h' ? 'hour' : range.range === '7d' ? 'day' : 'week';
+
+    state.modalChart = new Chart(ctx, {
+      type: 'line',
+      data: { datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { labels: { color: '#475569', boxWidth: 12, boxHeight: 12 } },
+          tooltip: {
+            callbacks: {
+              label(context) {
+                const metricKey = definition.metrics[context.datasetIndex];
+                const cfg = METRIC_CONFIG[metricKey];
+                const formatted = formatNumber(context.parsed.y, cfg?.decimals || 0);
+                return `${context.dataset.label}: ${formatted} ${cfg?.unit || ''}`.trim();
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            type: 'time',
+            time: { unit: timeUnit, tooltipFormat: 'dd.MM.yyyy HH:mm' },
+            ticks: { maxRotation: 0, maxTicksLimit: 6, color: '#94a3b8' },
+            grid: { display: false, drawBorder: false },
+            border: { display: false }
+          },
+          y: {
+            title: { display: true, text: definition.yTitle, color: '#9ca3af' },
+            ticks: { color: '#94a3b8' },
+            grid: { color: 'rgba(148, 163, 184, 0.15)', drawBorder: false },
+            border: { display: false },
+            suggestedMin: definition.yBounds?.min,
+            suggestedMax: definition.yBounds?.max
+          }
+        }
+      }
+    });
+
+    const label = METRIC_CONFIG[state.modalMetric || definition.metrics[0]]?.label || definition.title || definition.key;
+    ui.modalTitle.textContent = label;
+    const subParts = [range.label];
+    if (definition.sub) {
+      subParts.push(definition.sub);
+    } else if (definition.yTitle) {
+      subParts.push(definition.yTitle);
+    }
+    ui.modalSub.textContent = subParts.join(' • ');
+  }
+
+  function handleGlobalKeydown(event) {
+    if (event.key === 'Escape') {
+      closeChartModal();
+    }
   }
 
   function normalizeSeriesValues(raw) {
@@ -1074,49 +1239,6 @@
       smoothed.push({ x: points[i].x, y: sum / slice.length });
     }
     return smoothed;
-  }
-
-  function applyChartData(chart, definition, data) {
-    let maxY = Number.NEGATIVE_INFINITY;
-    let minY = Number.POSITIVE_INFINITY;
-    definition.metrics.forEach((metric, index) => {
-      const points = data[metric] || [];
-      chart.data.datasets[index].data = points;
-      chart.data.datasets[index].decimation.samples = MAX_POINTS;
-      points.forEach((point) => {
-        if (!point) return;
-        const value = Number(point.y);
-        if (!Number.isFinite(value)) return;
-        if (value > maxY) maxY = value;
-        if (value < minY) minY = value;
-      });
-    });
-    const yScale = chart.options?.scales?.y;
-    if (yScale) {
-      const bounds = definition.yBounds || {};
-      if (typeof bounds.min === 'number') {
-        yScale.min = bounds.min;
-        yScale.suggestedMin = bounds.min;
-      } else if (Number.isFinite(minY)) {
-        yScale.min = minY;
-      } else {
-        delete yScale.min;
-        delete yScale.suggestedMin;
-      }
-
-      if (typeof bounds.max === 'number') {
-        const safeMax = Number.isFinite(maxY) ? Math.max(bounds.max, maxY * 1.05) : bounds.max;
-        yScale.max = safeMax;
-        yScale.suggestedMax = bounds.max;
-      } else if (Number.isFinite(maxY)) {
-        yScale.max = maxY * 1.05;
-        delete yScale.suggestedMax;
-      } else {
-        delete yScale.max;
-        delete yScale.suggestedMax;
-      }
-    }
-    chart.update('none');
   }
 
   async function refreshPressureTrend() {
