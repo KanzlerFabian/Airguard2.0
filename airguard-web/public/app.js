@@ -430,6 +430,11 @@
 
     const data = normalizeNowData(payload.data || {});
     const merged = { ...(state.now || {}) };
+    for (const metric of Object.keys(merged)) {
+      if (!(metric in data)) {
+        delete merged[metric];
+      }
+    }
     for (const [metric, sample] of Object.entries(data)) {
       merged[metric] = sample;
     }
