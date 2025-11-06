@@ -49,6 +49,7 @@ body {
   color: var(--text-strong);
   display: flex;
   justify-content: center;
+  font-size: clamp(0.9rem, 2vw, 1.1rem);
 }
 
 img,
@@ -240,6 +241,7 @@ a {
   box-shadow: var(--shadow-card);
   cursor: pointer;
   transition: transform var(--transition-base), box-shadow var(--transition-base), border var(--transition-base);
+  text-align: right;
 }
 
 .mini-card:hover,
@@ -268,6 +270,8 @@ a {
 .mini-meta {
   display: grid;
   gap: 0.25rem;
+  justify-items: end;
+  text-align: right;
 }
 
 .mini-meta h3 {
@@ -283,7 +287,7 @@ a {
 }
 
 .mini-unit {
-  font-size: 0.85rem;
+  font-size: 0.8em;
   color: var(--text-soft);
 }
 
@@ -339,6 +343,7 @@ a {
   box-shadow: var(--shadow-card);
   cursor: pointer;
   transition: transform var(--transition-base), box-shadow var(--transition-base), border var(--transition-base);
+  text-align: right;
 }
 
 .status-card:hover,
@@ -351,7 +356,10 @@ a {
 
 .status-card header {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    'icon trend'
+    'icon head';
   gap: var(--space-2);
   align-items: center;
 }
@@ -365,6 +373,7 @@ a {
   background: var(--bg-soft);
   color: var(--tone-teal);
   transition: background var(--transition-base), color var(--transition-base);
+  grid-area: icon;
 }
 
 .metric-icon svg {
@@ -375,6 +384,10 @@ a {
 .metric-head {
   display: grid;
   gap: 0.35rem;
+  justify-items: end;
+  text-align: right;
+  align-items: end;
+  grid-area: head;
 }
 
 .metric-head h3 {
@@ -386,12 +399,19 @@ a {
   font-size: 0.9rem;
   color: var(--text-soft);
   justify-self: end;
+  grid-area: trend;
+  text-align: right;
 }
 
 .status-value {
   font-size: clamp(1.8rem, 3vw, 2.3rem);
   font-weight: 600;
   color: var(--text-strong);
+}
+
+.status-value .unit {
+  font-size: 0.8em;
+  color: var(--text-soft);
 }
 
 .status-note {
@@ -405,7 +425,7 @@ a {
 }
 
 .status-card.ready .trend {
-  color: var(--text-muted);
+  color: var(--tone-blue);
   font-weight: 600;
 }
 
@@ -497,6 +517,42 @@ a {
   color: var(--tone-yellow);
 }
 
+.status-card[data-intent="excellent"],
+.status-card[data-intent="good"],
+.mini-card[data-intent="excellent"],
+.mini-card[data-intent="good"] {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.16), rgba(16, 185, 129, 0.08));
+  border-color: rgba(34, 197, 94, 0.28);
+}
+
+.status-card[data-intent="elevated"],
+.status-card[data-intent="dry"],
+.mini-card[data-intent="elevated"],
+.mini-card[data-intent="dry"] {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(251, 191, 36, 0.12));
+  border-color: rgba(245, 158, 11, 0.28);
+}
+
+.status-card[data-intent="poor"],
+.status-card[data-intent="warm"],
+.mini-card[data-intent="poor"],
+.mini-card[data-intent="warm"] {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.18), rgba(248, 113, 113, 0.12));
+  border-color: rgba(239, 68, 68, 0.26);
+}
+
+.status-card[data-intent="cool"],
+.mini-card[data-intent="cool"] {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.18), rgba(14, 165, 233, 0.12));
+  border-color: rgba(59, 130, 246, 0.26);
+}
+
+.status-card[data-intent="humid"],
+.mini-card[data-intent="humid"] {
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.18), rgba(45, 212, 191, 0.12));
+  border-color: rgba(6, 182, 212, 0.26);
+}
+
 .circadian-card {
   background: var(--bg-surface);
   border-radius: var(--radius-lg);
@@ -561,6 +617,73 @@ a {
   color: var(--text-muted);
 }
 
+.circadian-cycle {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.cycle-track {
+  position: relative;
+  height: 16px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(253, 224, 71, 0.25) 0%, rgba(253, 186, 116, 0.4) 35%, rgba(96, 165, 250, 0.32) 70%, rgba(30, 64, 175, 0.5) 100%);
+  overflow: hidden;
+}
+
+.cycle-icon {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.85rem;
+  pointer-events: none;
+}
+
+.cycle-icon--sun {
+  left: 0.75rem;
+  color: #f59e0b;
+}
+
+.cycle-icon--moon {
+  right: 0.75rem;
+  color: #6366f1;
+}
+
+.cycle-marker {
+  position: absolute;
+  top: 50%;
+  left: var(--cycle-pos, 50%);
+  transform: translate(-50%, -50%);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  color: #f59e0b;
+  display: grid;
+  place-items: center;
+  font-size: 0.9rem;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.18);
+  transition: left var(--transition-base), background var(--transition-base), color var(--transition-base), box-shadow var(--transition-base);
+}
+
+.cycle-marker[data-period='night'] {
+  background: rgba(30, 64, 175, 0.9);
+  color: #f5f3ff;
+  box-shadow: 0 6px 18px rgba(30, 64, 175, 0.35);
+}
+
+.cycle-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+  font-weight: 500;
+}
+
+.cycle-labels span:nth-child(2) {
+  color: var(--tone-blue);
+  font-weight: 600;
+}
+
 .circadian-bars {
   display: grid;
   gap: var(--space-3);
@@ -584,6 +707,23 @@ a {
   border-radius: 999px;
   background: rgba(148, 163, 184, 0.18);
   overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bar-track::after {
+  content: attr(data-range-label);
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 1;
 }
 
 .bar-track .bar-range {
@@ -593,6 +733,7 @@ a {
   left: var(--target-start, 0%);
   width: calc(var(--target-end, 0%) - var(--target-start, 0%));
   background: linear-gradient(90deg, rgba(6, 182, 212, 0.25), rgba(16, 185, 129, 0.35));
+  z-index: 0;
 }
 
 .bar-track .bar-marker {
@@ -606,6 +747,7 @@ a {
   background: var(--tone-teal);
   box-shadow: 0 8px 20px rgba(6, 182, 212, 0.35);
   transition: left var(--transition-base), background var(--transition-base);
+  z-index: 2;
 }
 
 .bar-track[data-intent="cool"] .bar-marker {
@@ -709,11 +851,13 @@ a {
   position: relative;
   width: 100%;
   height: clamp(240px, 48vh, 420px);
+  overflow-x: auto;
 }
 
 .chart-modal__canvas canvas {
   width: 100% !important;
   height: 100% !important;
+  min-width: 640px;
 }
 
 .bar-track[data-state="hidden"] .bar-marker {
@@ -797,6 +941,35 @@ a {
   width: 100%;
   min-height: 220px;
   display: flex;
+}
+
+@media (max-width: 768px) {
+  .app-shell {
+    padding: calc(var(--space-6) * 0.7) calc(var(--space-4) * 0.7) calc(var(--space-7) * 0.7);
+    gap: calc(var(--space-6) * 0.7);
+  }
+
+  .hero {
+    padding: clamp(1.6rem, 5vw, 2rem);
+    gap: calc(var(--space-6) * 0.7);
+  }
+
+  .main-content,
+  .mini-metric-grid,
+  .status-grid,
+  .circadian-bars {
+    gap: calc(var(--space-3) * 0.7);
+  }
+
+  .mini-card,
+  .status-card,
+  .circadian-card {
+    padding: calc(var(--space-4) * 0.7);
+  }
+
+  .section-heading {
+    margin-bottom: calc(var(--space-3) * 0.7);
+  }
 }
 
 .chart-card canvas {

@@ -2,7 +2,7 @@ airguardpi.local {
     encode gzip zstd
     tls internal
 
-    @dashboard path /dashboard* /assets/* /styles.css /app.js /lib/*
+    @dashboard path /dashboard* /assets/* /styles.css /app.js /lib/* /sw.js /manifest.webmanifest /data.json /data_24h.json /data_7d.json
     handle @dashboard {
         header {
             Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
