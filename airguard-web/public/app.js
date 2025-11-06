@@ -203,6 +203,9 @@
     circadianPhase: null,
     circadianStatus: null,
     circadianTip: null,
+    circadianCycle: null,
+    circadianCycleMarker: null,
+    circadianCycleLabel: null,
     cctNow: null,
     cctTarget: null,
     cctEval: null,
@@ -253,6 +256,9 @@
     ui.circadianPhase = document.querySelector('.circadian-phase');
     ui.circadianStatus = document.querySelector('.circadian-status');
     ui.circadianTip = document.querySelector('.circadian-tip');
+    ui.circadianCycle = document.querySelector('.circadian-cycle');
+    ui.circadianCycleMarker = document.querySelector('.cycle-marker');
+    ui.circadianCycleLabel = document.getElementById('circadian-cycle-label');
     ui.cctNow = document.getElementById('cct-now');
     ui.cctTarget = document.getElementById('cct-target');
     ui.cctEval = document.getElementById('cct-eval');
@@ -319,6 +325,8 @@
     if (ui.toastClose) {
       ui.toastClose.addEventListener('click', hideToast);
     }
+
+    updateCircadianCycle(resolveCircadianPhase());
   }
 
   function updateOfflineState() {
@@ -400,6 +408,7 @@
     state.timers.push(setInterval(() => refreshNow().catch(handleError), NOW_REFRESH_MS));
     state.timers.push(setInterval(() => preloadSeries(true).catch(handleError), CHART_REFRESH_MS));
     state.timers.push(setInterval(() => refreshPressureTrend().catch(handleError), PRESSURE_REFRESH_MS));
+    state.timers.push(setInterval(() => updateCircadianCycle(resolveCircadianPhase()), NOW_REFRESH_MS));
     window.addEventListener('beforeunload', () => {
       state.timers.forEach((timer) => clearInterval(timer));
     });
@@ -420,13 +429,18 @@
     }
 
     const data = normalizeNowData(payload.data || {});
-    state.now = data;
+    const merged = { ...(state.now || {}) };
+    for (const [metric, sample] of Object.entries(data)) {
+      merged[metric] = sample;
+    }
+    state.now = merged;
+    const displayData = state.now;
     updateTimestamp(payload.ts || Date.now());
-    updateHero(data);
-    updateStatusCards(data);
-    updateCircadian(data);
-    checkAlerts(data);
-    if (data['Luftdruck']) {
+    updateHero(displayData);
+    updateStatusCards(displayData);
+    updateCircadian(displayData);
+    checkAlerts(displayData);
+    if (displayData['Luftdruck']) {
       refreshPressureTrend().catch((error) => console.warn('Drucktrend Fehler', error));
     }
   }
@@ -670,11 +684,11 @@
     const cached = state.chartDataCache.get(cacheKey);
     const series = cached?.[mapping.metricKey];
     if (!Array.isArray(series) || series.length < 2) {
-      return { symbol: '→', text: '→ stabil' };
+      return { symbol: '→', text: '→' };
     }
     const last = series[series.length - 1];
     if (!last || !isFinite(last.y)) {
-      return { symbol: '→', text: '→ stabil' };
+      return { symbol: '→', text: '→' };
     }
     const thresholdMs = 30 * 60 * 1000;
     let reference = series[0];
@@ -687,15 +701,14 @@
       }
     }
     if (!reference || !isFinite(reference.y)) {
-      return { symbol: '→', text: '→ stabil' };
+      return { symbol: '→', text: '→' };
     }
     const diff = last.y - reference.y;
     const threshold = getTrendThreshold(metric);
     let symbol = '→';
     if (diff > threshold) symbol = '↑';
     else if (diff < -threshold) symbol = '↓';
-    const diffText = formatTrendDiff(metric, diff);
-    return { symbol, text: `${symbol} ${diffText}` };
+    return { symbol, text: symbol };
   }
 
   function getTrendMapping(metric) {
@@ -715,19 +728,6 @@
       Farbtemperatur: 120
     };
     return thresholds[metric] ?? 0.1;
-  }
-
-  function formatTrendDiff(metric, diff) {
-    const config = METRIC_CONFIG[metric];
-    let decimals = config?.decimals ?? 1;
-    if (decimals === 0 && Math.abs(diff) < 1) {
-      decimals = 1;
-    }
-    const magnitude = Math.abs(diff);
-    const formatted = formatNumber(magnitude, decimals);
-    const prefix = diff > 0 ? '+' : diff < 0 ? '−' : '±';
-    const unit = config?.unit ? ` ${config.unit}` : '';
-    return `${prefix}${formatted}${unit} / 30 min`;
   }
 
   function colorWithAlpha(color, alpha) {
@@ -789,7 +789,7 @@
         card.dataset.intent = status.intent || status.tone || 'neutral';
         const trend = computeTrend(metric);
         if (trendEl) {
-          trendEl.textContent = trend?.text || '→ stabil';
+          trendEl.textContent = trend?.text || trend?.symbol || '→';
         }
       }
       card.classList.add('ready');
@@ -855,12 +855,39 @@
     ui.luxTarget.textContent = `Ziel ${phase.luxRange[0]}–${phase.luxRange[1]} lx`;
     ui.luxEval.dataset.tone = evaluation.luxTone;
     ui.luxEval.textContent = evaluation.luxLabel;
+    if (ui.barCct) {
+      ui.barCct.setAttribute('data-range-label', `Ziel ${phase.cctRange[0]}–${phase.cctRange[1]} K`);
+    }
+    if (ui.barLux) {
+      ui.barLux.setAttribute('data-range-label', `Ziel ${phase.luxRange[0]}–${phase.luxRange[1]} lx`);
+    }
 
     updateBarTrack(ui.barCct, cctValue, phase.cctRange, CCT_RANGE, evaluation.cctTone);
     updateBarTrack(ui.barLux, luxValue, phase.luxRange, LUX_RANGE, evaluation.luxTone);
+    updateCircadianCycle(phase);
 
     ui.circadianCard.dataset.intent = evaluation.cctTone;
     ui.circadianCard.classList.add('ready');
+  }
+
+  function updateCircadianCycle(phase) {
+    if (!ui.circadianCycle) return;
+    const now = new Date();
+    const minutes = now.getHours() * 60 + now.getMinutes();
+    const percent = (minutes / (24 * 60)) * 100;
+    ui.circadianCycle.style.setProperty('--cycle-pos', `${clamp(percent, 0, 100)}%`);
+    if (ui.circadianCycleLabel) {
+      ui.circadianCycleLabel.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    if (ui.circadianCycleMarker) {
+      ui.circadianCycleMarker.style.left = `${clamp(percent, 0, 100)}%`;
+      const isDaytime = minutes >= 360 && minutes < 1080;
+      ui.circadianCycleMarker.dataset.period = isDaytime ? 'day' : 'night';
+      ui.circadianCycleMarker.textContent = isDaytime ? '☀' : '☾';
+    }
+    if (phase?.key) {
+      ui.circadianCycle.dataset.phase = phase.key;
+    }
   }
 
   function resolveCircadianPhase() {
@@ -1088,6 +1115,11 @@
     const rangeKey = state.modalRangeKey in TIME_RANGES ? state.modalRangeKey : '24h';
     const range = TIME_RANGES[rangeKey];
     const data = await ensureSeries(definition, range, force);
+    if (state.modalMetric !== metric) {
+      // The user switched or closed the modal before this request resolved.
+      // Abort so we don't render stale data under the new metric's heading.
+      return;
+    }
     renderModalChart(definition, data, range);
   }
 
