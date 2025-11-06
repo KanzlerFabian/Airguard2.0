@@ -261,10 +261,22 @@
               <p class="circadian-tip">—</p>
             </div>
           </div>
+          <div class="circadian-cycle">
+            <div class="cycle-track" aria-hidden="true">
+              <span class="cycle-icon cycle-icon--sun" aria-hidden="true">☀</span>
+              <span class="cycle-icon cycle-icon--moon" aria-hidden="true">☾</span>
+              <span class="cycle-marker" data-period="day">☀</span>
+            </div>
+            <div class="cycle-labels">
+              <span>00:00</span>
+              <span id="circadian-cycle-label">—:—</span>
+              <span>24:00</span>
+            </div>
+          </div>
           <div class="circadian-bars">
             <div class="bar-group">
               <div class="bar-label">CCT</div>
-              <div class="bar-track" data-kind="cct">
+              <div class="bar-track" data-kind="cct" data-range-label="Ziel —">
                 <span class="bar-range"></span>
                 <span class="bar-marker"></span>
               </div>
@@ -276,7 +288,7 @@
             </div>
             <div class="bar-group">
               <div class="bar-label">Lux</div>
-              <div class="bar-track" data-kind="lux">
+              <div class="bar-track" data-kind="lux" data-range-label="Ziel —">
                 <span class="bar-range"></span>
                 <span class="bar-marker"></span>
               </div>
