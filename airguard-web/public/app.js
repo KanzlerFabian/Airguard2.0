@@ -88,6 +88,187 @@
     PM10: { unit: 'µg/m³', decimals: 1, label: 'PM10' }
   };
 
+  const NOW_KEY_ALIASES = new Map([
+    ['temperatur', 'Temperatur'],
+    ['temperature', 'Temperatur'],
+    ['temperatur__bme_kalibriert_', 'Temperatur'],
+    ['temperatur_kalibriert', 'Temperatur']
+  ]);
+
+  const SCALE_TONES = {
+    excellent: '#10b981',
+    optimal: '#10b981',
+    good: '#0d9488',
+    elevated: '#f59e0b',
+    warning: '#f59e0b',
+    poor: '#ef4444',
+    critical: '#ef4444'
+  };
+
+  const METRIC_INSIGHTS = {
+    CO2: {
+      sections: [
+        { title: 'Bedeutung', text: 'CO₂ ist ein Indikator für die Luftqualität und die Frischluftzufuhr in Innenräumen. Hohe Werte deuten auf verbrauchte Luft und zu wenig Lüftung hin.' },
+        { title: 'Gesunde Werte', text: 'Unter 800 ppm ideal, bis 1000 ppm noch akzeptabel.' },
+        { title: 'Auswirkungen', text: 'Ab etwa 1000 ppm sinkt die Konzentrationsfähigkeit; über 1400 ppm kann es zu Kopfschmerzen, Müdigkeit und schlechterem Wohlbefinden kommen.' },
+        { title: 'Verbesserung', text: 'Regelmäßig lüften – ideal ist Querlüftung über 5–10 Minuten, besonders in Räumen mit mehreren Personen.' }
+      ],
+      scale: {
+        unit: 'ppm',
+        min: 400,
+        max: 2000,
+        caption: 'Bewertung orientiert sich an Innenraumempfehlungen für CO₂.',
+        stops: [
+          { value: 800, label: 'Optimal', tone: 'excellent' },
+          { value: 1000, label: 'Gut', tone: 'good' },
+          { value: 1400, label: 'Erhöht', tone: 'elevated' },
+          { value: 2000, label: 'Schlecht', tone: 'poor' }
+        ]
+      }
+    },
+    'PM2.5': {
+      sections: [
+        { title: 'Bedeutung', text: 'Feinstaub besteht aus sehr kleinen Partikeln, die tief in die Lunge eindringen können.' },
+        { title: 'Gesunde Werte', text: 'Unter 5 µg/m³ ideal, bis 12 µg/m³ gut.' },
+        { title: 'Auswirkungen', text: 'Längere Belastung kann Atemwegsprobleme oder Reizungen verursachen.' },
+        { title: 'Verbesserung', text: 'Innenquellen vermeiden (Kerzen, Kochen, Staub), regelmäßig lüften oder Luftreiniger mit HEPA-Filter verwenden.' }
+      ],
+      scale: {
+        unit: 'µg/m³',
+        min: 0,
+        max: 60,
+        caption: 'Grenzwerte angelehnt an WHO-Richtwerte für PM2.5.',
+        stops: [
+          { value: 5, label: 'Optimal', tone: 'excellent' },
+          { value: 12, label: 'Gut', tone: 'good' },
+          { value: 25, label: 'Erhöht', tone: 'elevated' },
+          { value: 50, label: 'Schlecht', tone: 'poor' }
+        ]
+      }
+    },
+    TVOC: {
+      sections: [
+        { title: 'Bedeutung', text: 'TVOCs entstehen durch Ausdünstungen von Reinigern, Möbeln, Farben oder Parfums.' },
+        { title: 'Gesunde Werte', text: 'Unter 150 ppb ideal, bis 300 ppb gut.' },
+        { title: 'Auswirkungen', text: 'Hohe Konzentrationen können Kopfschmerzen, Reizungen oder Schwindel verursachen.' },
+        { title: 'Verbesserung', text: 'Räume regelmäßig lüften, Duftstoffe und Chemikalien vermeiden, bei hohen Werten Quellen lokalisieren.' }
+      ],
+      scale: {
+        unit: 'ppb',
+        min: 0,
+        max: 1200,
+        caption: 'Bewertung gemäß Innenraum-Leitwerten für VOC.',
+        stops: [
+          { value: 150, label: 'Optimal', tone: 'excellent' },
+          { value: 300, label: 'Gut', tone: 'good' },
+          { value: 600, label: 'Erhöht', tone: 'elevated' },
+          { value: 1000, label: 'Schlecht', tone: 'poor' }
+        ]
+      }
+    },
+    Temperatur: {
+      sections: [
+        { title: 'Bedeutung', text: 'Die Raumtemperatur beeinflusst direkt das Wohlbefinden, die Konzentration und die Schlafqualität.' },
+        { title: 'Gesunde Werte', text: '20–24 °C sind ideal, darunter wird es schnell unbehaglich, darüber zu warm und ermüdend.' },
+        { title: 'Auswirkungen', text: 'Zu niedrige Temperaturen können zu Unbehagen und erhöhter Luftfeuchte führen, zu hohe zu Müdigkeit und Leistungseinbußen.' },
+        { title: 'Verbesserung', text: 'Temperatur durch Heizung, Beschattung oder Lüftung anpassen; für Schlafräume leicht kühler, für Arbeit leicht wärmer.' }
+      ],
+      scale: {
+        unit: '°C',
+        min: 16,
+        max: 30,
+        caption: 'Komfortbereiche gemäß arbeitsmedizinischen Empfehlungen.',
+        stops: [
+          { value: 18, label: 'Sehr kalt', tone: 'poor' },
+          { value: 20, label: 'Kühl', tone: 'elevated' },
+          { value: 24, label: 'Optimal', tone: 'excellent' },
+          { value: 26, label: 'Warm', tone: 'good' },
+          { value: 30, label: 'Sehr warm', tone: 'poor' }
+        ]
+      }
+    },
+    'rel. Feuchte': {
+      sections: [
+        { title: 'Bedeutung', text: 'Sie beschreibt, wie viel Feuchtigkeit die Luft enthält, verglichen mit dem Maximum.' },
+        { title: 'Gesunde Werte', text: '40–55 % sind optimal.' },
+        { title: 'Auswirkungen', text: 'Unter 35 % wird die Luft trocken und reizt Schleimhäute; über 60 % steigt das Schimmelrisiko.' },
+        { title: 'Verbesserung', text: 'Bei Trockenheit Luftbefeuchter, Pflanzen oder Wasserschalen; bei Feuchte Stoßlüften, ggf. Entfeuchter verwenden.' }
+      ],
+      scale: {
+        unit: '%',
+        min: 20,
+        max: 80,
+        caption: 'Optimalbereich 40–55 % relativer Feuchte.',
+        stops: [
+          { value: 35, label: 'Trocken', tone: 'poor' },
+          { value: 45, label: 'Optimal', tone: 'excellent' },
+          { value: 60, label: 'Feucht', tone: 'elevated' },
+          { value: 70, label: 'Schimmelrisiko', tone: 'poor' }
+        ]
+      }
+    },
+    Lux: {
+      sections: [
+        { title: 'Bedeutung', text: 'Lux beschreibt die Beleuchtungsstärke im Raum und wirkt direkt auf Stimmung und Konzentration.' },
+        { title: 'Gesunde Werte', text: '300–1000 lx sind ideal für Arbeit; unter 100 lx zu dunkel, über 2000 lx kann blenden.' },
+        { title: 'Auswirkungen', text: 'Zu wenig Licht senkt Wachheit, zu viel kann anstrengend sein.' },
+        { title: 'Verbesserung', text: 'Lichtquellen anpassen, indirekte Beleuchtung nutzen, am Tag natürliches Licht bevorzugen.' }
+      ],
+      scale: {
+        unit: 'lx',
+        min: 0,
+        max: 2500,
+        caption: 'Orientierungswerte für Arbeits- und Wohnräume.',
+        stops: [
+          { value: 100, label: 'Dunkel', tone: 'poor' },
+          { value: 300, label: 'Optimal', tone: 'excellent' },
+          { value: 1000, label: 'Hell', tone: 'good' },
+          { value: 2000, label: 'Blendung', tone: 'poor' }
+        ]
+      }
+    },
+    Farbtemperatur: {
+      sections: [
+        { title: 'Bedeutung', text: 'Die Farbtemperatur beschreibt, ob Licht warm (gelblich) oder kalt (bläulich) wirkt.' },
+        { title: 'Gesunde Werte', text: '4000–5000 K gelten als neutral und angenehm.' },
+        { title: 'Auswirkungen', text: 'Kaltes Licht aktiviert, warmes Licht beruhigt – ideal für Tagesrhythmussteuerung.' },
+        { title: 'Verbesserung', text: 'Morgens/Tagsüber kühleres Licht (5000–6000 K), abends warmes Licht (2700–3500 K).' }
+      ],
+      scale: {
+        unit: 'K',
+        min: 2200,
+        max: 7000,
+        caption: 'Empfohlene Bereiche für dynamische Beleuchtung.',
+        stops: [
+          { value: 3200, label: 'Abend', tone: 'elevated' },
+          { value: 4500, label: 'Neutral', tone: 'excellent' },
+          { value: 5500, label: 'Aktiv', tone: 'good' },
+          { value: 6500, label: 'Sehr kühl', tone: 'poor' }
+        ]
+      }
+    },
+    Luftdruck: {
+      sections: [
+        { title: 'Bedeutung', text: 'Der Luftdruck hängt vom Wetter ab und beeinflusst, wie sich der Körper fühlt.' },
+        { title: 'Gesunde Werte', text: 'Zwischen 980 und 1030 hPa.' },
+        { title: 'Auswirkungen', text: 'Sinkender Druck kann Wetterfühligkeit, Kopfschmerzen oder Müdigkeit verursachen.' },
+        { title: 'Verbesserung', text: 'Keine aktive Einflussnahme möglich, aber Werte helfen, Wettereinflüsse zu erkennen.' }
+      ],
+      scale: {
+        unit: 'hPa',
+        min: 960,
+        max: 1040,
+        caption: 'Typischer Bereich für den mitteleuropäischen Luftdruck.',
+        stops: [
+          { value: 980, label: 'Tiefdruck', tone: 'elevated' },
+          { value: 1005, label: 'Neutral', tone: 'good' },
+          { value: 1030, label: 'Hochdruck', tone: 'excellent' },
+          { value: 1040, label: 'Sehr hoch', tone: 'elevated' }
+        ]
+      }
+    }
+  };
+
   const CHART_DEFINITIONS = {
     CO2: {
       key: 'CO2',
@@ -224,7 +405,19 @@
     modalSub: null,
     modalCanvas: null,
     modalTabs: [],
-    modalCloseButtons: []
+    modalCloseButtons: [],
+    modalCurrent: null,
+    modalCurrentValue: null,
+    modalCurrentUnit: null,
+    modalCurrentLabel: null,
+    modalInsight: null,
+    modalScale: null,
+    modalScaleLabels: null,
+    modalScaleValues: null,
+    modalScaleGradient: null,
+    modalScaleMarker: null,
+    modalScaleMarkerValue: null,
+    modalScaleCaption: null
   };
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -294,6 +487,18 @@
     ui.modalTitle = document.getElementById('chart-modal-title');
     ui.modalSub = document.getElementById('chart-modal-sub');
     ui.modalCanvas = document.getElementById('chart-modal-canvas');
+    ui.modalCurrent = document.getElementById('chart-modal-current');
+    ui.modalCurrentValue = document.getElementById('chart-modal-current-value');
+    ui.modalCurrentUnit = document.getElementById('chart-modal-current-unit');
+    ui.modalCurrentLabel = document.getElementById('chart-modal-current-label');
+    ui.modalInsight = document.getElementById('chart-modal-insight');
+    ui.modalScale = document.getElementById('chart-modal-scale');
+    ui.modalScaleLabels = document.getElementById('chart-modal-scale-labels');
+    ui.modalScaleValues = document.getElementById('chart-modal-scale-values');
+    ui.modalScaleGradient = document.getElementById('chart-modal-scale-gradient');
+    ui.modalScaleMarker = document.getElementById('chart-modal-scale-marker');
+    ui.modalScaleMarkerValue = document.getElementById('chart-modal-scale-marker-value');
+    ui.modalScaleCaption = document.getElementById('chart-modal-scale-caption');
     ui.modalTabs = Array.from(document.querySelectorAll('.modal-tab'));
     ui.modalCloseButtons = Array.from(document.querySelectorAll('[data-close="true"]'));
 
@@ -440,6 +645,9 @@
     updateStatusCards(displayData);
     updateCircadian(displayData);
     checkAlerts(displayData);
+    if (state.modalMetric) {
+      refreshModalDetails(state.modalMetric);
+    }
     if (displayData['Luftdruck']) {
       refreshPressureTrend().catch((error) => console.warn('Drucktrend Fehler', error));
     }
@@ -447,9 +655,37 @@
 
   function normalizeNowData(raw) {
     const mapped = {};
-    for (const [key, value] of Object.entries(raw)) {
+    for (const [rawKey, value] of Object.entries(raw)) {
       if (value == null) continue;
-      mapped[key] = value;
+      if (rawKey == null) continue;
+      const normalizedKey = typeof rawKey === 'string' ? rawKey.trim() : rawKey;
+      const lowerKey = typeof normalizedKey === 'string' ? normalizedKey.toLowerCase() : normalizedKey;
+      const aliasTarget = typeof normalizedKey === 'string'
+        ? NOW_KEY_ALIASES.get(normalizedKey) || NOW_KEY_ALIASES.get(lowerKey)
+        : null;
+      const key = aliasTarget || normalizedKey;
+
+      if (typeof value === 'object' && value !== null) {
+        const cloned = { ...value };
+        if ('value' in cloned) {
+          const numeric = Number.parseFloat(cloned.value);
+          if (Number.isFinite(numeric)) {
+            cloned.value = numeric;
+          }
+        }
+        if ('ts' in cloned) {
+          const numericTs = Number.parseInt(cloned.ts, 10);
+          if (Number.isFinite(numericTs)) {
+            cloned.ts = numericTs;
+          }
+        }
+        const existing = mapped[key];
+        if (!existing || (cloned?.ts && (!existing.ts || cloned.ts >= existing.ts))) {
+          mapped[key] = cloned;
+        }
+      } else if (!(key in mapped)) {
+        mapped[key] = value;
+      }
     }
     return mapped;
   }
@@ -533,54 +769,63 @@
         return buildStatus('poor', 'Schlecht', 'Hohe VOC-Belastung.', 'Sofort lüften und Quellen entfernen.');
       case 'Temperatur':
         if (value < 18) {
-          return buildStatus('cool', 'Kühl', 'Raumtemperatur niedrig.', 'Heizung leicht erhöhen.');
+          return buildStatus('poor', 'Zu kalt', 'Temperatur deutlich unter dem Komfortbereich.', 'Raum moderat aufheizen oder wärmer kleiden.');
         }
         if (value < 20) {
-          return buildStatus('cool', 'Frisch', 'Etwas kühl.', 'Sanft nachheizen möglich.');
+          return buildStatus('elevated', 'Kühl', 'Leicht unter dem Wohlfühlbereich.', 'Heizung leicht erhöhen oder Türen geschlossen halten.');
         }
-        if (value <= 23) {
-          return buildStatus('good', 'Komfort', 'Wohlfühlbereich erreicht.', 'Perfekt für Alltag & Fokus.');
+        if (value <= 24) {
+          return buildStatus('excellent', 'Optimal', 'Komfortable Raumtemperatur.', 'Temperatur beibehalten.');
         }
         if (value <= 26) {
-          return buildStatus('elevated', 'Warm', 'Leicht erhöht.', 'Leicht abkühlen oder lüften.');
+          return buildStatus('elevated', 'Warm', 'Temperatur steigt über den Idealbereich.', 'Stoßlüften oder Beschattung nutzen.');
         }
-        return buildStatus('warm', 'Sehr warm', 'Hitze belastet den Schlaf.', 'Aktiv kühlen oder beschatten.');
+        return buildStatus('poor', 'Zu warm', 'Hohe Temperatur belastet Kreislauf und Schlaf.', 'Aktiv kühlen, beschatten oder intensiv lüften.');
       case 'rel. Feuchte':
-        if (value < 30) {
-          return buildStatus('dry', 'Trocken', 'Luft zu trocken.', 'Luft befeuchten oder Pflanzen gießen.');
+        if (value < 35) {
+          return buildStatus('poor', 'Trocken', 'Luftfeuchte deutlich zu gering.', 'Befeuchten, Pflanzen oder Wasserschalen einsetzen.');
+        }
+        if (value < 40) {
+          return buildStatus('elevated', 'Leicht trocken', 'Unterer Komfortbereich.', 'Mehr lüften oder leicht befeuchten.');
+        }
+        if (value <= 55) {
+          return buildStatus('excellent', 'Optimal', 'Ideale Luftfeuchte.', 'Aktuelles Lüftungsverhalten beibehalten.');
         }
         if (value <= 60) {
-          return buildStatus('good', 'Ok', 'Optimale Luftfeuchte.', 'Weiter regelmäßig lüften.');
+          return buildStatus('good', 'Noch im Rahmen', 'Etwas erhöhte Feuchte.', 'Regelmäßig lüften, Feuchtequellen prüfen.');
         }
         if (value <= 70) {
-          return buildStatus('humid', 'Feucht', 'Leicht erhöht.', 'Stoßlüften und trocknen.');
+          return buildStatus('elevated', 'Feucht', 'Schimmelgefahr nimmt zu.', 'Stoßlüften und trocknen, ggf. Entfeuchter nutzen.');
         }
-        return buildStatus('poor', 'Sehr feucht', 'Schimmelrisiko steigt.', 'Entfeuchten oder stärker lüften.');
+        return buildStatus('poor', 'Sehr feucht', 'Stark erhöhtes Schimmelrisiko.', 'Raum aktiv entfeuchten und dauerhaft lüften.');
       case 'Lux':
-        if (value < 50) {
-          return buildStatus('cool', 'Sehr dunkel', 'Kaum Beleuchtung vorhanden.', 'Licht erhöhen oder Vorhänge öffnen.');
+        if (value < 100) {
+          return buildStatus('poor', 'Zu dunkel', 'Beleuchtungsstärke unterschreitet den Wohlfühlbereich.', 'Lichtquellen verstärken oder Tageslicht nutzen.');
         }
-        if (value <= 400) {
-          return buildStatus('good', 'Angenehm', 'Helles, aber sanftes Licht.', 'Beleuchtung beibehalten.');
+        if (value < 300) {
+          return buildStatus('elevated', 'Dämmerig', 'Etwas mehr Licht steigert die Aktivität.', 'Arbeitslicht einschalten oder Vorhänge öffnen.');
         }
-        if (value <= 800) {
-          return buildStatus('elevated', 'Hell', 'Sehr kräftiges Licht.', 'Blendungen reduzieren oder dimmen.');
+        if (value <= 1000) {
+          return buildStatus('excellent', 'Optimal', 'Ausgewogene Beleuchtung für Fokus und Wohlbefinden.', 'Lichtsituation beibehalten.');
         }
-        return buildStatus('warm', 'Sehr hell', 'Extrem helle Umgebung.', 'Dimmen oder indirektes Licht nutzen.');
+        if (value <= 2000) {
+          return buildStatus('good', 'Hell', 'Kräftiges Licht unterstützt Wachheit.', 'Blendquellen prüfen und ggf. abschirmen.');
+        }
+        return buildStatus('poor', 'Blendung', 'Sehr hohe Beleuchtungsstärke kann ermüden.', 'Dimmen oder indirekte Beleuchtung verwenden.');
       case 'Farbtemperatur':
-        if (value < 2600) {
-          return buildStatus('warm', 'Sehr warm', 'Licht wirkt stark warm.', 'Etwas kühler einstellen für Fokus.');
+        if (value < 2700) {
+          return buildStatus('poor', 'Sehr warm', 'Sehr warmes Licht wirkt schummrig und ermüdet.', 'Für produktive Phasen etwas kühler einstellen.');
         }
-        if (value < 3200) {
-          return buildStatus('warm', 'Warm', 'Gemütliches Warmweiß.', 'Ideal für Abend & Entspannung.');
+        if (value < 3500) {
+          return buildStatus('elevated', 'Warm', 'Gemütliches Licht unterstützt Entspannung.', 'Bei Fokusaufgaben kühleres Licht zuschalten.');
         }
         if (value <= 5000) {
-          return buildStatus('good', 'Neutral', 'Ausgeglichenes Weißlicht.', 'Perfekt für Alltag & Arbeit.');
+          return buildStatus('excellent', 'Neutral', 'Ausgeglichenes Weißlicht für klare Wahrnehmung.', 'Ideal für den Großteil des Tages.');
         }
-        if (value <= 6500) {
-          return buildStatus('cool', 'Frisch', 'Kühles, aktivierendes Licht.', 'Gut für konzentriertes Arbeiten.');
+        if (value <= 6000) {
+          return buildStatus('good', 'Kühl', 'Aktivierendes Licht steigert Aufmerksamkeit.', 'Abends langsam auf warmes Licht wechseln.');
         }
-        return buildStatus('cool', 'Sehr kühl', 'Licht wirkt sehr kalt.', 'Für Wohlbefinden etwas wärmer stellen.');
+        return buildStatus('poor', 'Sehr kühl', 'Dauerhaft kaltes Licht kann den Biorhythmus stören.', 'Später am Tag wärmere Lichtfarbe wählen.');
       default:
         return { tone: 'neutral', intent: 'neutral', label: '', note: '', tip: '' };
     }
@@ -663,6 +908,7 @@
   function toneToColor(tone) {
     const palette = {
       excellent: '#10b981',
+      optimal: '#10b981',
       good: '#22c55e',
       elevated: '#f59e0b',
       dry: '#f59e0b',
@@ -670,7 +916,9 @@
       poor: '#ef4444',
       warm: '#f97316',
       cool: '#3b82f6',
-      neutral: '#94a3b8'
+      neutral: '#94a3b8',
+      warning: '#f59e0b',
+      critical: '#ef4444'
     };
     return palette[tone] || '#06b6d4';
   }
@@ -1080,6 +1328,154 @@
     });
   }
 
+  function refreshModalDetails(metric) {
+    updateModalCurrent(metric);
+    updateModalScale(metric);
+  }
+
+  function updateModalInsight(metric) {
+    if (!ui.modalInsight) return;
+    const insight = METRIC_INSIGHTS[metric];
+    if (!insight?.sections?.length) {
+      ui.modalInsight.innerHTML =
+        '<div><dt>Hinweis</dt><dd>Für diese Messgröße liegen derzeit keine Zusatzinformationen vor.</dd></div>';
+      return;
+    }
+    ui.modalInsight.innerHTML = insight.sections
+      .map((section) => `<div><dt>${section.title}</dt><dd>${section.text}</dd></div>`)
+      .join('');
+  }
+
+  function updateModalCurrent(metric) {
+    if (!ui.modalCurrent || !ui.modalCurrentValue || !ui.modalCurrentUnit || !ui.modalCurrentLabel) return;
+    const config = METRIC_CONFIG[metric];
+    if (!config) {
+      ui.modalCurrent.dataset.tone = 'neutral';
+      ui.modalCurrentValue.textContent = '—';
+      ui.modalCurrentUnit.textContent = '';
+      ui.modalCurrentLabel.textContent = 'Unbekannt';
+      return;
+    }
+    const sample = state.now?.[metric];
+    const unit = config.unit || '';
+    ui.modalCurrentUnit.textContent = unit;
+    if (!sample || !isFinite(sample.value)) {
+      ui.modalCurrent.dataset.tone = 'neutral';
+      ui.modalCurrentValue.textContent = '—';
+      ui.modalCurrentLabel.textContent = 'Keine Daten';
+      return;
+    }
+    const status = determineStatus(metric, sample.value);
+    ui.modalCurrentValue.textContent = formatNumber(sample.value, config.decimals);
+    ui.modalCurrentLabel.textContent = status.label || 'Aktuell';
+    ui.modalCurrent.dataset.tone = status.tone || status.intent || 'neutral';
+  }
+
+  function updateModalScale(metric) {
+    if (!ui.modalScale || !ui.modalScaleLabels || !ui.modalScaleValues || !ui.modalScaleMarker) return;
+    const scale = METRIC_INSIGHTS[metric]?.scale;
+    if (!scale) {
+      ui.modalScale.hidden = true;
+      return;
+    }
+    ui.modalScale.hidden = false;
+    const config = METRIC_CONFIG[metric];
+    const stops = Array.isArray(scale.stops) ? scale.stops.slice(0, 6) : [];
+    ui.modalScale.style.setProperty('--scale-columns', Math.max(stops.length, 1));
+    ui.modalScaleLabels.innerHTML = stops.map((stop) => `<span>${stop.label}</span>`).join('');
+    const tickValues = [scale.min, ...stops.map((stop) => stop.value)];
+    ui.modalScale.style.setProperty('--scale-ticks', Math.max(tickValues.length, 1));
+    ui.modalScaleValues.innerHTML = tickValues
+      .map((value) => `<span>${formatScaleTick(value, scale.unit)}</span>`)
+      .join('');
+    if (ui.modalScaleGradient) {
+      ui.modalScaleGradient.style.background = buildScaleGradient(scale, stops);
+    }
+    const sample = state.now?.[metric];
+    const value = sample && isFinite(sample.value) ? sample.value : null;
+    if (value == null) {
+      ui.modalScaleMarker.style.left = '0%';
+      ui.modalScaleMarker.dataset.tone = 'neutral';
+      if (ui.modalScaleMarkerValue) {
+        ui.modalScaleMarkerValue.textContent = `— ${scale.unit || ''}`.trim();
+      }
+    } else {
+      const percent = computeScalePosition(value, scale);
+      ui.modalScaleMarker.style.left = `${percent}%`;
+      const tone = resolveScaleTone(value, stops);
+      ui.modalScaleMarker.dataset.tone = tone || 'neutral';
+      if (ui.modalScaleMarkerValue) {
+        const decimals = config?.decimals ?? 1;
+        ui.modalScaleMarkerValue.textContent = `${formatNumber(value, decimals)} ${scale.unit || ''}`.trim();
+      }
+    }
+    if (ui.modalScaleCaption) {
+      ui.modalScaleCaption.textContent = scale.caption || '';
+    }
+  }
+
+  function computeScalePosition(value, scale) {
+    const min = Number.isFinite(scale.min) ? scale.min : 0;
+    const max = Number.isFinite(scale.max) ? scale.max : min + 1;
+    const span = max - min;
+    if (span <= 0) {
+      return 0;
+    }
+    const percent = ((value - min) / span) * 100;
+    return clamp(percent, 0, 100);
+  }
+
+  function resolveScaleTone(value, stops) {
+    if (!Array.isArray(stops) || stops.length === 0) {
+      return 'neutral';
+    }
+    for (const stop of stops) {
+      if (value <= stop.value) {
+        return stop.tone;
+      }
+    }
+    return stops[stops.length - 1].tone;
+  }
+
+  function buildScaleGradient(scale, stops) {
+    if (!Array.isArray(stops) || stops.length === 0) {
+      return 'linear-gradient(90deg, rgba(148, 163, 184, 0.4), rgba(148, 163, 184, 0.6))';
+    }
+    const min = Number.isFinite(scale.min) ? scale.min : 0;
+    const max = Number.isFinite(scale.max) ? scale.max : min + 1;
+    const span = Math.max(max - min, 1);
+    const segments = [];
+    let previousPercent = 0;
+    stops.forEach((stop, index) => {
+      const color = SCALE_TONES[stop.tone] || '#0ea5e9';
+      const percent = clamp(((stop.value - min) / span) * 100, 0, 100);
+      if (index === 0) {
+        segments.push(`${color} 0%`);
+      } else {
+        const prevColor = SCALE_TONES[stops[index - 1].tone] || color;
+        segments.push(`${prevColor} ${percent}%`);
+      }
+      segments.push(`${color} ${percent}%`);
+      previousPercent = percent;
+    });
+    const lastColor = SCALE_TONES[stops[stops.length - 1].tone] || '#0ea5e9';
+    if (previousPercent < 100) {
+      segments.push(`${lastColor} 100%`);
+    }
+    return `linear-gradient(90deg, ${segments.join(', ')})`;
+  }
+
+  function formatScaleTick(value, unit) {
+    if (!Number.isFinite(value)) {
+      return `— ${unit || ''}`.trim();
+    }
+    const decimals = Math.abs(value) < 10 && unit !== 'ppm' ? 1 : 0;
+    return `${Number(value).toLocaleString('de-DE', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals
+    })} ${unit || ''}`.trim();
+  }
+
   function getDefinitionForMetric(metric) {
     const chartKey = METRIC_TO_CHART_KEY[metric];
     if (!chartKey) return null;
@@ -1091,6 +1487,8 @@
     if (!definition || !ui.modalRoot || !ui.modalCanvas) return;
     state.modalMetric = metric;
     updateModalTabs(state.modalRangeKey);
+    updateModalInsight(metric);
+    refreshModalDetails(metric);
     ui.modalTitle.textContent = definition.title || metricLabel(metric);
     ui.modalSub.textContent = 'Lade Daten …';
     ui.modalRoot.hidden = false;
@@ -1352,6 +1750,23 @@
 
   function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
+    const { protocol, hostname } = window.location;
+    const host = typeof hostname === 'string' ? hostname.toLowerCase() : '';
+    const isLocalhost = ['localhost', '127.0.0.1', '::1'].includes(host);
+    const isLocalDomain = host.endsWith('.local');
+
+    if (!window.isSecureContext && !isLocalhost) {
+      console.info('Service Worker übersprungen: unsichere Umgebung.');
+      return;
+    }
+    if (protocol === 'https:' && isLocalDomain) {
+      console.info('Service Worker übersprungen: lokales Zertifikat nicht vertrauenswürdig.');
+      return;
+    }
+    if (protocol !== 'https:' && !isLocalhost) {
+      return;
+    }
+
     navigator.serviceWorker
       .register('./sw.js')
       .then(() => console.info('Service Worker registriert'))
