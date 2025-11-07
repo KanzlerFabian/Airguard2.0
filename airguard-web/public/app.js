@@ -88,6 +88,13 @@
     PM10: { unit: 'µg/m³', decimals: 1, label: 'PM10' }
   };
 
+  const NOW_KEY_ALIASES = new Map([
+    ['temperatur', 'Temperatur'],
+    ['temperature', 'Temperatur'],
+    ['temperatur__bme_kalibriert_', 'Temperatur'],
+    ['temperatur_kalibriert', 'Temperatur']
+  ]);
+
   const SCALE_TONES = {
     excellent: '#10b981',
     optimal: '#10b981',
@@ -648,8 +655,16 @@
 
   function normalizeNowData(raw) {
     const mapped = {};
-    for (const [key, value] of Object.entries(raw)) {
+    for (const [rawKey, value] of Object.entries(raw)) {
       if (value == null) continue;
+      if (rawKey == null) continue;
+      const normalizedKey = typeof rawKey === 'string' ? rawKey.trim() : rawKey;
+      const lowerKey = typeof normalizedKey === 'string' ? normalizedKey.toLowerCase() : normalizedKey;
+      const aliasTarget = typeof normalizedKey === 'string'
+        ? NOW_KEY_ALIASES.get(normalizedKey) || NOW_KEY_ALIASES.get(lowerKey)
+        : null;
+      const key = aliasTarget || normalizedKey;
+
       if (typeof value === 'object' && value !== null) {
         const cloned = { ...value };
         if ('value' in cloned) {
@@ -658,8 +673,17 @@
             cloned.value = numeric;
           }
         }
-        mapped[key] = cloned;
-      } else {
+        if ('ts' in cloned) {
+          const numericTs = Number.parseInt(cloned.ts, 10);
+          if (Number.isFinite(numericTs)) {
+            cloned.ts = numericTs;
+          }
+        }
+        const existing = mapped[key];
+        if (!existing || (cloned?.ts && (!existing.ts || cloned.ts >= existing.ts))) {
+          mapped[key] = cloned;
+        }
+      } else if (!(key in mapped)) {
         mapped[key] = value;
       }
     }
@@ -1726,6 +1750,23 @@
 
   function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
+    const { protocol, hostname } = window.location;
+    const host = typeof hostname === 'string' ? hostname.toLowerCase() : '';
+    const isLocalhost = ['localhost', '127.0.0.1', '::1'].includes(host);
+    const isLocalDomain = host.endsWith('.local');
+
+    if (!window.isSecureContext && !isLocalhost) {
+      console.info('Service Worker übersprungen: unsichere Umgebung.');
+      return;
+    }
+    if (protocol === 'https:' && isLocalDomain) {
+      console.info('Service Worker übersprungen: lokales Zertifikat nicht vertrauenswürdig.');
+      return;
+    }
+    if (protocol !== 'https:' && !isLocalhost) {
+      return;
+    }
+
     navigator.serviceWorker
       .register('./sw.js')
       .then(() => console.info('Service Worker registriert'))
