@@ -19,7 +19,7 @@ const METRICS = [
     label: 'Temperatur',
     unit: '\u00b0C',
     decimals: 1,
-    promName: 'temperatur__bme_kalibriert_'
+    promName: 'Temperatur'
   },
   { key: 'rel. Feuchte', label: 'rel. Feuchte', unit: '%', decimals: 1 },
   { key: 'Luftdruck', label: 'Luftdruck', unit: 'hPa', decimals: 1 },
