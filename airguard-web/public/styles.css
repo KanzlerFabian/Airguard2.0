@@ -813,6 +813,70 @@ a {
   gap: 0.35rem;
 }
 
+.chart-modal__heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.chart-modal__title-group {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.chart-modal__current {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 0.9rem;
+  background: rgba(148, 163, 184, 0.14);
+  color: var(--text-strong);
+  min-width: 180px;
+  justify-content: center;
+  transition: background var(--transition-base), color var(--transition-base);
+}
+
+.chart-modal__current[data-tone="excellent"],
+.chart-modal__current[data-tone="optimal"] {
+  background: rgba(16, 185, 129, 0.16);
+  color: #047857;
+}
+
+.chart-modal__current[data-tone="good"] {
+  background: rgba(13, 148, 136, 0.16);
+  color: #0f766e;
+}
+
+.chart-modal__current[data-tone="elevated"],
+.chart-modal__current[data-tone="warning"] {
+  background: rgba(245, 158, 11, 0.18);
+  color: #92400e;
+}
+
+.chart-modal__current[data-tone="poor"],
+.chart-modal__current[data-tone="critical"] {
+  background: rgba(239, 68, 68, 0.2);
+  color: #b91c1c;
+}
+
+.chart-modal__current-value {
+  font-size: clamp(1.8rem, 3vw, 2.2rem);
+  font-weight: 700;
+}
+
+.chart-modal__current-unit {
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.chart-modal__current-label {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
 .chart-modal__sub {
   font-size: 0.95rem;
   color: var(--text-muted);
@@ -858,6 +922,139 @@ a {
   width: 100% !important;
   height: 100% !important;
   min-width: 640px;
+}
+
+.chart-modal__info {
+  background: rgba(148, 163, 184, 0.08);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+
+.chart-modal__insight {
+  margin: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.chart-modal__insight > div {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.chart-modal__insight dt {
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.chart-modal__insight dd {
+  margin: 0;
+  font-size: 0.98rem;
+  line-height: 1.5;
+  color: var(--text-strong);
+}
+
+.chart-modal__scale {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.chart-modal__scale-labels,
+.chart-modal__scale-values {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.chart-modal__scale-labels {
+  grid-template-columns: repeat(var(--scale-columns, 4), minmax(0, 1fr));
+}
+
+.chart-modal__scale-values {
+  grid-template-columns: repeat(var(--scale-ticks, 5), minmax(0, 1fr));
+}
+
+.chart-modal__scale-labels span {
+  text-align: center;
+  font-weight: 600;
+}
+
+.chart-modal__scale-values span {
+  text-align: center;
+}
+
+.chart-modal__scale-track {
+  position: relative;
+  height: 12px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(148, 163, 184, 0.3);
+}
+
+.chart-modal__scale-gradient {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(148, 163, 184, 0.4), rgba(148, 163, 184, 0.6));
+}
+
+.chart-modal__scale-marker {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 60px;
+}
+
+.chart-modal__scale-marker-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.25);
+  background: #0f172a;
+}
+
+.chart-modal__scale-marker[data-tone="excellent"] .chart-modal__scale-marker-dot,
+.chart-modal__scale-marker[data-tone="optimal"] .chart-modal__scale-marker-dot {
+  background: #10b981;
+}
+
+.chart-modal__scale-marker[data-tone="good"] .chart-modal__scale-marker-dot {
+  background: #0d9488;
+}
+
+.chart-modal__scale-marker[data-tone="elevated"] .chart-modal__scale-marker-dot,
+.chart-modal__scale-marker[data-tone="warning"] .chart-modal__scale-marker-dot {
+  background: #f59e0b;
+}
+
+.chart-modal__scale-marker[data-tone="poor"] .chart-modal__scale-marker-dot,
+.chart-modal__scale-marker[data-tone="critical"] .chart-modal__scale-marker-dot {
+  background: #ef4444;
+}
+
+.chart-modal__scale-marker-value {
+  background: rgba(15, 23, 42, 0.85);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0.25rem 0.8rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.chart-modal__scale-caption {
+  font-size: 0.85rem;
+  color: var(--text-soft);
+  text-align: center;
+  margin: 0;
 }
 
 .bar-track[data-state="hidden"] .bar-marker {
