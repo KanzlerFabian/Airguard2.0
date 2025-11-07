@@ -15,11 +15,11 @@ const METRICS = [
   { key: 'PM2.5', label: 'PM2.5', unit: '\u00b5g/m\u00b3', decimals: 1 },
   { key: 'PM10', label: 'PM10', unit: '\u00b5g/m\u00b3', decimals: 1 },
   {
-    key: 'Temperatur',
+    key: 'temperatur',
     label: 'Temperatur',
     unit: '\u00b0C',
     decimals: 1,
-    promName: 'temperatur__bme_kalibriert_'
+    promName: 'temperatur'
   },
   { key: 'rel. Feuchte', label: 'rel. Feuchte', unit: '%', decimals: 1 },
   { key: 'Luftdruck', label: 'Luftdruck', unit: 'hPa', decimals: 1 },
