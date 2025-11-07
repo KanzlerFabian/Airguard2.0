@@ -91,7 +91,7 @@
   const NOW_KEY_ALIASES = new Map([
     ['temperatur', 'Temperatur'],
     ['temperature', 'Temperatur'],
-    ['temperatur__bme_kalibriert_', 'Temperatur'],
+    ['temperatur__bme_kalibriert_', 'temperatur'],
     ['temperatur_kalibriert', 'Temperatur']
   ]);
 
