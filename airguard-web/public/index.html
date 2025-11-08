@@ -2,11 +2,14 @@
 <html lang="de">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#ffffff">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0ea5e9">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>AirGuard Dashboard</title>
-  <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="icon" type="image/png" href="./assets/logo.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/png" href="/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <link rel="stylesheet" href="./styles.css">
   <script defer src="./lib/chart.umd.min.js"></script>
   <script defer src="./lib/chartjs-adapter-date-fns.bundle.min.js"></script>
@@ -315,8 +318,8 @@
   </div>
 
   <div class="chart-modal" id="chart-modal" role="dialog" aria-modal="true" hidden>
-    <div class="chart-modal__backdrop" data-close="true"></div>
-    <div class="chart-modal__content">
+    <div class="chart-modal__backdrop" aria-hidden="true" data-close="true"></div>
+    <div class="chart-modal__content" tabindex="-1">
       <button type="button" class="chart-modal__close" aria-label="Schließen" data-close="true">×</button>
       <header class="chart-modal__header">
         <div class="chart-modal__heading">

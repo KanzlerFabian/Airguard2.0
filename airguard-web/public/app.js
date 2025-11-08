@@ -74,6 +74,8 @@
   const MAX_POINTS = 600;
   const CCT_RANGE = { min: 1800, max: 7000 };
   const LUX_RANGE = { min: 0, max: 1100 };
+  const FOCUSABLE_SELECTOR =
+    'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
   const CIRCADIAN_PHASES = [
     {
@@ -431,7 +433,14 @@
     sparklines: new Map(),
     modalChart: null,
     modalMetric: null,
-    modalRangeKey: '24h'
+    modalRangeKey: '24h',
+    modalResizeObserver: null,
+    modalResizeTarget: null,
+    modalResizeTimer: 0,
+    modalResizeActive: false,
+    modalLayoutFrame: 0,
+    modalReturnFocus: null,
+    bodyScrollLock: null
   };
 
   const ui = {
@@ -464,6 +473,7 @@
     toastText: null,
     toastClose: null,
     modalRoot: null,
+    modalContent: null,
     modalHeader: null,
     modalTitle: null,
     modalSub: null,
@@ -549,6 +559,7 @@
     });
 
     ui.modalRoot = document.getElementById('chart-modal');
+    ui.modalContent = document.querySelector('.chart-modal__content');
     ui.modalHeader = document.querySelector('.chart-modal__header');
     ui.modalTitle = document.getElementById('chart-modal-title');
     ui.modalSub = document.getElementById('chart-modal-sub');
@@ -612,6 +623,183 @@
     } else {
       ui.offlineIndicator.hidden = true;
     }
+  }
+
+  function lockBodyScroll() {
+    const body = document.body;
+    if (!body || state.bodyScrollLock) return;
+    const scrollY = window.scrollY || window.pageYOffset || 0;
+    const lockState = {
+      scrollY,
+      styles: {
+        position: body.style.position || '',
+        top: body.style.top || '',
+        overflow: body.style.overflow || '',
+        width: body.style.width || '',
+        left: body.style.left || ''
+      }
+    };
+    state.bodyScrollLock = lockState;
+    body.style.overflow = 'hidden';
+    body.style.position = 'fixed';
+    body.style.width = '100%';
+    body.style.left = '0';
+    body.style.top = `-${scrollY}px`;
+    body.classList.add('is-modal-open');
+  }
+
+  function unlockBodyScroll() {
+    const body = document.body;
+    if (!body) return;
+    const lockState = state.bodyScrollLock;
+    body.classList.remove('is-modal-open');
+    if (lockState) {
+      const { styles, scrollY } = lockState;
+      body.style.position = styles.position || '';
+      body.style.top = styles.top || '';
+      body.style.overflow = styles.overflow || '';
+      body.style.width = styles.width || '';
+      body.style.left = styles.left || '';
+      state.bodyScrollLock = null;
+      window.requestAnimationFrame(() => {
+        window.scrollTo({ top: scrollY || 0, left: 0 });
+      });
+    } else {
+      body.style.position = '';
+      body.style.top = '';
+      body.style.overflow = '';
+      body.style.width = '';
+      body.style.left = '';
+    }
+  }
+
+  function getModalFocusables() {
+    if (!ui.modalContent) return [];
+    return Array.from(ui.modalContent.querySelectorAll(FOCUSABLE_SELECTOR)).filter((element) => {
+      if (!(element instanceof HTMLElement)) return false;
+      if (element.hasAttribute('disabled')) return false;
+      if (element.getAttribute('aria-hidden') === 'true') return false;
+      if (element.tabIndex === -1) return false;
+      return element.offsetParent !== null;
+    });
+  }
+
+  function handleModalFocusTrap(event) {
+    if (event.key !== 'Tab' || !state.modalMetric || !ui.modalRoot || ui.modalRoot.hidden) {
+      return;
+    }
+    const focusables = getModalFocusables();
+    if (focusables.length === 0) {
+      event.preventDefault();
+      return;
+    }
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    const active = document.activeElement;
+    if (event.shiftKey) {
+      if (!active || !ui.modalContent?.contains(active) || active === first) {
+        event.preventDefault();
+        last.focus();
+      }
+    } else {
+      if (!active || !ui.modalContent?.contains(active) || active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+  }
+
+  function activateModalFocusTrap() {
+    state.modalReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    document.addEventListener('keydown', handleModalFocusTrap, true);
+    queueModalLayoutSync();
+    const focusables = getModalFocusables();
+    if (focusables.length > 0) {
+      window.requestAnimationFrame(() => {
+        focusables[0].focus();
+      });
+    } else if (ui.modalContent) {
+      window.requestAnimationFrame(() => {
+        ui.modalContent.focus?.();
+      });
+    }
+  }
+
+  function releaseModalFocusTrap() {
+    document.removeEventListener('keydown', handleModalFocusTrap, true);
+    const target = state.modalReturnFocus;
+    state.modalReturnFocus = null;
+    if (target && typeof target.focus === 'function') {
+      window.requestAnimationFrame(() => target.focus());
+    }
+  }
+
+  function queueModalLayoutSync() {
+    if (state.modalLayoutFrame) {
+      window.cancelAnimationFrame(state.modalLayoutFrame);
+    }
+    state.modalLayoutFrame = window.requestAnimationFrame(() => {
+      updateModalStickyOffsets();
+    });
+  }
+
+  function updateModalStickyOffsets() {
+    if (!ui.modalTabList || !ui.modalHeader) return;
+    const headerHeight = ui.modalHeader.getBoundingClientRect().height || 0;
+    const offset = Math.max(Math.round(headerHeight + 12), 72);
+    ui.modalTabList.style.setProperty('--tabs-offset', `${offset}px`);
+  }
+
+  function scheduleModalResize() {
+    if (!state.modalChart) return;
+    window.clearTimeout(state.modalResizeTimer);
+    state.modalResizeTimer = window.setTimeout(() => {
+      if (!state.modalChart) return;
+      try {
+        state.modalChart.resize();
+        state.modalChart.update('none');
+        queueModalLayoutSync();
+      } catch (error) {
+        console.warn('Chart-Resize fehlgeschlagen', error);
+      }
+    }, 100);
+  }
+
+  function attachModalResizeHandlers() {
+    if (!ui.modalCanvas || state.modalResizeActive) return;
+    const target = ui.modalCanvas.closest('.chart-modal__canvas');
+    if (!target) return;
+    state.modalResizeTarget = target;
+    if ('ResizeObserver' in window) {
+      if (!state.modalResizeObserver) {
+        state.modalResizeObserver = new ResizeObserver(() => scheduleModalResize());
+      }
+      state.modalResizeObserver.observe(target);
+    }
+    window.addEventListener('resize', scheduleModalResize);
+    window.addEventListener('orientationchange', scheduleModalResize);
+    state.modalResizeActive = true;
+    scheduleModalResize();
+  }
+
+  function detachModalResizeHandlers() {
+    if (!state.modalResizeActive) return;
+    window.removeEventListener('resize', scheduleModalResize);
+    window.removeEventListener('orientationchange', scheduleModalResize);
+    if (state.modalResizeObserver) {
+      try {
+        if (state.modalResizeTarget) {
+          state.modalResizeObserver.unobserve(state.modalResizeTarget);
+        }
+        state.modalResizeObserver.disconnect();
+      } catch (error) {
+        console.warn('ResizeObserver konnte nicht getrennt werden', error);
+      }
+    }
+    state.modalResizeTarget = null;
+    state.modalResizeActive = false;
+    window.clearTimeout(state.modalResizeTimer);
+    state.modalResizeTimer = 0;
   }
 
   function setupCardModalTrigger(card, metric) {
@@ -691,7 +879,7 @@
   }
 
   async function refreshNow() {
-    const response = await fetch('./api/now', { headers: { 'Accept': 'application/json' } });
+    const response = await fetch('/api/now', { headers: { 'Accept': 'application/json' } });
     if (!response.ok) {
       throw new Error('Fehler beim Laden der Live-Daten');
     }
@@ -1426,7 +1614,7 @@
         step: range.step,
         win: range.win
       });
-      const response = await fetch(`./api/series?${params.toString()}`);
+      const response = await fetch(`/api/series?${params.toString()}`);
       if (!response.ok) {
         throw new Error(`Fehler beim Laden der Serie ${metric}`);
       }
@@ -1474,6 +1662,7 @@
     ui.modalTabs.forEach((tab) => {
       tab.setAttribute('aria-selected', tab.getAttribute('data-range') === key ? 'true' : 'false');
     });
+    queueModalLayoutSync();
   }
 
   function refreshModalDetails(metric) {
@@ -1510,6 +1699,7 @@
       html += `<div data-tone="${tone || 'neutral'}"><dt>Aktuelle Phase</dt><dd>${phase.title}: ${statusLabel} (${valueText}) • Ziel ${rangeText}. ${evaluation.tip}</dd></div>`;
     }
     ui.modalInsight.innerHTML = html;
+    queueModalLayoutSync();
   }
 
   function updateModalCurrent(metric) {
@@ -1521,6 +1711,7 @@
       ui.modalCurrentValue.textContent = '—';
       ui.modalCurrentUnit.textContent = '';
       ui.modalCurrentLabel.textContent = 'Unbekannt';
+      queueModalLayoutSync();
       return;
     }
     const sample = state.now?.[metric];
@@ -1531,6 +1722,7 @@
       applyModalTone('neutral');
       ui.modalCurrentValue.textContent = '—';
       ui.modalCurrentLabel.textContent = 'Keine Daten';
+      queueModalLayoutSync();
       return;
     }
     const status = determineStatus(metric, sample.value);
@@ -1538,6 +1730,7 @@
     ui.modalCurrentLabel.textContent = status.label || 'Aktuell';
     ui.modalCurrent.dataset.tone = status.tone || status.intent || 'neutral';
     applyModalTone(status.tone || status.intent || 'neutral');
+    queueModalLayoutSync();
   }
 
   function applyModalTone(tone) {
@@ -1560,6 +1753,7 @@
     const scaleConfig = METRIC_INSIGHTS[metric]?.scale;
     if (!scaleConfig) {
       ui.modalScale.hidden = true;
+      queueModalLayoutSync();
       return;
     }
     ui.modalScale.hidden = false;
@@ -1616,6 +1810,7 @@
     if (ui.modalScaleCaption) {
       ui.modalScaleCaption.textContent = caption;
     }
+    queueModalLayoutSync();
   }
 
   function computeScalePosition(value, scale) {
@@ -1703,15 +1898,27 @@
     refreshModalDetails(metric);
     ui.modalTitle.textContent = definition.title || metricLabel(metric);
     ui.modalSub.textContent = 'Lade Daten …';
+    lockBodyScroll();
     ui.modalRoot.hidden = false;
-    document.body.style.overflow = 'hidden';
+    attachModalResizeHandlers();
+    activateModalFocusTrap();
+    queueModalLayoutSync();
     loadModalChart(metric, false).catch(handleError);
   }
 
   function closeChartModal() {
-    if (!ui.modalRoot) return;
+    if (!ui.modalRoot || ui.modalRoot.hidden) return;
     ui.modalRoot.hidden = true;
-    document.body.style.overflow = '';
+    releaseModalFocusTrap();
+    detachModalResizeHandlers();
+    if (state.modalLayoutFrame) {
+      window.cancelAnimationFrame(state.modalLayoutFrame);
+      state.modalLayoutFrame = 0;
+    }
+    if (ui.modalTabList) {
+      ui.modalTabList.style.removeProperty('--tabs-offset');
+    }
+    unlockBodyScroll();
     if (state.modalChart) {
       state.modalChart.destroy();
       state.modalChart = null;
@@ -1748,6 +1955,8 @@
       tension: 0.35,
       fill: 'start',
       pointRadius: 0,
+      pointHitRadius: 18,
+      pointHoverRadius: 4,
       borderWidth: 2,
       spanGaps: true
     }));
@@ -1763,9 +1972,17 @@
         responsive: true,
         maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
+        layout: { padding: { top: 8, right: 12, bottom: 8, left: 6 } },
         plugins: {
-          legend: { labels: { color: '#475569', boxWidth: 12, boxHeight: 12 } },
+          legend: { labels: { color: '#475569', boxWidth: 12, boxHeight: 12, padding: 12 } },
           tooltip: {
+            displayColors: false,
+            padding: 10,
+            boxPadding: 4,
+            cornerRadius: 10,
+            caretSize: 6,
+            backgroundColor: 'rgba(15, 23, 42, 0.92)',
+            position: 'nearest',
             callbacks: {
               label(context) {
                 const metricKey = definition.metrics[context.datasetIndex];
@@ -1791,11 +2008,12 @@
             title: { display: true, text: definition.yTitle, color: '#9ca3af' },
             ticks: {
               color: '#94a3b8',
+              maxTicksLimit: 6,
               callback(value) {
                 return formatScaleTick(value, definition.yTitle);
               }
             },
-            grid: { color: 'rgba(148, 163, 184, 0.15)', drawBorder: false },
+            grid: { color: 'rgba(148, 163, 184, 0.12)', lineWidth: 1, drawBorder: false },
             border: { display: false },
             suggestedMin: definition.yBounds?.min,
             suggestedMax: definition.yBounds?.max
@@ -1813,6 +2031,8 @@
       subParts.push(definition.yTitle);
     }
     ui.modalSub.textContent = subParts.join(' • ');
+    scheduleModalResize();
+    queueModalLayoutSync();
   }
 
   function buildTargetGuides(metric) {
@@ -1935,7 +2155,7 @@
     state.lastPressureFetch = Date.now();
     try {
       const params = new URLSearchParams({ name: 'Luftdruck', range: '3h', step: '15m', win: '30m' });
-      const response = await fetch(`./api/series?${params.toString()}`);
+      const response = await fetch(`/api/series?${params.toString()}`);
       if (!response.ok) return;
       const payload = await response.json();
       const values = normalizeSeriesValues(payload?.data);
@@ -1978,7 +2198,7 @@
         navigator.serviceWorker.ready.then((registration) => {
           registration.showNotification('AirGuard Hinweis', {
             body: message,
-            icon: './assets/logo.png',
+            icon: '/icons/icon-192.png',
             tag: 'airguard-alert'
           });
         });
@@ -2011,22 +2231,13 @@
     const { protocol, hostname } = window.location;
     const host = typeof hostname === 'string' ? hostname.toLowerCase() : '';
     const isLocalhost = ['localhost', '127.0.0.1', '::1'].includes(host);
-    const isLocalDomain = host.endsWith('.local');
-
-    if (!window.isSecureContext && !isLocalhost) {
-      console.info('Service Worker übersprungen: unsichere Umgebung.');
-      return;
-    }
-    if (protocol === 'https:' && isLocalDomain) {
-      console.info('Service Worker übersprungen: lokales Zertifikat nicht vertrauenswürdig.');
-      return;
-    }
     if (protocol !== 'https:' && !isLocalhost) {
+      console.info('Service Worker übersprungen: unsichere Umgebung.');
       return;
     }
 
     navigator.serviceWorker
-      .register('./sw.js')
+      .register('/sw.js')
       .then(() => console.info('Service Worker registriert'))
       .catch((error) => console.error('Service Worker Fehler', error));
   }
@@ -2083,12 +2294,12 @@
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true
       });
-      await fetch('./push/subscribe', {
+      await fetch('/push/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(subscription)
       });
-      await fetch('./push/test', { method: 'POST' });
+      await fetch('/push/test', { method: 'POST' });
     } catch (error) {
       console.warn('Push-Subscription fehlgeschlagen', error);
     }
