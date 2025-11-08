@@ -11,6 +11,54 @@
   if (Array.isArray(Chart.registerables)) {
     Chart.register(...Chart.registerables);
   }
+  const targetGuidePlugin = {
+    id: 'targetGuides',
+    afterDraw(chart, _args, opts) {
+      const guides = opts?.guides;
+      if (!Array.isArray(guides) || guides.length === 0) return;
+      const { ctx, chartArea } = chart;
+      const yScale = chart.scales?.y;
+      if (!ctx || !chartArea || !yScale) return;
+      const left = chartArea.left;
+      const right = chartArea.right;
+      ctx.save();
+      guides.forEach((guide) => {
+        const color = guide.color || STATUS_TONES.good;
+        const label = guide.label;
+        if (guide.min != null && guide.max != null) {
+          const top = yScale.getPixelForValue(guide.min);
+          const bottom = yScale.getPixelForValue(guide.max);
+          const startY = Math.min(top, bottom);
+          const height = Math.max(Math.abs(bottom - top), 2);
+          ctx.fillStyle = colorWithAlpha(color, 0.12);
+          ctx.fillRect(left, startY, right - left, height);
+          if (label) {
+            ctx.fillStyle = color;
+            ctx.font = '12px "Inter", sans-serif';
+            ctx.fillText(label, left + 8, startY + 14);
+          }
+        } else if (guide.value != null) {
+          const y = yScale.getPixelForValue(guide.value);
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([6, 6]);
+          ctx.beginPath();
+          ctx.moveTo(left, y);
+          ctx.lineTo(right, y);
+          ctx.stroke();
+          if (label) {
+            ctx.setLineDash([]);
+            ctx.fillStyle = color;
+            ctx.font = '12px "Inter", sans-serif';
+            ctx.fillText(label, left + 8, Math.max(chartArea.top + 12, y - 6));
+          }
+        }
+      });
+      ctx.restore();
+    }
+  };
+
+  Chart.register(targetGuidePlugin);
   Chart.defaults.font.family = "'Inter','Segoe UI',system-ui,sans-serif";
   Chart.defaults.color = '#6b7280';
   Chart.defaults.plugins.legend.labels.usePointStyle = true;
@@ -18,6 +66,7 @@
   Chart.defaults.plugins.tooltip.mode = 'index';
   Chart.defaults.plugins.tooltip.intersect = false;
 
+  const NARROW_SPACE = '\u202f';
   const CIRCUMFERENCE = 339.292;
   const NOW_REFRESH_MS = 60_000;
   const CHART_REFRESH_MS = 300_000;
@@ -86,6 +135,201 @@
     Farbtemperatur: { unit: 'K', decimals: 0, label: 'CCT' },
     'PM1.0': { unit: 'µg/m³', decimals: 1, label: 'PM1.0' },
     PM10: { unit: 'µg/m³', decimals: 1, label: 'PM10' }
+  };
+
+  const NOW_KEY_ALIASES = new Map([
+    ['temperatur', 'Temperatur'],
+    ['temperature', 'Temperatur'],
+    ['temperatur__bme_kalibriert_', 'Temperatur'],
+    ['temperatur_kalibriert', 'Temperatur'],
+    ['temp', 'Temperatur']
+  ]);
+
+  const STATUS_TONES = {
+    excellent: '#16a34a',
+    optimal: '#16a34a',
+    good: '#0ea5e9',
+    elevated: '#facc15',
+    warning: '#facc15',
+    poor: '#ef4444',
+    critical: '#ef4444',
+    neutral: '#94a3b8'
+  };
+
+  const SCALE_TONES = { ...STATUS_TONES };
+
+  const METRIC_INSIGHTS = {
+    CO2: {
+      sections: [
+        { title: 'Bedeutung', text: 'CO₂ zeigt, wie verbraucht die Raumluft ist und wie gut gelüftet wurde.' },
+        { title: 'Gesunde Werte', text: 'Unter 800 ppm ideal, bis 1000 ppm noch gut.' },
+        { title: 'Auswirkungen', text: 'Bei über 1000 ppm sinken Konzentration und Wohlbefinden; ab 1400 ppm drohen Kopfschmerzen und Müdigkeit.' },
+        { title: 'Verbesserung', text: 'Räume regelmäßig querlüften (5–10 Minuten), besonders bei mehreren Personen oder geschlossenen Fenstern.' }
+      ],
+      scale: {
+        unit: 'ppm',
+        min: 400,
+        max: 2000,
+        caption: 'Bewertung orientiert sich an Innenraumempfehlungen für CO₂.',
+        stops: [
+          { value: 800, label: 'Optimal', tone: 'excellent' },
+          { value: 1000, label: 'Stabil', tone: 'good' },
+          { value: 1400, label: 'Lüften', tone: 'elevated' },
+          { value: 2000, label: 'Alarm', tone: 'poor' }
+        ]
+      }
+    },
+    'PM2.5': {
+      sections: [
+        { title: 'Bedeutung', text: 'Feinstaub besteht aus winzigen Partikeln, die tief in die Lunge gelangen.' },
+        { title: 'Gesunde Werte', text: 'Unter 5 µg/m³ optimal, bis 12 µg/m³ gut.' },
+        { title: 'Auswirkungen', text: 'Langfristige Belastung kann Atemwege reizen und Entzündungen fördern.' },
+        { title: 'Verbesserung', text: 'Innenquellen vermeiden (Kerzen, Kochen, Staub), Luftreiniger mit HEPA-Filter verwenden.' }
+      ],
+      scale: {
+        unit: 'µg/m³',
+        min: 0,
+        max: 60,
+        caption: 'Grenzwerte angelehnt an WHO-Empfehlungen für Feinstaub.',
+        stops: [
+          { value: 5, label: 'Rein', tone: 'excellent' },
+          { value: 12, label: 'Okay', tone: 'good' },
+          { value: 25, label: 'Belastet', tone: 'elevated' },
+          { value: 50, label: 'Kritisch', tone: 'poor' }
+        ]
+      }
+    },
+    TVOC: {
+      sections: [
+        { title: 'Bedeutung', text: 'TVOCs entstehen durch Ausdünstungen aus Möbeln, Farben, Reinigern oder Parfums.' },
+        { title: 'Gesunde Werte', text: 'Unter 150 ppb ideal, bis 300 ppb gut.' },
+        { title: 'Auswirkungen', text: 'Hohe Werte können Kopfschmerzen, Reizungen oder Schwindel verursachen.' },
+        { title: 'Verbesserung', text: 'Regelmäßig lüften, Duft- und Chemikalienquellen reduzieren.' }
+      ],
+      scale: {
+        unit: 'ppb',
+        min: 0,
+        max: 1200,
+        caption: 'Bewertung orientiert sich an Innenraum-Leitwerten für VOC.',
+        stops: [
+          { value: 150, label: 'Niedrig', tone: 'excellent' },
+          { value: 300, label: 'Unauffällig', tone: 'good' },
+          { value: 600, label: 'Ansteigen', tone: 'elevated' },
+          { value: 1000, label: 'Hoch', tone: 'poor' }
+        ]
+      }
+    },
+    Temperatur: {
+      sections: [
+        { title: 'Bedeutung', text: 'Raumtemperatur beeinflusst direkt das Wohlbefinden, die Konzentration und den Schlaf.' },
+        { title: 'Gesunde Werte', text: '20–24 °C optimal, darunter kühl, darüber ermüdend.' },
+        { title: 'Auswirkungen', text: 'Zu kalt: Unbehagen, trockene Luft. Zu warm: Müdigkeit, sinkende Leistungsfähigkeit.' },
+        { title: 'Verbesserung', text: 'Heizen, Beschatten oder Lüften, um die Komfortzone zu halten; Schlafzimmer kühler, Arbeitsräume wärmer.' }
+      ],
+      scale: {
+        unit: '°C',
+        min: 16,
+        max: 30,
+        caption: 'Komfortbereich nach Empfehlungen für Wohn- und Arbeitsräume.',
+        stops: [
+          { value: 19, label: 'Kühl', tone: 'elevated' },
+          { value: 22, label: 'Komfort', tone: 'excellent' },
+          { value: 25, label: 'Warm', tone: 'elevated' },
+          { value: 28, label: 'Heiß', tone: 'poor' }
+        ]
+      }
+    },
+    'rel. Feuchte': {
+      sections: [
+        { title: 'Bedeutung', text: 'Gibt an, wie viel Wasserdampf die Luft enthält – wichtig für Wohlbefinden und Schimmelprävention.' },
+        { title: 'Gesunde Werte', text: '40–55 % ideal.' },
+        { title: 'Auswirkungen', text: 'Unter 35 % trockene Schleimhäute; über 60 % Schimmelgefahr.' },
+        { title: 'Verbesserung', text: 'Luftbefeuchter oder Pflanzen bei Trockenheit, Stoßlüften oder Entfeuchter bei hoher Feuchte.' }
+      ],
+      scale: {
+        unit: '%',
+        min: 20,
+        max: 80,
+        caption: 'Komfortband nach Innenraumempfehlungen für relative Feuchte.',
+        stops: [
+          { value: 35, label: 'Trocken', tone: 'poor' },
+          { value: 45, label: 'Wohlfühl', tone: 'excellent' },
+          { value: 60, label: 'Feucht', tone: 'elevated' },
+          { value: 70, label: 'Nass', tone: 'poor' }
+        ]
+      }
+    },
+    Lux: {
+      sections: [
+        { title: 'Bedeutung', text: 'Lux beschreibt die Beleuchtungsstärke im Raum und beeinflusst Konzentration, Stimmung und Biorhythmus.' },
+        { title: 'Gesunde Werte', text: '300–1000 lx sind ideal für Alltag und Arbeit.' },
+        { title: 'Auswirkungen', text: 'Zu wenig Licht macht müde; zu viel blendet und kann unangenehm sein.' },
+        { title: 'Verbesserung', text: 'Natürliches Licht tagsüber nutzen, abends warmes Licht; Arbeitszonen gleichmäßig ausleuchten.' }
+      ],
+      scale: {
+        unit: 'lx',
+        min: 0,
+        max: 1800,
+        caption: 'Skala orientiert sich an circadianen Zielbereichen für Lichtintensität.',
+        stops: [
+          { value: 100, label: 'Dämmerig', tone: 'elevated' },
+          { value: 350, label: 'Komfort', tone: 'excellent' },
+          { value: 800, label: 'Aktiv', tone: 'good' },
+          { value: 1500, label: 'Blendung', tone: 'poor' }
+        ]
+      }
+    },
+    Farbtemperatur: {
+      sections: [
+        { title: 'Bedeutung', text: 'Die Farbtemperatur zeigt, ob Licht warm (gelblich) oder kalt (bläulich) wirkt.' },
+        { title: 'Gesunde Werte', text: '4000–5000 K gelten als neutral und angenehm.' },
+        { title: 'Auswirkungen', text: 'Kaltes Licht aktiviert, warmes Licht beruhigt – ideal zur Steuerung des circadianen Rhythmus.' },
+        { title: 'Verbesserung', text: 'Morgens und tagsüber kühleres Licht (5000–6000 K), abends warmes Licht (2700–3500 K).' }
+      ],
+      scale: {
+        unit: 'K',
+        min: 1800,
+        max: 6800,
+        caption: 'Skala spiegelt die circadiane Empfehlung für Lichtfarbe wider.',
+        stops: [
+          { value: 3200, label: 'Abend', tone: 'elevated' },
+          { value: 4500, label: 'Neutral', tone: 'excellent' },
+          { value: 5500, label: 'Tag', tone: 'good' },
+          { value: 6500, label: 'Sehr kühl', tone: 'poor' }
+        ]
+      }
+    },
+    Luftdruck: {
+      sections: [
+        { title: 'Bedeutung', text: 'Luftdruck schwankt mit dem Wetter und beeinflusst Kreislauf und Wohlbefinden.' },
+        { title: 'Gesunde Werte', text: '980–1030 hPa.' },
+        { title: 'Auswirkungen', text: 'Sinkender Druck kann Kopfschmerzen oder Wetterfühligkeit auslösen.' },
+        { title: 'Verbesserung', text: 'Keine direkte Steuerung möglich – dient zur Beobachtung von Wettertrends.' }
+      ],
+      scale: {
+        unit: 'hPa',
+        min: 960,
+        max: 1040,
+        caption: 'Typischer Bereich für den mitteleuropäischen Luftdruck.',
+        stops: [
+          { value: 980, label: 'Tiefdruck', tone: 'elevated' },
+          { value: 1005, label: 'Neutral', tone: 'good' },
+          { value: 1030, label: 'Hoch', tone: 'excellent' },
+          { value: 1040, label: 'Sehr hoch', tone: 'elevated' }
+        ]
+      }
+    }
+  };
+
+  const TARGET_GUIDES = {
+    CO2: [{ value: 800, unit: 'ppm', label: 'Ziel 800 ppm' }],
+    'PM2.5': [{ value: 12, unit: 'µg/m³', label: 'WHO 12 µg/m³' }],
+    TVOC: [{ value: 300, unit: 'ppb', label: 'Ziel 300 ppb' }],
+    Temperatur: [{ min: 20, max: 24, unit: '°C', label: 'Komfort 20–24 °C' }],
+    'rel. Feuchte': [{ min: 40, max: 55, unit: '%', label: 'Komfort 40–55 %' }],
+    Lux: [{ dynamic: 'lux', unit: 'lx' }],
+    Farbtemperatur: [{ dynamic: 'cct', unit: 'K' }],
+    Luftdruck: [{ value: 1013, unit: 'hPa', label: 'Referenz 1013 hPa' }]
   };
 
   const CHART_DEFINITIONS = {
@@ -220,11 +464,25 @@
     toastText: null,
     toastClose: null,
     modalRoot: null,
+    modalHeader: null,
     modalTitle: null,
     modalSub: null,
     modalCanvas: null,
+    modalTabList: null,
     modalTabs: [],
-    modalCloseButtons: []
+    modalCloseButtons: [],
+    modalCurrent: null,
+    modalCurrentValue: null,
+    modalCurrentUnit: null,
+    modalCurrentLabel: null,
+    modalInsight: null,
+    modalScale: null,
+    modalScaleLabels: null,
+    modalScaleValues: null,
+    modalScaleGradient: null,
+    modalScaleMarker: null,
+    modalScaleMarkerValue: null,
+    modalScaleCaption: null
   };
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -291,9 +549,23 @@
     });
 
     ui.modalRoot = document.getElementById('chart-modal');
+    ui.modalHeader = document.querySelector('.chart-modal__header');
     ui.modalTitle = document.getElementById('chart-modal-title');
     ui.modalSub = document.getElementById('chart-modal-sub');
     ui.modalCanvas = document.getElementById('chart-modal-canvas');
+    ui.modalCurrent = document.getElementById('chart-modal-current');
+    ui.modalCurrentValue = document.getElementById('chart-modal-current-value');
+    ui.modalCurrentUnit = document.getElementById('chart-modal-current-unit');
+    ui.modalCurrentLabel = document.getElementById('chart-modal-current-label');
+    ui.modalInsight = document.getElementById('chart-modal-insight');
+    ui.modalScale = document.getElementById('chart-modal-scale');
+    ui.modalScaleLabels = document.getElementById('chart-modal-scale-labels');
+    ui.modalScaleValues = document.getElementById('chart-modal-scale-values');
+    ui.modalScaleGradient = document.getElementById('chart-modal-scale-gradient');
+    ui.modalScaleMarker = document.getElementById('chart-modal-scale-marker');
+    ui.modalScaleMarkerValue = document.getElementById('chart-modal-scale-marker-value');
+    ui.modalScaleCaption = document.getElementById('chart-modal-scale-caption');
+    ui.modalTabList = document.querySelector('.modal-range-tabs');
     ui.modalTabs = Array.from(document.querySelectorAll('.modal-tab'));
     ui.modalCloseButtons = Array.from(document.querySelectorAll('[data-close="true"]'));
 
@@ -440,6 +712,9 @@
     updateStatusCards(displayData);
     updateCircadian(displayData);
     checkAlerts(displayData);
+    if (state.modalMetric) {
+      refreshModalDetails(state.modalMetric);
+    }
     if (displayData['Luftdruck']) {
       refreshPressureTrend().catch((error) => console.warn('Drucktrend Fehler', error));
     }
@@ -447,11 +722,98 @@
 
   function normalizeNowData(raw) {
     const mapped = {};
-    for (const [key, value] of Object.entries(raw)) {
+    const fallbackTs = Date.now();
+    for (const [rawKey, value] of Object.entries(raw)) {
       if (value == null) continue;
-      mapped[key] = value;
+      if (rawKey == null) continue;
+      const normalizedKey = typeof rawKey === 'string' ? rawKey.trim() : rawKey;
+      const lowerKey = typeof normalizedKey === 'string' ? normalizedKey.toLowerCase() : normalizedKey;
+      const aliasTarget = typeof normalizedKey === 'string'
+        ? NOW_KEY_ALIASES.get(normalizedKey) || NOW_KEY_ALIASES.get(lowerKey)
+        : null;
+      let key = aliasTarget || normalizedKey;
+      if (typeof key === 'string') {
+        const lowered = key.toLowerCase();
+        if (lowered.includes('temperatur') && !lowered.includes('farb')) {
+          key = 'Temperatur';
+        }
+      }
+      const sample = normalizeNowSample(value, fallbackTs);
+      if (!sample) continue;
+      const existing = mapped[key];
+      if (!existing || (sample.ts && (!existing.ts || sample.ts >= existing.ts))) {
+        mapped[key] = sample;
+      }
     }
     return mapped;
+  }
+
+  function normalizeNowSample(value, fallbackTs) {
+    if (value == null) return null;
+    if (typeof value === 'object' && value !== null) {
+      const cloned = { ...value };
+      if ('value' in cloned) {
+        const numeric = parseNumeric(cloned.value);
+        if (Number.isFinite(numeric)) {
+          cloned.value = numeric;
+        } else {
+          return null;
+        }
+      }
+      if ('ts' in cloned) {
+        const numericTs = parseInt(cloned.ts, 10);
+        if (Number.isFinite(numericTs)) {
+          cloned.ts = numericTs;
+        } else {
+          delete cloned.ts;
+        }
+      }
+      if (typeof cloned.value !== 'number' || !Number.isFinite(cloned.value)) {
+        return null;
+      }
+      if (!('ts' in cloned)) {
+        cloned.ts = fallbackTs;
+      }
+      return cloned;
+    }
+    const numeric = parseNumeric(value);
+    if (!Number.isFinite(numeric)) {
+      return null;
+    }
+    return { value: numeric, ts: fallbackTs };
+  }
+
+  function parseNumeric(input) {
+    if (typeof input === 'number') {
+      return Number.isFinite(input) ? input : NaN;
+    }
+    if (typeof input === 'string') {
+      const trimmed = input.trim();
+      if (!trimmed) {
+        return NaN;
+      }
+      const cleaned = trimmed
+        .replace(/\u202f/g, '')
+        .replace(/\s/g, '')
+        .replace(/[^0-9.,+\-]/g, '');
+      if (!cleaned) {
+        return NaN;
+      }
+      let normalized = cleaned;
+      if (normalized.includes(',')) {
+        normalized = normalized.replace(/\./g, '');
+        normalized = normalized.replace(/,/g, '.');
+      } else {
+        const parts = normalized.split('.');
+        if (parts.length > 2) {
+          const fraction = parts.pop();
+          normalized = `${parts.join('')}.${fraction}`;
+        }
+      }
+      const numeric = Number.parseFloat(normalized);
+      return Number.isFinite(numeric) ? numeric : NaN;
+    }
+    return NaN;
   }
 
   function updateTimestamp(ts) {
@@ -500,87 +862,93 @@
     switch (metric) {
       case 'CO2':
         if (value <= 800) {
-          return buildStatus('excellent', 'Hervorragend', 'Luft sehr frisch.', 'Kein Handlungsbedarf.');
+          return buildStatus('excellent', 'Frisch', 'Luft sehr frisch.', 'Kein Handlungsbedarf.');
         }
         if (value <= 1000) {
-          return buildStatus('good', 'Gut', 'Werte stabil.', 'Regelmäßig weiter lüften.');
+          return buildStatus('good', 'Stabil', 'Werte im grünen Bereich.', 'Regelmäßig lüften hält das Niveau.');
         }
-        if (value <= 1500) {
-          return buildStatus('elevated', 'Erhöht', 'Konzentration nimmt ab.', 'Jetzt lüften empfohlen.');
+        if (value <= 1400) {
+          return buildStatus('elevated', 'Lüften', 'Konzentration lässt nach.', 'Jetzt querlüften.');
         }
-        return buildStatus('poor', 'Schlecht', 'Sehr hohe CO₂-Belastung.', 'Fenster öffnen oder Lüftung aktivieren.');
+        return buildStatus('poor', 'Alarm', 'Sehr hohe CO₂-Belastung.', 'Fenster öffnen oder Lüftung aktivieren.');
       case 'PM2.5':
-        if (value <= 10) {
-          return buildStatus('excellent', 'Hervorragend', 'Partikel kaum messbar.', 'Saubere Luft – weiter so.');
+        if (value <= 5) {
+          return buildStatus('excellent', 'Rein', 'Partikel kaum messbar.', 'Weiter so.');
         }
-        if (value <= 15) {
-          return buildStatus('good', 'Gut', 'Feinstaub niedrig.', 'Sanft lüften, um es so zu halten.');
+        if (value <= 12) {
+          return buildStatus('good', 'Okay', 'Feinstaub gering.', 'Leicht lüften genügt.');
         }
-        if (value <= 35) {
-          return buildStatus('elevated', 'Mittel', 'Belastung steigt leicht.', 'Luftreiniger prüfen & lüften.');
+        if (value <= 25) {
+          return buildStatus('elevated', 'Anstieg', 'Belastung nimmt zu.', 'Luftreiniger prüfen und lüften.');
         }
-        return buildStatus('poor', 'Schlecht', 'Hohe Partikelbelastung.', 'Sofort lüften oder Filter aktivieren.');
+        return buildStatus('poor', 'Hoch', 'Deutliche Feinstaubbelastung.', 'Sofort lüften oder Filter aktivieren.');
       case 'TVOC':
-        if (value <= 200) {
-          return buildStatus('excellent', 'Hervorragend', 'Kaum VOC-Belastung.', 'Keine Aktion nötig.');
+        if (value <= 150) {
+          return buildStatus('excellent', 'Niedrig', 'Kaum VOC-Belastung.', 'Keine Aktion nötig.');
         }
-        if (value <= 400) {
-          return buildStatus('good', 'Gut', 'Werte unkritisch.', 'Regelmäßig lüften hält die Luft frisch.');
+        if (value <= 300) {
+          return buildStatus('good', 'Stabil', 'Werte unkritisch.', 'Regelmäßig lüften hält die Luft frisch.');
         }
-        if (value <= 1000) {
-          return buildStatus('elevated', 'Erhöht', 'Flüchtige Stoffe nehmen zu.', 'Quellen prüfen & lüften.');
+        if (value <= 600) {
+          return buildStatus('elevated', 'Achtung', 'Flüchtige Stoffe nehmen zu.', 'Quellen prüfen und lüften.');
         }
-        return buildStatus('poor', 'Schlecht', 'Hohe VOC-Belastung.', 'Sofort lüften und Quellen entfernen.');
+        return buildStatus('poor', 'Hoch', 'Hohe VOC-Belastung.', 'Lüften und Auslöser reduzieren.');
       case 'Temperatur':
-        if (value < 18) {
-          return buildStatus('cool', 'Kühl', 'Raumtemperatur niedrig.', 'Heizung leicht erhöhen.');
+        if (value < 19) {
+          return buildStatus('poor', 'Kalt', 'Deutlich unter dem Komfortbereich.', 'Heizung anpassen oder wärmer kleiden.');
         }
         if (value < 20) {
-          return buildStatus('cool', 'Frisch', 'Etwas kühl.', 'Sanft nachheizen möglich.');
+          return buildStatus('elevated', 'Kühl', 'Etwas unter der Komfortzone.', 'Behutsam aufheizen.');
         }
-        if (value <= 23) {
-          return buildStatus('good', 'Komfort', 'Wohlfühlbereich erreicht.', 'Perfekt für Alltag & Fokus.');
+        if (value <= 24) {
+          return buildStatus('excellent', 'Komfort', 'Im Wohlfühlbereich.', 'Temperatur beibehalten.');
         }
         if (value <= 26) {
-          return buildStatus('elevated', 'Warm', 'Leicht erhöht.', 'Leicht abkühlen oder lüften.');
+          return buildStatus('elevated', 'Warm', 'Leicht über der Komfortzone.', 'Stoßlüften oder Beschattung nutzen.');
         }
-        return buildStatus('warm', 'Sehr warm', 'Hitze belastet den Schlaf.', 'Aktiv kühlen oder beschatten.');
+        return buildStatus('poor', 'Heiß', 'Sehr warm belastet Kreislauf und Schlaf.', 'Aktiv kühlen und konsequent lüften.');
       case 'rel. Feuchte':
-        if (value < 30) {
-          return buildStatus('dry', 'Trocken', 'Luft zu trocken.', 'Luft befeuchten oder Pflanzen gießen.');
+        if (value < 35) {
+          return buildStatus('poor', 'Trocken', 'Luft sehr trocken.', 'Befeuchten, Pflanzen oder Wasserschalen nutzen.');
+        }
+        if (value < 40) {
+          return buildStatus('elevated', 'Leicht trocken', 'Unterer Komfortbereich.', 'Sanft befeuchten oder lüften.');
+        }
+        if (value <= 55) {
+          return buildStatus('excellent', 'Ideal', 'Im Wohlfühlband.', 'Aktuelles Verhalten passt.');
         }
         if (value <= 60) {
-          return buildStatus('good', 'Ok', 'Optimale Luftfeuchte.', 'Weiter regelmäßig lüften.');
+          return buildStatus('good', 'Feucht', 'Etwas erhöhte Luftfeuchte.', 'Regelmäßig lüften.');
         }
         if (value <= 70) {
-          return buildStatus('humid', 'Feucht', 'Leicht erhöht.', 'Stoßlüften und trocknen.');
+          return buildStatus('elevated', 'Sehr feucht', 'Schimmelgefahr steigt.', 'Stoßlüften und trocknen.');
         }
-        return buildStatus('poor', 'Sehr feucht', 'Schimmelrisiko steigt.', 'Entfeuchten oder stärker lüften.');
+        return buildStatus('poor', 'Nass', 'Luftfeuchte stark erhöht.', 'Entfeuchter einsetzen und dauerhaft lüften.');
       case 'Lux':
-        if (value < 50) {
-          return buildStatus('cool', 'Sehr dunkel', 'Kaum Beleuchtung vorhanden.', 'Licht erhöhen oder Vorhänge öffnen.');
+        if (value < 150) {
+          return buildStatus('poor', 'Dunkel', 'Licht deutlich zu schwach.', 'Lichtquellen verstärken oder Tageslicht nutzen.');
         }
-        if (value <= 400) {
-          return buildStatus('good', 'Angenehm', 'Helles, aber sanftes Licht.', 'Beleuchtung beibehalten.');
+        if (value < 300) {
+          return buildStatus('elevated', 'Sanft', 'Etwas mehr Licht steigert die Aktivität.', 'Arbeitslicht einschalten oder Vorhänge öffnen.');
         }
-        if (value <= 800) {
-          return buildStatus('elevated', 'Hell', 'Sehr kräftiges Licht.', 'Blendungen reduzieren oder dimmen.');
+        if (value <= 1000) {
+          return buildStatus('excellent', 'Komfort', 'Ausgewogene Beleuchtung.', 'Lichtsituation beibehalten.');
         }
-        return buildStatus('warm', 'Sehr hell', 'Extrem helle Umgebung.', 'Dimmen oder indirektes Licht nutzen.');
+        if (value <= 1600) {
+          return buildStatus('good', 'Hell', 'Kräftiges Licht unterstützt Wachheit.', 'Blendquellen prüfen.');
+        }
+        return buildStatus('poor', 'Blendung', 'Sehr helle Beleuchtung kann ermüden.', 'Dimmen oder indirektes Licht nutzen.');
       case 'Farbtemperatur':
-        if (value < 2600) {
-          return buildStatus('warm', 'Sehr warm', 'Licht wirkt stark warm.', 'Etwas kühler einstellen für Fokus.');
+        if (value < 3000) {
+          return buildStatus('elevated', 'Warm', 'Sehr warmes Licht beruhigt.', 'Für Fokusphasen etwas kühler werden.');
         }
-        if (value < 3200) {
-          return buildStatus('warm', 'Warm', 'Gemütliches Warmweiß.', 'Ideal für Abend & Entspannung.');
+        if (value < 4200) {
+          return buildStatus('excellent', 'Neutral', 'Ausgeglichenes Tageslichtweiß.', 'Optimal für klares Arbeiten.');
         }
-        if (value <= 5000) {
-          return buildStatus('good', 'Neutral', 'Ausgeglichenes Weißlicht.', 'Perfekt für Alltag & Arbeit.');
+        if (value <= 5500) {
+          return buildStatus('good', 'Kühl', 'Aktivierendes Licht steigert Aufmerksamkeit.', 'Abends langsam auf warmes Licht wechseln.');
         }
-        if (value <= 6500) {
-          return buildStatus('cool', 'Frisch', 'Kühles, aktivierendes Licht.', 'Gut für konzentriertes Arbeiten.');
-        }
-        return buildStatus('cool', 'Sehr kühl', 'Licht wirkt sehr kalt.', 'Für Wohlbefinden etwas wärmer stellen.');
+        return buildStatus('poor', 'Sehr kühl', 'Licht sehr kalt, kann den Biorhythmus stören.', 'Später am Tag wärmere Lichtfarbe wählen.');
       default:
         return { tone: 'neutral', intent: 'neutral', label: '', note: '', tip: '' };
     }
@@ -662,17 +1030,16 @@
 
   function toneToColor(tone) {
     const palette = {
-      excellent: '#10b981',
-      good: '#22c55e',
-      elevated: '#f59e0b',
-      dry: '#f59e0b',
-      humid: '#06b6d4',
+      excellent: '#16a34a',
+      optimal: '#16a34a',
+      good: '#0ea5e9',
+      elevated: '#facc15',
+      warning: '#facc15',
       poor: '#ef4444',
-      warm: '#f97316',
-      cool: '#3b82f6',
+      critical: '#ef4444',
       neutral: '#94a3b8'
     };
-    return palette[tone] || '#06b6d4';
+    return palette[tone] || '#0ea5e9';
   }
 
   function computeTrend(metric) {
@@ -847,19 +1214,21 @@
     ui.circadianPhase.textContent = `${phase.title} • ${phase.window}`;
     ui.circadianStatus.textContent = evaluation.cctStatus;
     ui.circadianTip.textContent = evaluation.tip;
-    ui.cctNow.textContent = cctValue != null ? `${formatNumber(cctValue, 0)} K` : '— K';
-    ui.cctTarget.textContent = `Ziel ${phase.cctRange[0]}–${phase.cctRange[1]} K`;
+    const cctRangeLabel = `${formatNumber(phase.cctRange[0], 0)}–${formatNumber(phase.cctRange[1], 0)}${NARROW_SPACE}K`;
+    const luxRangeLabel = `${formatNumber(phase.luxRange[0], 0)}–${formatNumber(phase.luxRange[1], 0)}${NARROW_SPACE}lx`;
+    ui.cctNow.textContent = formatWithUnit(cctValue, 'K', 0);
+    ui.cctTarget.textContent = `Ziel ${cctRangeLabel}`;
     ui.cctEval.dataset.tone = evaluation.cctTone;
     ui.cctEval.textContent = evaluation.cctLabel;
-    ui.luxNow.textContent = luxValue != null ? `${formatNumber(luxValue, 0)} lx` : '— lx';
-    ui.luxTarget.textContent = `Ziel ${phase.luxRange[0]}–${phase.luxRange[1]} lx`;
+    ui.luxNow.textContent = formatWithUnit(luxValue, 'lx', 0);
+    ui.luxTarget.textContent = `Ziel ${luxRangeLabel}`;
     ui.luxEval.dataset.tone = evaluation.luxTone;
     ui.luxEval.textContent = evaluation.luxLabel;
     if (ui.barCct) {
-      ui.barCct.setAttribute('data-range-label', `Ziel ${phase.cctRange[0]}–${phase.cctRange[1]} K`);
+      ui.barCct.setAttribute('data-range-label', `Ziel ${cctRangeLabel}`);
     }
     if (ui.barLux) {
-      ui.barLux.setAttribute('data-range-label', `Ziel ${phase.luxRange[0]}–${phase.luxRange[1]} lx`);
+      ui.barLux.setAttribute('data-range-label', `Ziel ${luxRangeLabel}`);
     }
 
     updateBarTrack(ui.barCct, cctValue, phase.cctRange, CCT_RANGE, evaluation.cctTone);
@@ -875,12 +1244,13 @@
     const now = new Date();
     const minutes = now.getHours() * 60 + now.getMinutes();
     const percent = (minutes / (24 * 60)) * 100;
-    ui.circadianCycle.style.setProperty('--cycle-pos', `${clamp(percent, 0, 100)}%`);
+    const bounded = clamp(percent, 3, 97);
+    ui.circadianCycle.style.setProperty('--cycle-pos', `${bounded}%`);
     if (ui.circadianCycleLabel) {
       ui.circadianCycleLabel.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
     if (ui.circadianCycleMarker) {
-      ui.circadianCycleMarker.style.left = `${clamp(percent, 0, 100)}%`;
+      ui.circadianCycleMarker.style.left = `${bounded}%`;
       const isDaytime = minutes >= 360 && minutes < 1080;
       ui.circadianCycleMarker.dataset.period = isDaytime ? 'day' : 'night';
       ui.circadianCycleMarker.textContent = isDaytime ? '☀' : '☾';
@@ -918,17 +1288,17 @@
       cctLabel = 'keine Daten';
       cctTone = 'neutral';
       cctStatus = 'CCT unbekannt';
-      actionText = 'CCT Sensor prüfen';
+      actionText = 'CCT-Sensor prüfen';
     } else if (cct < cctMin) {
-      cctLabel = 'zu kalt';
-      cctTone = 'cool';
-      cctStatus = 'CCT zu kalt';
-      actionText = 'wärmer stellen';
-    } else if (cct > cctMax) {
       cctLabel = 'zu warm';
-      cctTone = 'warm';
-      cctStatus = 'CCT zu warm';
-      actionText = 'kühler einstellen';
+      cctTone = 'elevated';
+      cctStatus = 'CCT unter Ziel';
+      actionText = 'Licht kühler einstellen';
+    } else if (cct > cctMax) {
+      cctLabel = 'zu kalt';
+      cctTone = 'poor';
+      cctStatus = 'CCT über Ziel';
+      actionText = 'Licht wärmer stellen';
     } else {
       cctLabel = 'im Ziel';
       cctTone = 'excellent';
@@ -938,24 +1308,36 @@
 
     let luxLabel;
     let luxTone;
+    let luxAction;
     if (lux == null) {
       luxLabel = 'keine Daten';
       luxTone = 'neutral';
+      luxAction = 'Lux-Sensor prüfen';
     } else if (lux < luxMin) {
       luxLabel = 'zu dunkel';
-      luxTone = 'cool';
+      luxTone = 'elevated';
+      luxAction = 'Helligkeit erhöhen';
     } else if (lux > luxMax) {
       luxLabel = 'zu hell';
-      luxTone = 'warm';
+      luxTone = 'poor';
+      luxAction = 'Licht dimmen';
     } else {
-      luxLabel = 'ok';
+      luxLabel = 'im Ziel';
       luxTone = 'excellent';
+      luxAction = 'Helligkeit passt';
     }
 
     const luxText = lux != null
-      ? `Lux ${formatNumber(lux, 0)} → Ziel ${luxMin}–${luxMax}`
-      : 'Lux Sensor prüfen';
-    const tip = `${phase.context}: ${actionText}${luxText ? `, ${luxText}` : ''}`;
+      ? `Lux ${formatNumber(lux, 0)}${NARROW_SPACE}lx → Ziel ${formatNumber(luxMin, 0)}–${formatNumber(luxMax, 0)}${NARROW_SPACE}lx`
+      : '';
+    const tipParts = [phase.context, actionText];
+    if (luxAction && luxAction !== 'Helligkeit passt') {
+      tipParts.push(luxAction);
+    }
+    if (luxText) {
+      tipParts.push(luxText);
+    }
+    const tip = tipParts.filter(Boolean).join(' • ');
 
     return {
       cctStatus,
@@ -969,17 +1351,18 @@
 
   function updateBarTrack(track, value, targetRange, bounds, tone) {
     if (!track) return;
-    const span = bounds.max - bounds.min;
-    const startPercent = ((targetRange[0] - bounds.min) / span) * 100;
-    const endPercent = ((targetRange[1] - bounds.min) / span) * 100;
+    const scale = { min: bounds.min, max: bounds.max };
+    const span = scale.max - scale.min || 1;
+    const startPercent = ((targetRange[0] - scale.min) / span) * 100;
+    const endPercent = ((targetRange[1] - scale.min) / span) * 100;
     track.style.setProperty('--target-start', `${clamp(startPercent, 0, 100)}%`);
     track.style.setProperty('--target-end', `${clamp(endPercent, 0, 100)}%`);
     if (value == null || !isFinite(value)) {
       track.dataset.state = 'hidden';
       track.style.setProperty('--marker-pos', '-999%');
     } else {
-      const markerPercent = ((value - bounds.min) / span) * 100;
-      track.style.setProperty('--marker-pos', `${clamp(markerPercent, 0, 100)}%`);
+      const markerPercent = computeMarkerPosition(value, scale);
+      track.style.setProperty('--marker-pos', `${markerPercent}%`);
       track.dataset.state = 'visible';
     }
     track.dataset.intent = tone || 'neutral';
@@ -996,10 +1379,23 @@
   }
 
   function formatNumber(value, decimals) {
-    return Number(value).toLocaleString('de-DE', {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      return '—';
+    }
+    const formatted = numeric.toLocaleString('de-DE', {
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals
     });
+    return formatted.replace(/\./g, NARROW_SPACE);
+  }
+
+  function formatWithUnit(value, unit, decimals) {
+    const number = formatNumber(value, decimals);
+    if (number === '—') {
+      return `—${unit ? `${NARROW_SPACE}${unit}` : ''}`;
+    }
+    return unit ? `${number}${NARROW_SPACE}${unit}` : number;
   }
 
   async function preloadSeries(force) {
@@ -1080,6 +1476,218 @@
     });
   }
 
+  function refreshModalDetails(metric) {
+    updateModalCurrent(metric);
+    updateModalScale(metric);
+  }
+
+  function updateModalInsight(metric) {
+    if (!ui.modalInsight) return;
+    const insight = METRIC_INSIGHTS[metric];
+    if (!insight?.sections?.length) {
+      ui.modalInsight.innerHTML =
+        '<div><dt>Hinweis</dt><dd>Für diese Messgröße liegen derzeit keine Zusatzinformationen vor.</dd></div>';
+      return;
+    }
+    let html = insight.sections
+      .map((section) => `<div><dt>${section.title}</dt><dd>${section.text}</dd></div>`)
+      .join('');
+    if (metric === 'Lux' || metric === 'Farbtemperatur') {
+      const phase = resolveCircadianPhase();
+      const cctValue = state.now?.Farbtemperatur?.value;
+      const luxValue = state.now?.Lux?.value;
+      const evaluation = evaluateCircadian(cctValue, luxValue, phase);
+      const isLux = metric === 'Lux';
+      const unit = isLux ? 'lx' : 'K';
+      const currentValue = isLux ? luxValue : cctValue;
+      const range = isLux ? phase.luxRange : phase.cctRange;
+      const statusLabel = isLux ? evaluation.luxLabel : evaluation.cctLabel;
+      const tone = isLux ? evaluation.luxTone : evaluation.cctTone;
+      const valueText = currentValue != null
+        ? formatWithUnit(currentValue, unit, 0)
+        : `—${NARROW_SPACE}${unit}`;
+      const rangeText = `${formatNumber(range[0], 0)}–${formatNumber(range[1], 0)}${NARROW_SPACE}${unit}`;
+      html += `<div data-tone="${tone || 'neutral'}"><dt>Aktuelle Phase</dt><dd>${phase.title}: ${statusLabel} (${valueText}) • Ziel ${rangeText}. ${evaluation.tip}</dd></div>`;
+    }
+    ui.modalInsight.innerHTML = html;
+  }
+
+  function updateModalCurrent(metric) {
+    if (!ui.modalCurrent || !ui.modalCurrentValue || !ui.modalCurrentUnit || !ui.modalCurrentLabel) return;
+    const config = METRIC_CONFIG[metric];
+    if (!config) {
+      ui.modalCurrent.dataset.tone = 'neutral';
+      applyModalTone('neutral');
+      ui.modalCurrentValue.textContent = '—';
+      ui.modalCurrentUnit.textContent = '';
+      ui.modalCurrentLabel.textContent = 'Unbekannt';
+      return;
+    }
+    const sample = state.now?.[metric];
+    const unit = config.unit || '';
+    ui.modalCurrentUnit.textContent = unit;
+    if (!sample || !isFinite(sample.value)) {
+      ui.modalCurrent.dataset.tone = 'neutral';
+      applyModalTone('neutral');
+      ui.modalCurrentValue.textContent = '—';
+      ui.modalCurrentLabel.textContent = 'Keine Daten';
+      return;
+    }
+    const status = determineStatus(metric, sample.value);
+    ui.modalCurrentValue.textContent = formatNumber(sample.value, config.decimals);
+    ui.modalCurrentLabel.textContent = status.label || 'Aktuell';
+    ui.modalCurrent.dataset.tone = status.tone || status.intent || 'neutral';
+    applyModalTone(status.tone || status.intent || 'neutral');
+  }
+
+  function applyModalTone(tone) {
+    const resolved = tone || 'neutral';
+    if (ui.modalRoot) {
+      ui.modalRoot.dataset.tone = resolved;
+    }
+    if (ui.modalHeader) {
+      ui.modalHeader.dataset.tone = resolved;
+    }
+    if (ui.modalTabList) {
+      const color = STATUS_TONES[resolved] || STATUS_TONES.neutral;
+      ui.modalTabList.style.setProperty('--tab-tone-color', color);
+      ui.modalTabList.style.setProperty('--tab-tone-bg', colorWithAlpha(color, 0.18));
+    }
+  }
+
+  function updateModalScale(metric) {
+    if (!ui.modalScale || !ui.modalScaleLabels || !ui.modalScaleValues || !ui.modalScaleMarker) return;
+    const scaleConfig = METRIC_INSIGHTS[metric]?.scale;
+    if (!scaleConfig) {
+      ui.modalScale.hidden = true;
+      return;
+    }
+    ui.modalScale.hidden = false;
+    const config = METRIC_CONFIG[metric];
+    const scale = { ...scaleConfig };
+    const stops = Array.isArray(scaleConfig.stops)
+      ? scaleConfig.stops.map((stop) => ({ ...stop })).slice(0, 6)
+      : [];
+    ui.modalScale.style.setProperty('--scale-columns', Math.max(stops.length, 1));
+    ui.modalScaleLabels.innerHTML = stops.map((stop) => `<span>${stop.label}</span>`).join('');
+    const tickValues = Array.from(new Set([scale.min, ...stops.map((stop) => stop.value), scale.max].filter((v) => v != null)))
+      .sort((a, b) => a - b);
+    ui.modalScale.style.setProperty('--scale-ticks', Math.max(tickValues.length, 1));
+    ui.modalScaleValues.innerHTML = tickValues
+      .map((value) => `<span>${formatScaleTick(value, scale.unit)}</span>`)
+      .join('');
+    if (ui.modalScaleGradient) {
+      ui.modalScaleGradient.style.background = buildScaleGradient(scale, stops);
+    }
+    const sample = state.now?.[metric];
+    const value = sample && isFinite(sample.value) ? sample.value : null;
+    const markerPercent = computeMarkerPosition(value, scale);
+    ui.modalScaleMarker.style.left = `${markerPercent}%`;
+    if (value == null) {
+      ui.modalScaleMarker.dataset.tone = 'neutral';
+      if (ui.modalScaleMarkerValue) {
+        ui.modalScaleMarkerValue.textContent = formatWithUnit(null, scale.unit || '', config?.decimals ?? 0);
+      }
+    } else {
+      const tone = resolveScaleTone(value, stops);
+      ui.modalScaleMarker.dataset.tone = tone || 'neutral';
+      if (ui.modalScaleMarkerValue) {
+        const decimals = config?.decimals ?? 1;
+        ui.modalScaleMarkerValue.textContent = formatWithUnit(value, scale.unit || '', decimals);
+      }
+    }
+    if (ui.modalScale) {
+      ui.modalScale.style.removeProperty('--target-start');
+      ui.modalScale.style.removeProperty('--target-end');
+      ui.modalScale.style.removeProperty('--target-visible');
+    }
+    let caption = scale.caption || '';
+    if (metric === 'Lux' || metric === 'Farbtemperatur') {
+      const phase = resolveCircadianPhase();
+      const range = metric === 'Lux' ? phase.luxRange : phase.cctRange;
+      if (ui.modalScale) {
+        ui.modalScale.style.setProperty('--target-start', `${computeScalePosition(range[0], scale)}%`);
+        ui.modalScale.style.setProperty('--target-end', `${computeScalePosition(range[1], scale)}%`);
+        ui.modalScale.style.setProperty('--target-visible', '1');
+      }
+      const formattedRange = `${formatNumber(range[0], 0)}–${formatNumber(range[1], 0)}${NARROW_SPACE}${scale.unit}`;
+      caption = `${phase.title}: Ziel ${formattedRange}`;
+    }
+    if (ui.modalScaleCaption) {
+      ui.modalScaleCaption.textContent = caption;
+    }
+  }
+
+  function computeScalePosition(value, scale) {
+    const min = Number.isFinite(scale.min) ? scale.min : 0;
+    const max = Number.isFinite(scale.max) ? scale.max : min + 1;
+    const span = max - min;
+    if (span <= 0) {
+      return 0;
+    }
+    const percent = ((value - min) / span) * 100;
+    return clamp(percent, 0, 100);
+  }
+
+  function computeMarkerPosition(value, scale) {
+    const fallback = Number.isFinite(scale.min)
+      ? scale.min
+      : Number.isFinite(scale.max)
+        ? scale.max
+        : 0;
+    const numeric = Number.isFinite(value) ? value : fallback;
+    const percent = computeScalePosition(numeric, scale);
+    return clamp(percent, 3, 97);
+  }
+
+  function resolveScaleTone(value, stops) {
+    if (!Array.isArray(stops) || stops.length === 0) {
+      return 'neutral';
+    }
+    for (const stop of stops) {
+      if (value <= stop.value) {
+        return stop.tone;
+      }
+    }
+    return stops[stops.length - 1].tone;
+  }
+
+  function buildScaleGradient(scale, stops) {
+    if (!Array.isArray(stops) || stops.length === 0) {
+      return 'linear-gradient(90deg, rgba(148, 163, 184, 0.4), rgba(148, 163, 184, 0.6))';
+    }
+    const min = Number.isFinite(scale.min) ? scale.min : 0;
+    const max = Number.isFinite(scale.max) ? scale.max : min + 1;
+    const span = Math.max(max - min, 1);
+    const segments = [];
+    let previousPercent = 0;
+    stops.forEach((stop, index) => {
+      const color = SCALE_TONES[stop.tone] || '#0ea5e9';
+      const percent = clamp(((stop.value - min) / span) * 100, 0, 100);
+      if (index === 0) {
+        segments.push(`${color} 0%`);
+      } else {
+        const prevColor = SCALE_TONES[stops[index - 1].tone] || color;
+        segments.push(`${prevColor} ${percent}%`);
+      }
+      segments.push(`${color} ${percent}%`);
+      previousPercent = percent;
+    });
+    const lastColor = SCALE_TONES[stops[stops.length - 1].tone] || '#0ea5e9';
+    if (previousPercent < 100) {
+      segments.push(`${lastColor} 100%`);
+    }
+    return `linear-gradient(90deg, ${segments.join(', ')})`;
+  }
+
+  function formatScaleTick(value, unit) {
+    if (!Number.isFinite(value)) {
+      return formatWithUnit(null, unit, 0);
+    }
+    const decimals = Math.abs(value) < 10 && unit !== 'ppm' ? 1 : 0;
+    return formatWithUnit(value, unit, decimals);
+  }
+
   function getDefinitionForMetric(metric) {
     const chartKey = METRIC_TO_CHART_KEY[metric];
     if (!chartKey) return null;
@@ -1091,6 +1699,8 @@
     if (!definition || !ui.modalRoot || !ui.modalCanvas) return;
     state.modalMetric = metric;
     updateModalTabs(state.modalRangeKey);
+    updateModalInsight(metric);
+    refreshModalDetails(metric);
     ui.modalTitle.textContent = definition.title || metricLabel(metric);
     ui.modalSub.textContent = 'Lade Daten …';
     ui.modalRoot.hidden = false;
@@ -1143,10 +1753,12 @@
     }));
 
     const timeUnit = range.range === '24h' ? 'hour' : range.range === '7d' ? 'day' : 'week';
+    const guides = buildTargetGuides(state.modalMetric || definition.metrics[0]);
 
     state.modalChart = new Chart(ctx, {
       type: 'line',
       data: { datasets },
+      plugins: [targetGuidePlugin],
       options: {
         responsive: true,
         maintainAspectRatio: false,
@@ -1158,11 +1770,14 @@
               label(context) {
                 const metricKey = definition.metrics[context.datasetIndex];
                 const cfg = METRIC_CONFIG[metricKey];
-                const formatted = formatNumber(context.parsed.y, cfg?.decimals || 0);
-                return `${context.dataset.label}: ${formatted} ${cfg?.unit || ''}`.trim();
+                const valueLabel = formatWithUnit(context.parsed.y, cfg?.unit || '', cfg?.decimals ?? 0);
+                const status = determineStatus(metricKey, context.parsed.y);
+                const suffix = status?.label ? ` – ${status.label}` : '';
+                return `${context.dataset.label}: ${valueLabel}${suffix}`;
               }
             }
-          }
+          },
+          targetGuides: { guides }
         },
         scales: {
           x: {
@@ -1174,7 +1789,12 @@
           },
           y: {
             title: { display: true, text: definition.yTitle, color: '#9ca3af' },
-            ticks: { color: '#94a3b8' },
+            ticks: {
+              color: '#94a3b8',
+              callback(value) {
+                return formatScaleTick(value, definition.yTitle);
+              }
+            },
             grid: { color: 'rgba(148, 163, 184, 0.15)', drawBorder: false },
             border: { display: false },
             suggestedMin: definition.yBounds?.min,
@@ -1193,6 +1813,42 @@
       subParts.push(definition.yTitle);
     }
     ui.modalSub.textContent = subParts.join(' • ');
+  }
+
+  function buildTargetGuides(metric) {
+    const entries = TARGET_GUIDES[metric] || [];
+    const guides = [];
+    entries.forEach((entry) => {
+      if (entry.dynamic === 'lux' || entry.dynamic === 'cct') {
+        const phase = resolveCircadianPhase();
+        const range = entry.dynamic === 'lux' ? phase.luxRange : phase.cctRange;
+        if (!Array.isArray(range) || range.length < 2) return;
+        guides.push({
+          min: range[0],
+          max: range[1],
+          color: STATUS_TONES.good,
+          label: `${phase.title}: ${formatNumber(range[0], 0)}–${formatNumber(range[1], 0)}${NARROW_SPACE}${entry.unit}`
+        });
+        return;
+      }
+      if (entry.min != null && entry.max != null) {
+        guides.push({
+          min: entry.min,
+          max: entry.max,
+          color: STATUS_TONES.good,
+          label: entry.label || `${formatNumber(entry.min, 0)}–${formatNumber(entry.max, 0)}${NARROW_SPACE}${entry.unit || ''}`.trim()
+        });
+        return;
+      }
+      if (entry.value != null) {
+        guides.push({
+          value: entry.value,
+          color: STATUS_TONES.good,
+          label: entry.label || `${formatWithUnit(entry.value, entry.unit || '', 0)}`
+        });
+      }
+    });
+    return guides;
   }
 
   function handleGlobalKeydown(event) {
@@ -1352,6 +2008,23 @@
 
   function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
+    const { protocol, hostname } = window.location;
+    const host = typeof hostname === 'string' ? hostname.toLowerCase() : '';
+    const isLocalhost = ['localhost', '127.0.0.1', '::1'].includes(host);
+    const isLocalDomain = host.endsWith('.local');
+
+    if (!window.isSecureContext && !isLocalhost) {
+      console.info('Service Worker übersprungen: unsichere Umgebung.');
+      return;
+    }
+    if (protocol === 'https:' && isLocalDomain) {
+      console.info('Service Worker übersprungen: lokales Zertifikat nicht vertrauenswürdig.');
+      return;
+    }
+    if (protocol !== 'https:' && !isLocalhost) {
+      return;
+    }
+
     navigator.serviceWorker
       .register('./sw.js')
       .then(() => console.info('Service Worker registriert'))
