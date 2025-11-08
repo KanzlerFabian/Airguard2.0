@@ -15,8 +15,8 @@ const METRICS = [
     label: 'CO\u2082',
     unit: 'ppm',
     decimals: 0,
-    promNames: ['CO2', 'co2'],
-    queryNames: ['CO\u2082', 'CO2', 'co2'],
+    promNames: ['co2_ppm', 'CO2', 'co2'],
+    queryNames: ['CO\u2082', 'CO2', 'co2', 'co2_ppm'],
     slug: 'co2'
   },
   {
@@ -24,7 +24,7 @@ const METRICS = [
     label: 'PM1',
     unit: '\u00b5g/m\u00b3',
     decimals: 1,
-    promNames: ['PM1.0', 'pm1.0', 'pm1'],
+    promNames: ['pm1', 'PM1.0', 'pm1.0'],
     queryNames: ['PM1', 'PM1.0', 'pm1'],
     slug: 'pm1'
   },
@@ -33,7 +33,7 @@ const METRICS = [
     label: 'PM2.5',
     unit: '\u00b5g/m\u00b3',
     decimals: 1,
-    promNames: ['PM2.5', 'pm2_5', 'pm2.5'],
+    promNames: ['pm25', 'PM2.5', 'pm2_5', 'pm2.5'],
     queryNames: ['PM2.5', 'pm2.5', 'pm25'],
     slug: 'pm25'
   },
@@ -42,7 +42,7 @@ const METRICS = [
     label: 'PM10',
     unit: '\u00b5g/m\u00b3',
     decimals: 1,
-    promNames: ['PM10', 'pm10'],
+    promNames: ['pm10', 'PM10'],
     queryNames: ['PM10', 'pm10'],
     slug: 'pm10'
   },
@@ -52,31 +52,31 @@ const METRICS = [
     unit: '\u00b0C',
     decimals: 1,
     promNames: [
+      'temp_final',
       'temperatur',
       'temperatur_kalibriert',
       'temperatur__bme_kalibriert_',
       'temperature',
-      'temp',
-      'temp_final'
+      'temp'
     ],
     queryNames: ['Temperatur', 'temperatur', 'temperature', 'temp', 'temp_final', 'temperature_final'],
-    slug: 'temperatur'
+    slug: 'temp_final'
   },
   {
     key: 'rel. Feuchte',
     label: 'rel. Feuchte',
     unit: '%',
     decimals: 1,
-    promNames: ['rel. Feuchte', 'rel_feuchte', 'humidity'],
-    queryNames: ['rel. Feuchte', 'relfeuchte', 'luftfeuchte'],
-    slug: 'relfeuchte'
+    promNames: ['humidity', 'rel. Feuchte', 'rel_feuchte'],
+    queryNames: ['rel. Feuchte', 'relfeuchte', 'luftfeuchte', 'humidity'],
+    slug: 'humidity'
   },
   {
     key: 'Lux',
     label: 'Lux',
     unit: 'lx',
     decimals: 0,
-    promNames: ['Lux', 'beleuchtungsstaerke', 'lx'],
+    promNames: ['lux', 'Lux', 'beleuchtungsstaerke'],
     queryNames: ['Lux', 'lux'],
     slug: 'lux'
   },
@@ -85,26 +85,26 @@ const METRICS = [
     label: 'CCT',
     unit: 'K',
     decimals: 0,
-    promNames: ['Farbtemperatur', 'cct', 'farbtemperatur'],
-    queryNames: ['CCT', 'Farbtemperatur', 'cct'],
-    slug: 'cct'
+    promNames: ['cct_k', 'Farbtemperatur', 'cct', 'farbtemperatur'],
+    queryNames: ['CCT', 'Farbtemperatur', 'cct', 'cct_k'],
+    slug: 'cct_k'
   },
   {
     key: 'Luftdruck',
     label: 'Luftdruck',
     unit: 'hPa',
     decimals: 1,
-    promNames: ['Luftdruck', 'pressure', 'luftdruck'],
-    queryNames: ['Luftdruck', 'druck'],
-    slug: 'luftdruck'
+    promNames: ['pressure_hpa', 'Luftdruck', 'pressure', 'luftdruck'],
+    queryNames: ['Luftdruck', 'druck', 'pressure_hpa'],
+    slug: 'pressure_hpa'
   },
   {
     key: 'TVOC',
     label: 'TVOC',
     unit: 'ppb',
     decimals: 0,
-    promNames: ['TVOC', 'tvoc'],
-    queryNames: ['TVOC', 'voc'],
+    promNames: ['tvoc', 'TVOC'],
+    queryNames: ['TVOC', 'voc', 'tvoc'],
     slug: 'tvoc'
   }
 ];
@@ -117,7 +117,14 @@ for (const metric of METRICS) {
   metric.promNames = promList;
   metric.promQueryName = promList[0];
 
-  const aliases = new Set([metric.key, metric.label, ...(metric.queryNames || [])]);
+  const aliases = new Set([
+    metric.key,
+    metric.label,
+    metric.slug,
+    metric.promQueryName,
+    ...(metric.promNames || []),
+    ...(metric.queryNames || [])
+  ]);
   for (const alias of aliases) {
     if (!alias) continue;
     const normalized = normalizeQueryName(alias);
@@ -136,11 +143,12 @@ const PORT = Number.parseInt(process.env.PORT || '', 10) || 8088;
 const PROM_URL = (process.env.PROM_URL || 'http://127.0.0.1:9090').replace(/\/+$/, '');
 const PROM_TIMEOUT_MS = Number.parseInt(process.env.PROM_TIMEOUT_MS || '', 10) || 8000;
 const MAX_RANGE_SECONDS = Number.parseInt(process.env.MAX_RANGE_SECONDS || '', 10) || 30 * 24 * 60 * 60;
+const isProduction = process.env.NODE_ENV === 'production';
 
 const cspDirectives = {
   defaultSrc: ["'self'"],
   scriptSrc: ["'self'"],
-  styleSrc: ["'self'", "'unsafe-inline'"],
+  styleSrc: ["'self'"],
   imgSrc: ["'self'", 'data:'],
   fontSrc: ["'self'"],
   connectSrc: ["'self'"],
@@ -148,6 +156,13 @@ const cspDirectives = {
   baseUri: ["'self'"],
   frameAncestors: ["'none'"]
 };
+
+if (isProduction) {
+  cspDirectives.styleSrc.push("'unsafe-inline'");
+} else {
+  cspDirectives.scriptSrc.push("'unsafe-inline'", "'unsafe-eval'");
+  cspDirectives.styleSrc.push("'unsafe-inline'");
+}
 
 
 const app = express();

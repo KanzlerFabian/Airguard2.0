@@ -166,11 +166,25 @@
     ['temperatur__bme_kalibriert_', 'Temperatur'],
     ['temperatur_kalibriert', 'Temperatur'],
     ['temp', 'Temperatur'],
+    ['temp_final', 'Temperatur'],
+    ['co2', 'CO2'],
+    ['co2_ppm', 'CO2'],
     ['pm1', 'PM1.0'],
-    ['pm10', 'PM10'],
     ['pm1.0', 'PM1.0'],
     ['pm 1', 'PM1.0'],
-    ['pm 10', 'PM10']
+    ['pm10', 'PM10'],
+    ['pm 10', 'PM10'],
+    ['pm25', 'PM2.5'],
+    ['pm2_5', 'PM2.5'],
+    ['tvoc', 'TVOC'],
+    ['voc', 'TVOC'],
+    ['humidity', 'rel. Feuchte'],
+    ['rel_feuchte', 'rel. Feuchte'],
+    ['pressure_hpa', 'Luftdruck'],
+    ['pressure', 'Luftdruck'],
+    ['lux', 'Lux'],
+    ['cct', 'Farbtemperatur'],
+    ['cct_k', 'Farbtemperatur']
   ]);
 
   const STATUS_TONES = {
@@ -2200,7 +2214,7 @@
     } else if (payload?.error) {
       console.warn(`Serie ${metric} antwortete mit Fehler:`, payload.error);
     }
-    return new Error(`Fehler beim Laden der Serie ${label} (${rangeLabel}). Bitte später erneut versuchen.`);
+    return new Error(`Die Daten für ${label} konnten nicht geladen werden (${rangeLabel}). Bitte später erneut versuchen.`);
   }
 
   function updateSparklines() {
@@ -2905,10 +2919,15 @@
   function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     const host = typeof window.location.hostname === 'string' ? window.location.hostname.toLowerCase() : '';
-    const allowLocalhost = host === 'localhost';
-    if (!window.isSecureContext && !allowLocalhost) {
-      console.info('Service Worker nicht registriert: Zertifikat oder sicherer Kontext fehlt.');
+    const allowedHosts = new Set(['localhost', 'airguardpi.local']);
+    const secureContext = Boolean(window.isSecureContext);
+    const isAllowedHost = allowedHosts.has(host);
+    if (!secureContext && !isAllowedHost) {
+      console.info(
+        `Service Worker nicht registriert: unsicherer Kontext für ${host || 'unbekannten Host'}.`
+      );
       if (ui.pwaStatusBadge) {
+        ui.pwaStatusBadge.textContent = 'Offline-Cache deaktiviert (kein gültiges Zertifikat)';
         ui.pwaStatusBadge.hidden = false;
       }
       return;
@@ -2923,8 +2942,9 @@
         }
       })
       .catch((error) => {
-        console.error('Service Worker Fehler', error);
+        console.warn('Service Worker nicht aktiv: Registrierung fehlgeschlagen.', error);
         if (ui.pwaStatusBadge) {
+          ui.pwaStatusBadge.textContent = 'Offline-Cache deaktiviert (kein gültiges Zertifikat)';
           ui.pwaStatusBadge.hidden = false;
         }
       });
