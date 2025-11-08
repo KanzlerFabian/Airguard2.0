@@ -1,20 +1,34 @@
-const CACHE_NAME = 'airguard-shell-v1';
-const ASSETS = [
-  './',
-  './index.html',
-  './styles.css',
-  './app.js',
-  './manifest.webmanifest',
-  './assets/logo.png',
-  './lib/chart.umd.min.js',
-  './lib/chartjs-adapter-date-fns.bundle.min.js'
+const SHELL_CACHE = 'airguard-shell-v2';
+const DATA_CACHE = 'airguard-data-v1';
+
+const SHELL_ASSETS = [
+  '/',
+  '/index.html',
+  '/styles.css',
+  '/app.js',
+  '/manifest.webmanifest',
+  '/lib/chart.umd.min.js',
+  '/lib/chartjs-adapter-date-fns.bundle.min.js',
+  '/icons/icon-192.png',
+  '/icons/icon-256.png',
+  '/icons/icon-384.png',
+  '/icons/icon-512.png'
 ];
+
+const DATA_ENDPOINTS = new Set([
+  '/data.json',
+  '/data_24h.json',
+  '/data_7d.json',
+  '/ai/eval',
+  '/api/now',
+  '/api/series'
+]);
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
-      .open(CACHE_NAME)
-      .then((cache) => cache.addAll(ASSETS))
+      .open(SHELL_CACHE)
+      .then((cache) => cache.addAll(SHELL_ASSETS))
       .then(() => self.skipWaiting())
   );
 });
@@ -26,7 +40,7 @@ self.addEventListener('activate', (event) => {
       .then((keys) =>
         Promise.all(
           keys.map((key) => {
-            if (key !== CACHE_NAME) {
+            if (key !== SHELL_CACHE && key !== DATA_CACHE) {
               return caches.delete(key);
             }
             return undefined;
@@ -42,56 +56,94 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') {
     return;
   }
-
   const url = new URL(request.url);
-
   if (url.origin !== self.location.origin) {
     return;
   }
 
-  if (url.pathname.startsWith('/api/')) {
-    event.respondWith(networkFirst(request));
-    return;
-  }
-
   if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put('./index.html', copy));
-          return response;
-        })
-        .catch(() => caches.match('./index.html'))
-    );
+    event.respondWith(handleNavigation(request));
     return;
   }
 
-  event.respondWith(cacheFirst(request));
+  if (DATA_ENDPOINTS.has(url.pathname)) {
+    event.respondWith(staleWhileRevalidate(event, DATA_CACHE));
+    return;
+  }
+
+  if (SHELL_ASSETS.includes(url.pathname)) {
+    event.respondWith(staleWhileRevalidate(event, SHELL_CACHE));
+    return;
+  }
+
+  event.respondWith(staleWhileRevalidate(event, SHELL_CACHE));
 });
 
-async function cacheFirst(request) {
-  const cached = await caches.match(request, { ignoreVary: true });
-  if (cached) {
-    return cached;
-  }
-  const response = await fetch(request);
-  const cache = await caches.open(CACHE_NAME);
-  cache.put(request, response.clone());
-  return response;
-}
-
-async function networkFirst(request) {
+async function handleNavigation(request) {
   try {
     const response = await fetch(request);
-    const cache = await caches.open(CACHE_NAME);
-    cache.put(request, response.clone());
+    const cache = await caches.open(SHELL_CACHE);
+    cache.put('/index.html', response.clone());
+    cache.put('/', response.clone());
     return response;
   } catch (error) {
-    const cached = await caches.match(request);
+    const cache = await caches.open(SHELL_CACHE);
+    const cached =
+      (await cache.match(request)) || (await cache.match('/index.html')) || (await cache.match('/'));
     if (cached) {
       return cached;
     }
-    throw error;
+    return new Response('Offline', { status: 503, headers: { 'Content-Type': 'text/plain' } });
   }
+}
+
+function staleWhileRevalidate(event, cacheName) {
+  const { request } = event;
+  return (async () => {
+    const cache = await caches.open(cacheName);
+    const cached = await cache.match(request, { ignoreVary: true });
+    const networkPromise = fetch(request)
+      .then((response) => {
+        if (response && response.ok) {
+          cache.put(request, response.clone());
+        }
+        return response;
+      })
+      .catch(() => null);
+
+    if (cached) {
+      event.waitUntil(
+        networkPromise
+          .then((response) => {
+            if (response && response.ok) {
+              cache.put(request, response.clone());
+            }
+          })
+          .catch(() => undefined)
+      );
+      return cached;
+    }
+
+    const network = await networkPromise;
+    if (network) {
+      return network;
+    }
+
+    if (cacheName === DATA_CACHE) {
+      const fallback = await cache.match(request);
+      if (fallback) {
+        return fallback;
+      }
+      return new Response(JSON.stringify({ ok: false, offline: true }), {
+        headers: { 'Content-Type': 'application/json' },
+        status: 503
+      });
+    }
+
+    const shellFallback = await caches.match('/index.html');
+    if (shellFallback) {
+      return shellFallback;
+    }
+    return new Response('Offline', { status: 503, headers: { 'Content-Type': 'text/plain' } });
+  })();
 }
