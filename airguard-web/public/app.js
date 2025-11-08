@@ -120,6 +120,26 @@
     }
   ];
 
+  const CIRCADIAN_SCALE_BANDS = {
+    lux: [
+      { label: 'Dunkel', min: 0, max: 100, tone: 'poor', display: `< 100${NARROW_SPACE}lx` },
+      { label: 'OK', min: 100, max: 500, tone: 'good', display: `100–500${NARROW_SPACE}lx` },
+      { label: 'Ziel', min: 500, max: 1000, tone: 'excellent', display: `500–1 000${NARROW_SPACE}lx` },
+      { label: 'Sehr hell', min: 1500, max: 2000, tone: 'poor', display: `> 1 500${NARROW_SPACE}lx` }
+    ],
+    cct: [
+      { label: 'Abend', min: 2200, max: 3200, tone: 'elevated', display: `2 200–3 200${NARROW_SPACE}K` },
+      { label: 'Neutral', min: 3800, max: 5200, tone: 'good', display: `3 800–5 200${NARROW_SPACE}K` },
+      { label: 'Aktiv', min: 5200, max: 6000, tone: 'excellent', display: `5 200–6 000${NARROW_SPACE}K` },
+      { label: 'Sehr kühl', min: 6000, max: 6500, tone: 'poor', display: `6 000–6 500${NARROW_SPACE}K` }
+    ]
+  };
+
+  const CIRCADIAN_SCALE_LIMITS = {
+    lux: { min: 0, max: 2000 },
+    cct: { min: 2200, max: 6500 }
+  };
+
   const TIME_RANGES = {
     '24h': { label: '24 h', range: '24h', step: '120s', win: '5m', samples: 28 },
     '7d': { label: '7 Tage', range: '7d', step: '45m', win: '2h', samples: 40 },
@@ -128,23 +148,29 @@
 
   const METRIC_CONFIG = {
     CO2: { unit: 'ppm', decimals: 0, label: 'CO₂' },
+    'PM1.0': { unit: 'µg/m³', decimals: 1, label: 'PM1' },
     'PM2.5': { unit: 'µg/m³', decimals: 1, label: 'PM2.5' },
+    PM10: { unit: 'µg/m³', decimals: 1, label: 'PM10' },
     TVOC: { unit: 'ppb', decimals: 0, label: 'TVOC' },
     Temperatur: { unit: '°C', decimals: 1, label: 'Temperatur' },
     'rel. Feuchte': { unit: '%', decimals: 0, label: 'rel. Feuchte' },
     Lux: { unit: 'lx', decimals: 0, label: 'Lux' },
     Luftdruck: { unit: 'hPa', decimals: 1, label: 'Luftdruck' },
-    Farbtemperatur: { unit: 'K', decimals: 0, label: 'CCT' },
-    'PM1.0': { unit: 'µg/m³', decimals: 1, label: 'PM1.0' },
-    PM10: { unit: 'µg/m³', decimals: 1, label: 'PM10' }
+    Farbtemperatur: { unit: 'K', decimals: 0, label: 'CCT' }
   };
 
   const NOW_KEY_ALIASES = new Map([
     ['temperatur', 'Temperatur'],
     ['temperature', 'Temperatur'],
+    ['temperature_final', 'Temperatur'],
     ['temperatur__bme_kalibriert_', 'Temperatur'],
     ['temperatur_kalibriert', 'Temperatur'],
-    ['temp', 'Temperatur']
+    ['temp', 'Temperatur'],
+    ['pm1', 'PM1.0'],
+    ['pm10', 'PM10'],
+    ['pm1.0', 'PM1.0'],
+    ['pm 1', 'PM1.0'],
+    ['pm 10', 'PM10']
   ]);
 
   const STATUS_TONES = {
@@ -158,26 +184,46 @@
     neutral: '#94a3b8'
   };
 
+  const STATUS_LABELS = {
+    excellent: 'Hervorragend',
+    optimal: 'Hervorragend',
+    good: 'Gut',
+    elevated: 'Erhöht',
+    warning: 'Erhöht',
+    poor: 'Schlecht',
+    critical: 'Schlecht',
+    neutral: 'Neutral'
+  };
+
   const SCALE_TONES = { ...STATUS_TONES };
 
   const METRIC_INSIGHTS = {
     CO2: {
       sections: [
-        { title: 'Bedeutung', text: 'CO₂ zeigt, wie verbraucht die Raumluft ist und wie gut gelüftet wurde.' },
-        { title: 'Gesunde Werte', text: 'Unter 800 ppm ideal, bis 1000 ppm noch gut.' },
-        { title: 'Auswirkungen', text: 'Bei über 1000 ppm sinken Konzentration und Wohlbefinden; ab 1400 ppm drohen Kopfschmerzen und Müdigkeit.' },
-        { title: 'Verbesserung', text: 'Räume regelmäßig querlüften (5–10 Minuten), besonders bei mehreren Personen oder geschlossenen Fenstern.' }
+        { title: 'Bedeutung', text: 'CO₂ zeigt, wie verbraucht die Raumluft ist und ob ausreichend Frischluft vorhanden ist.' },
+        {
+          title: 'Gesunde Werte',
+          text: '400–800 ppm optimal, 800–1000 ppm stabil, 1000–1400 ppm Lüften einplanen, ab 1400 ppm Alarm.'
+        },
+        {
+          title: 'Auswirkungen',
+          text: 'Steigt CO₂ über 1000 ppm, sinken Konzentration und Wohlbefinden; ab 1400 ppm drohen Kopfschmerzen und Müdigkeit.'
+        },
+        {
+          title: 'Verbesserung',
+          text: 'Regelmäßig querlüften (5–10 Minuten) oder Lüftungssystem aktivieren – besonders bei mehreren Personen im Raum.'
+        }
       ],
       scale: {
         unit: 'ppm',
         min: 400,
         max: 2000,
         caption: 'Bewertung orientiert sich an Innenraumempfehlungen für CO₂.',
-        stops: [
-          { value: 800, label: 'Optimal', tone: 'excellent' },
-          { value: 1000, label: 'Stabil', tone: 'good' },
-          { value: 1400, label: 'Lüften', tone: 'elevated' },
-          { value: 2000, label: 'Alarm', tone: 'poor' }
+        bands: [
+          { label: 'Optimal', min: 400, max: 800, tone: 'excellent' },
+          { label: 'Stabil', min: 800, max: 1000, tone: 'good' },
+          { label: 'Lüften', min: 1000, max: 1400, tone: 'elevated' },
+          { label: 'Alarm', min: 1400, max: 2000, tone: 'poor' }
         ]
       }
     },
@@ -198,6 +244,70 @@
           { value: 12, label: 'Okay', tone: 'good' },
           { value: 25, label: 'Belastet', tone: 'elevated' },
           { value: 50, label: 'Kritisch', tone: 'poor' }
+        ]
+      }
+    },
+    'PM1.0': {
+      sections: [
+        {
+          title: 'Bedeutung',
+          text: 'PM1 bezeichnet Feinstaubpartikel ≤ 1 µm. Diese sehr kleinen Partikel können tief in die Lunge gelangen.'
+        },
+        {
+          title: 'Gesunde Werte',
+          text: '≤ 5 µg/m³ optimal, ≤ 12 µg/m³ gut, ≤ 35 µg/m³ erhöht, > 35 µg/m³ hoch.'
+        },
+        {
+          title: 'Auswirkungen',
+          text: 'Längere Belastung kann Atemwege reizen; empfindliche Personen reagieren früher auf erhöhte Werte.'
+        },
+        {
+          title: 'Verbesserung',
+          text: 'Innenquellen meiden (Kerzen, Kochen, Staub), regelmäßig lüften und bei Bedarf HEPA-Luftreiniger einsetzen.'
+        }
+      ],
+      scale: {
+        unit: 'µg/m³',
+        min: 0,
+        max: 60,
+        caption: 'Bewertung orientiert sich an Leitwerten für PM1 in Innenräumen.',
+        bands: [
+          { label: 'Optimal', min: 0, max: 5, tone: 'excellent' },
+          { label: 'Gut', min: 5, max: 12, tone: 'good' },
+          { label: 'Erhöht', min: 12, max: 35, tone: 'elevated' },
+          { label: 'Schlecht', min: 35, max: 60, tone: 'poor' }
+        ]
+      }
+    },
+    PM10: {
+      sections: [
+        {
+          title: 'Bedeutung',
+          text: 'PM10 umfasst Partikel ≤ 10 µm – typischerweise Staub, Pollen oder aufgewirbelte Ablagerungen.'
+        },
+        {
+          title: 'Gesunde Werte',
+          text: '≤ 20 µg/m³ optimal, ≤ 40 µg/m³ gut, ≤ 60 µg/m³ erhöht, > 100 µg/m³ hoch.'
+        },
+        {
+          title: 'Auswirkungen',
+          text: 'Kann Augen und Atemwege reizen; hohe Werte machen Pollenlasten spürbar.'
+        },
+        {
+          title: 'Verbesserung',
+          text: 'Lüften nach Außensituation abstimmen, Staubquellen reduzieren und bei Bedarf Luftreiniger nutzen.'
+        }
+      ],
+      scale: {
+        unit: 'µg/m³',
+        min: 0,
+        max: 120,
+        caption: 'Bewertung orientiert sich an Innenraum-Richtwerten für PM10.',
+        bands: [
+          { label: 'Optimal', min: 0, max: 20, tone: 'excellent' },
+          { label: 'Gut', min: 20, max: 40, tone: 'good' },
+          { label: 'Erhöht', min: 40, max: 60, tone: 'elevated' },
+          { label: 'Schlecht', min: 60, max: 120, tone: 'poor', display: `> 100${NARROW_SPACE}µg/m³` }
         ]
       }
     },
@@ -263,10 +373,22 @@
     },
     Lux: {
       sections: [
-        { title: 'Bedeutung', text: 'Lux beschreibt die Beleuchtungsstärke im Raum und beeinflusst Konzentration, Stimmung und Biorhythmus.' },
-        { title: 'Gesunde Werte', text: '300–1000 lx sind ideal für Alltag und Arbeit.' },
-        { title: 'Auswirkungen', text: 'Zu wenig Licht macht müde; zu viel blendet und kann unangenehm sein.' },
-        { title: 'Verbesserung', text: 'Natürliches Licht tagsüber nutzen, abends warmes Licht; Arbeitszonen gleichmäßig ausleuchten.' }
+        {
+          title: 'Bedeutung',
+          text: 'Lux beschreibt die Beleuchtungsstärke. Sie steuert Wachheit am Tag und Entspannung am Abend.'
+        },
+        {
+          title: 'Gesunde Werte',
+          text: 'Morgens und tagsüber 500–1 000 lx für Aktivität, abends 50–300 lx zur Vorbereitung auf den Schlaf.'
+        },
+        {
+          title: 'Auswirkungen',
+          text: 'Zu dunkles Licht macht müde und reduziert Fokus; zu helles Licht kann blenden und den circadianen Rhythmus stören.'
+        },
+        {
+          title: 'Verbesserung',
+          text: 'Tagsüber möglichst hell und indirekt beleuchten, abends dimmen und warmeres Licht wählen; Blendung vermeiden.'
+        }
       ],
       scale: {
         unit: 'lx',
@@ -283,10 +405,22 @@
     },
     Farbtemperatur: {
       sections: [
-        { title: 'Bedeutung', text: 'Die Farbtemperatur zeigt, ob Licht warm (gelblich) oder kalt (bläulich) wirkt.' },
-        { title: 'Gesunde Werte', text: '4000–5000 K gelten als neutral und angenehm.' },
-        { title: 'Auswirkungen', text: 'Kaltes Licht aktiviert, warmes Licht beruhigt – ideal zur Steuerung des circadianen Rhythmus.' },
-        { title: 'Verbesserung', text: 'Morgens und tagsüber kühleres Licht (5000–6000 K), abends warmes Licht (2700–3500 K).' }
+        {
+          title: 'Bedeutung',
+          text: 'Die Farbtemperatur zeigt, ob Licht warm oder kalt wirkt und beeinflusst Aktivierung und Entspannung im Tagesverlauf.'
+        },
+        {
+          title: 'Gesunde Werte',
+          text: 'Morgen: 5 000–6 000 K, Tag: 4 000–5 000 K, Abend: 2 700–3 500 K.'
+        },
+        {
+          title: 'Auswirkungen',
+          text: 'Zu kühles Abendlicht kann den Schlaf verzögern, zu warmes Tageslicht verringert Fokus und Wachheit.'
+        },
+        {
+          title: 'Verbesserung',
+          text: 'Tagsüber neutral bis kühles Licht nutzen, abends warmes Licht einsetzen; Mischlicht vermeiden und Leuchten gezielt ausrichten.'
+        }
       ],
       scale: {
         unit: 'K',
@@ -416,7 +550,7 @@
     Luftdruck: 'Luftdruck'
   };
 
-  const HERO_METRICS = ['CO2', 'PM2.5', 'TVOC', 'rel. Feuchte'];
+  const HERO_METRICS = ['CO2', 'PM2.5', 'PM1.0', 'PM10', 'TVOC', 'rel. Feuchte'];
 
   const state = {
     range: TIME_RANGES['24h'],
@@ -439,8 +573,11 @@
     modalResizeTimer: 0,
     modalResizeActive: false,
     modalLayoutFrame: 0,
-    modalReturnFocus: null,
-    bodyScrollLock: null
+    activeModalRoot: null,
+    activeModalContent: null,
+    activeModalReturnFocus: null,
+    bodyScrollLock: null,
+    circadianCharts: { lux: null, cct: null }
   };
 
   const ui = {
@@ -469,6 +606,7 @@
     barLux: null,
     installBtn: null,
     notifyBtn: null,
+    pwaStatusBadge: null,
     toast: null,
     toastText: null,
     toastClose: null,
@@ -492,7 +630,20 @@
     modalScaleGradient: null,
     modalScaleMarker: null,
     modalScaleMarkerValue: null,
-    modalScaleCaption: null
+    modalScaleCaption: null,
+    circadianModal: null,
+    circadianModalContent: null,
+    circadianModalStatus: null,
+    circadianModalSummary: null,
+    circadianModalLuxValue: null,
+    circadianModalCctValue: null,
+    circadianLuxCanvas: null,
+    circadianCctCanvas: null,
+    circadianScaleSegments: new Map(),
+    circadianScaleLabels: new Map(),
+    circadianScaleMarkers: new Map(),
+    circadianScaleValues: new Map(),
+    circadianModalCloseButtons: []
   };
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -537,9 +688,22 @@
     ui.barLux = document.querySelector('.bar-track[data-kind="lux"]');
     ui.installBtn = document.getElementById('install-btn');
     ui.notifyBtn = document.getElementById('notify-btn');
+    ui.pwaStatusBadge = document.getElementById('pwa-status-badge');
     ui.toast = document.querySelector('.toast');
     ui.toastText = ui.toast?.querySelector('.toast-text') || null;
     ui.toastClose = ui.toast?.querySelector('.toast-close') || null;
+
+    if (ui.circadianCard) {
+      ui.circadianCard.tabIndex = 0;
+      ui.circadianCard.setAttribute('role', 'button');
+      ui.circadianCard.addEventListener('click', openCircadianModal);
+      ui.circadianCard.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          openCircadianModal();
+        }
+      });
+    }
 
     const miniCards = document.querySelectorAll('.mini-card');
     miniCards.forEach((card) => {
@@ -559,8 +723,8 @@
     });
 
     ui.modalRoot = document.getElementById('chart-modal');
-    ui.modalContent = document.querySelector('.chart-modal__content');
-    ui.modalHeader = document.querySelector('.chart-modal__header');
+    ui.modalContent = ui.modalRoot?.querySelector('.chart-modal__content') || null;
+    ui.modalHeader = ui.modalRoot?.querySelector('.chart-modal__header') || null;
     ui.modalTitle = document.getElementById('chart-modal-title');
     ui.modalSub = document.getElementById('chart-modal-sub');
     ui.modalCanvas = document.getElementById('chart-modal-canvas');
@@ -578,7 +742,7 @@
     ui.modalScaleCaption = document.getElementById('chart-modal-scale-caption');
     ui.modalTabList = document.querySelector('.modal-range-tabs');
     ui.modalTabs = Array.from(document.querySelectorAll('.modal-tab'));
-    ui.modalCloseButtons = Array.from(document.querySelectorAll('[data-close="true"]'));
+    ui.modalCloseButtons = Array.from(ui.modalRoot?.querySelectorAll('[data-close="true"]') || []);
 
     ui.modalTabs.forEach((tab) => {
       tab.addEventListener('click', () => {
@@ -601,6 +765,61 @@
       ui.modalRoot.addEventListener('click', (event) => {
         if (event.target?.dataset?.close === 'true') {
           closeChartModal();
+        }
+      });
+    }
+
+    ui.circadianModal = document.getElementById('circadian-modal');
+    ui.circadianModalContent = ui.circadianModal?.querySelector('.circadian-modal__content') || null;
+    ui.circadianModalStatus = document.getElementById('circadian-modal-status');
+    ui.circadianModalSummary = document.getElementById('circadian-modal-summary');
+    ui.circadianModalLuxValue = document.getElementById('circadian-modal-lux-value');
+    ui.circadianModalCctValue = document.getElementById('circadian-modal-cct-value');
+    ui.circadianLuxCanvas = document.getElementById('circadian-modal-lux-canvas');
+    ui.circadianCctCanvas = document.getElementById('circadian-modal-cct-canvas');
+    ui.circadianScaleSegments.clear();
+    ui.circadianScaleLabels.clear();
+    ui.circadianScaleMarkers.clear();
+
+    document.querySelectorAll('.circadian-scale__segments').forEach((element) => {
+      const kind = element.getAttribute('data-kind');
+      if (kind) {
+        ui.circadianScaleSegments.set(kind, element);
+      }
+    });
+    document.querySelectorAll('.circadian-scale__labels').forEach((element) => {
+      const kind = element.getAttribute('data-kind');
+      if (kind) {
+        ui.circadianScaleLabels.set(kind, element);
+      }
+    });
+    ui.circadianScaleValues.clear();
+    const scaleLuxValue = document.getElementById('circadian-scale-lux-value');
+    if (scaleLuxValue) {
+      ui.circadianScaleValues.set('lux', scaleLuxValue);
+    }
+    const scaleCctValue = document.getElementById('circadian-scale-cct-value');
+    if (scaleCctValue) {
+      ui.circadianScaleValues.set('cct', scaleCctValue);
+    }
+    const luxMarker = document.getElementById('circadian-scale-lux-marker');
+    if (luxMarker) {
+      ui.circadianScaleMarkers.set('lux', luxMarker);
+    }
+    const cctMarker = document.getElementById('circadian-scale-cct-marker');
+    if (cctMarker) {
+      ui.circadianScaleMarkers.set('cct', cctMarker);
+    }
+    ui.circadianModalCloseButtons = Array.from(
+      ui.circadianModal?.querySelectorAll('[data-close="true"]') || []
+    );
+    ui.circadianModalCloseButtons.forEach((button) => {
+      button.addEventListener('click', closeCircadianModal);
+    });
+    if (ui.circadianModal) {
+      ui.circadianModal.addEventListener('click', (event) => {
+        if (event.target?.dataset?.close === 'true') {
+          closeCircadianModal();
         }
       });
     }
@@ -674,8 +893,9 @@
   }
 
   function getModalFocusables() {
-    if (!ui.modalContent) return [];
-    return Array.from(ui.modalContent.querySelectorAll(FOCUSABLE_SELECTOR)).filter((element) => {
+    const container = state.activeModalContent;
+    if (!container) return [];
+    return Array.from(container.querySelectorAll(FOCUSABLE_SELECTOR)).filter((element) => {
       if (!(element instanceof HTMLElement)) return false;
       if (element.hasAttribute('disabled')) return false;
       if (element.getAttribute('aria-hidden') === 'true') return false;
@@ -685,7 +905,12 @@
   }
 
   function handleModalFocusTrap(event) {
-    if (event.key !== 'Tab' || !state.modalMetric || !ui.modalRoot || ui.modalRoot.hidden) {
+    if (event.key !== 'Tab') {
+      return;
+    }
+    const root = state.activeModalRoot;
+    const content = state.activeModalContent;
+    if (!root || !content || root.hidden) {
       return;
     }
     const focusables = getModalFocusables();
@@ -697,38 +922,45 @@
     const last = focusables[focusables.length - 1];
     const active = document.activeElement;
     if (event.shiftKey) {
-      if (!active || !ui.modalContent?.contains(active) || active === first) {
+      if (!active || !content.contains(active) || active === first) {
         event.preventDefault();
         last.focus();
       }
     } else {
-      if (!active || !ui.modalContent?.contains(active) || active === last) {
+      if (!active || !content.contains(active) || active === last) {
         event.preventDefault();
         first.focus();
       }
     }
   }
 
-  function activateModalFocusTrap() {
-    state.modalReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  function activateModalFocusTrap(root, content) {
+    if (!root || !content) return;
+    state.activeModalRoot = root;
+    state.activeModalContent = content;
+    state.activeModalReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     document.addEventListener('keydown', handleModalFocusTrap, true);
-    queueModalLayoutSync();
     const focusables = getModalFocusables();
     if (focusables.length > 0) {
       window.requestAnimationFrame(() => {
         focusables[0].focus();
       });
-    } else if (ui.modalContent) {
+    } else if (content) {
       window.requestAnimationFrame(() => {
-        ui.modalContent.focus?.();
+        content.focus?.();
       });
     }
   }
 
-  function releaseModalFocusTrap() {
+  function releaseModalFocusTrap(root) {
+    if (root && state.activeModalRoot && root !== state.activeModalRoot) {
+      return;
+    }
     document.removeEventListener('keydown', handleModalFocusTrap, true);
-    const target = state.modalReturnFocus;
-    state.modalReturnFocus = null;
+    const target = state.activeModalReturnFocus;
+    state.activeModalRoot = null;
+    state.activeModalContent = null;
+    state.activeModalReturnFocus = null;
     if (target && typeof target.focus === 'function') {
       window.requestAnimationFrame(() => target.focus());
     }
@@ -1017,7 +1249,7 @@
   }
 
   function updateHero(data) {
-    const metrics = ['CO2', 'PM2.5', 'TVOC', 'rel. Feuchte'];
+    const metrics = HERO_METRICS;
     const statuses = {};
     metrics.forEach((metric) => {
       const card = ui.heroCards.get(metric);
@@ -1050,100 +1282,132 @@
     switch (metric) {
       case 'CO2':
         if (value <= 800) {
-          return buildStatus('excellent', 'Frisch', 'Luft sehr frisch.', 'Kein Handlungsbedarf.');
+          return buildStatus('excellent', 'Luft sehr frisch.', 'Kein Handlungsbedarf.');
         }
         if (value <= 1000) {
-          return buildStatus('good', 'Stabil', 'Werte im grünen Bereich.', 'Regelmäßig lüften hält das Niveau.');
+          return buildStatus('good', 'CO₂ im stabilen Bereich.', 'Regelmäßiges Lüften hält das Niveau.');
         }
         if (value <= 1400) {
-          return buildStatus('elevated', 'Lüften', 'Konzentration lässt nach.', 'Jetzt querlüften.');
+          return buildStatus('elevated', 'CO₂ steigt – Konzentration sinkt.', 'Jetzt querlüften.');
         }
-        return buildStatus('poor', 'Alarm', 'Sehr hohe CO₂-Belastung.', 'Fenster öffnen oder Lüftung aktivieren.');
-      case 'PM2.5':
+        return buildStatus('poor', 'Sehr hohe CO₂-Belastung.', 'Fenster öffnen oder Lüftung aktivieren.');
+      case 'PM1.0':
         if (value <= 5) {
-          return buildStatus('excellent', 'Rein', 'Partikel kaum messbar.', 'Weiter so.');
+          return buildStatus('excellent', 'Sehr geringe PM1-Belastung.', 'Keine Maßnahmen erforderlich.');
         }
         if (value <= 12) {
-          return buildStatus('good', 'Okay', 'Feinstaub gering.', 'Leicht lüften genügt.');
+          return buildStatus('good', 'PM1 im gesunden Bereich.', 'Leichtes Lüften genügt.');
+        }
+        if (value <= 35) {
+          return buildStatus('elevated', 'Feinstaub steigt an.', 'Innenquellen reduzieren und lüften.');
+        }
+        return buildStatus('poor', 'Hohe PM1-Konzentration.', 'Intensiv lüften und HEPA-Filter einsetzen.');
+      case 'PM2.5':
+        if (value <= 5) {
+          return buildStatus('excellent', 'PM2.5 kaum messbar.', 'Weiter so.');
+        }
+        if (value <= 12) {
+          return buildStatus('good', 'Feinstaub unauffällig.', 'Kurzes Lüften reicht.');
         }
         if (value <= 25) {
-          return buildStatus('elevated', 'Anstieg', 'Belastung nimmt zu.', 'Luftreiniger prüfen und lüften.');
+          return buildStatus('elevated', 'Belastung nimmt zu.', 'Luftreiniger prüfen und lüften.');
         }
-        return buildStatus('poor', 'Hoch', 'Deutliche Feinstaubbelastung.', 'Sofort lüften oder Filter aktivieren.');
-      case 'TVOC':
-        if (value <= 150) {
-          return buildStatus('excellent', 'Niedrig', 'Kaum VOC-Belastung.', 'Keine Aktion nötig.');
+        return buildStatus('poor', 'Hohe PM2.5-Werte.', 'Sofort lüften oder Filter aktivieren.');
+      case 'PM10':
+        if (value <= 20) {
+          return buildStatus('excellent', 'Kaum aufgewirbelter Staub.', 'Situation beibehalten.');
         }
-        if (value <= 300) {
-          return buildStatus('good', 'Stabil', 'Werte unkritisch.', 'Regelmäßig lüften hält die Luft frisch.');
-        }
-        if (value <= 600) {
-          return buildStatus('elevated', 'Achtung', 'Flüchtige Stoffe nehmen zu.', 'Quellen prüfen und lüften.');
-        }
-        return buildStatus('poor', 'Hoch', 'Hohe VOC-Belastung.', 'Lüften und Auslöser reduzieren.');
-      case 'Temperatur':
-        if (value < 19) {
-          return buildStatus('poor', 'Kalt', 'Deutlich unter dem Komfortbereich.', 'Heizung anpassen oder wärmer kleiden.');
-        }
-        if (value < 20) {
-          return buildStatus('elevated', 'Kühl', 'Etwas unter der Komfortzone.', 'Behutsam aufheizen.');
-        }
-        if (value <= 24) {
-          return buildStatus('excellent', 'Komfort', 'Im Wohlfühlbereich.', 'Temperatur beibehalten.');
-        }
-        if (value <= 26) {
-          return buildStatus('elevated', 'Warm', 'Leicht über der Komfortzone.', 'Stoßlüften oder Beschattung nutzen.');
-        }
-        return buildStatus('poor', 'Heiß', 'Sehr warm belastet Kreislauf und Schlaf.', 'Aktiv kühlen und konsequent lüften.');
-      case 'rel. Feuchte':
-        if (value < 35) {
-          return buildStatus('poor', 'Trocken', 'Luft sehr trocken.', 'Befeuchten, Pflanzen oder Wasserschalen nutzen.');
-        }
-        if (value < 40) {
-          return buildStatus('elevated', 'Leicht trocken', 'Unterer Komfortbereich.', 'Sanft befeuchten oder lüften.');
-        }
-        if (value <= 55) {
-          return buildStatus('excellent', 'Ideal', 'Im Wohlfühlband.', 'Aktuelles Verhalten passt.');
+        if (value <= 40) {
+          return buildStatus('good', 'PM10 im grünen Bereich.', 'Regelmäßig lüften genügt.');
         }
         if (value <= 60) {
-          return buildStatus('good', 'Feucht', 'Etwas erhöhte Luftfeuchte.', 'Regelmäßig lüften.');
+          return buildStatus('elevated', 'Staubbelastung steigt.', 'Staubquellen reduzieren und lüften.');
+        }
+        if (value <= 100) {
+          return buildStatus('poor', 'Hohe PM10-Werte.', 'Gründlich lüften und Oberflächen reinigen.');
+        }
+        return buildStatus('poor', 'Extrem hohe PM10-Belastung.', 'Intensiv lüften und Luftreiniger einsetzen.');
+      case 'TVOC':
+        if (value <= 150) {
+          return buildStatus('excellent', 'VOC-Belastung sehr niedrig.', 'Keine Aktion erforderlich.');
+        }
+        if (value <= 300) {
+          return buildStatus('good', 'VOC unauffällig.', 'Regelmäßiges Lüften beibehmen.');
+        }
+        if (value <= 600) {
+          return buildStatus('elevated', 'Flüchtige Stoffe nehmen zu.', 'Quellen prüfen und lüften.');
+        }
+        return buildStatus('poor', 'Hohe VOC-Belastung.', 'Lüften und Auslöser reduzieren.');
+      case 'Temperatur':
+        if (value < 19) {
+          return buildStatus('poor', 'Deutlich zu kühl.', 'Heizung anpassen oder wärmer kleiden.');
+        }
+        if (value < 20) {
+          return buildStatus('elevated', 'Leicht unter Komfort.', 'Behutsam aufheizen.');
+        }
+        if (value <= 24) {
+          return buildStatus('excellent', 'Im Wohlfühlbereich.', 'Temperatur beibehalten.');
+        }
+        if (value <= 26) {
+          return buildStatus('elevated', 'Etwas warm.', 'Stoßlüften oder Beschattung nutzen.');
+        }
+        return buildStatus('poor', 'Sehr warm – belastend.', 'Aktiv kühlen und konsequent lüften.');
+      case 'rel. Feuchte':
+        if (value < 35) {
+          return buildStatus('poor', 'Luft sehr trocken.', 'Befeuchten oder Pflanzen aufstellen.');
+        }
+        if (value < 40) {
+          return buildStatus('elevated', 'Leicht trocken.', 'Sanft befeuchten oder lüften.');
+        }
+        if (value <= 55) {
+          return buildStatus('excellent', 'Wohlfühlfeuchte.', 'Aktuelles Verhalten passt.');
+        }
+        if (value <= 60) {
+          return buildStatus('good', 'Etwas feucht.', 'Regelmäßig lüften.');
         }
         if (value <= 70) {
-          return buildStatus('elevated', 'Sehr feucht', 'Schimmelgefahr steigt.', 'Stoßlüften und trocknen.');
+          return buildStatus('elevated', 'Sehr feucht – Schimmelgefahr.', 'Stoßlüften und trocknen.');
         }
-        return buildStatus('poor', 'Nass', 'Luftfeuchte stark erhöht.', 'Entfeuchter einsetzen und dauerhaft lüften.');
+        return buildStatus('poor', 'Extrem feucht.', 'Entfeuchter einsetzen und dauerhaft lüften.');
       case 'Lux':
-        if (value < 150) {
-          return buildStatus('poor', 'Dunkel', 'Licht deutlich zu schwach.', 'Lichtquellen verstärken oder Tageslicht nutzen.');
+        if (value < 100) {
+          return buildStatus('poor', 'Licht deutlich zu schwach.', 'Helligkeit erhöhen oder Tageslicht nutzen.');
         }
-        if (value < 300) {
-          return buildStatus('elevated', 'Sanft', 'Etwas mehr Licht steigert die Aktivität.', 'Arbeitslicht einschalten oder Vorhänge öffnen.');
+        if (value < 500) {
+          return buildStatus('elevated', 'Licht knapp für Fokus.', 'Arbeitslicht einschalten oder Vorhänge öffnen.');
         }
         if (value <= 1000) {
-          return buildStatus('excellent', 'Komfort', 'Ausgewogene Beleuchtung.', 'Lichtsituation beibehalten.');
+          return buildStatus('excellent', 'Beleuchtung im Zielbereich.', 'Lichtsituation beibehalten.');
         }
-        if (value <= 1600) {
-          return buildStatus('good', 'Hell', 'Kräftiges Licht unterstützt Wachheit.', 'Blendquellen prüfen.');
+        if (value <= 1500) {
+          return buildStatus('good', 'Kräftiges Licht unterstützt.', 'Blendquellen prüfen.');
         }
-        return buildStatus('poor', 'Blendung', 'Sehr helle Beleuchtung kann ermüden.', 'Dimmen oder indirektes Licht nutzen.');
+        return buildStatus('poor', 'Sehr hell – Blendgefahr.', 'Licht dimmen oder indirekt ausrichten.');
       case 'Farbtemperatur':
-        if (value < 3000) {
-          return buildStatus('elevated', 'Warm', 'Sehr warmes Licht beruhigt.', 'Für Fokusphasen etwas kühler werden.');
+        if (value < 3200) {
+          return buildStatus('elevated', 'Sehr warmes Licht – beruhigend.', 'Für Fokusphasen etwas kühler wählen.');
         }
-        if (value < 4200) {
-          return buildStatus('excellent', 'Neutral', 'Ausgeglichenes Tageslichtweiß.', 'Optimal für klares Arbeiten.');
+        if (value < 5200) {
+          return buildStatus('excellent', 'Neutral bis leicht kühl – ideal für Aktivität.', 'Am Abend langsam auf warmes Licht wechseln.');
         }
-        if (value <= 5500) {
-          return buildStatus('good', 'Kühl', 'Aktivierendes Licht steigert Aufmerksamkeit.', 'Abends langsam auf warmes Licht wechseln.');
+        if (value <= 6000) {
+          return buildStatus('good', 'Kühles Licht aktiviert.', 'Am späten Tag auf wärmere Lichtfarbe umstellen.');
         }
-        return buildStatus('poor', 'Sehr kühl', 'Licht sehr kalt, kann den Biorhythmus stören.', 'Später am Tag wärmere Lichtfarbe wählen.');
+        return buildStatus('poor', 'Sehr kühles Licht – stört abends.', 'Später am Tag warmes Licht verwenden.');
       default:
-        return { tone: 'neutral', intent: 'neutral', label: '', note: '', tip: '' };
+        return buildStatus('neutral', '', '');
     }
-    }
+  }
 
-  function buildStatus(intent, label, note, tip) {
-    return { intent, tone: intent, label, note, tip };
+  function buildStatus(intent, note, tip) {
+    const tone = intent || 'neutral';
+    return {
+      intent: tone,
+      tone,
+      label: STATUS_LABELS[tone] || STATUS_LABELS.neutral,
+      note,
+      tip
+    };
   }
 
   function updateHealthCard(statuses) {
@@ -1425,6 +1689,10 @@
 
     ui.circadianCard.dataset.intent = evaluation.cctTone;
     ui.circadianCard.classList.add('ready');
+
+    refreshCircadianModal().catch((error) => {
+      console.warn('Circadian Modal Update fehlgeschlagen', error);
+    });
   }
 
   function updateCircadianCycle(phase) {
@@ -1537,6 +1805,285 @@
     };
   }
 
+  function openCircadianModal() {
+    if (!ui.circadianModal) return;
+    if (!state.bodyScrollLock) {
+      lockBodyScroll();
+    }
+    ui.circadianModal.hidden = false;
+    activateModalFocusTrap(ui.circadianModal, ui.circadianModalContent);
+    refreshCircadianModal(true).catch(handleError);
+  }
+
+  function closeCircadianModal() {
+    if (!ui.circadianModal || ui.circadianModal.hidden) return;
+    ui.circadianModal.hidden = true;
+    releaseModalFocusTrap(ui.circadianModal);
+    if (!ui.modalRoot || ui.modalRoot.hidden) {
+      unlockBodyScroll();
+    }
+  }
+
+  async function refreshCircadianModal(forceCharts = false) {
+    if (!ui.circadianModal) return;
+    const phase = resolveCircadianPhase();
+    const luxValue = state.now?.Lux?.value;
+    const cctValue = state.now?.Farbtemperatur?.value;
+
+    updateCircadianModalSummary(phase, luxValue, cctValue);
+    updateCircadianModalScales(phase, luxValue, cctValue);
+
+    const chartsVisible = !ui.circadianModal.hidden || forceCharts;
+    if (!chartsVisible) {
+      return;
+    }
+
+    const range = TIME_RANGES['24h'];
+    const [luxSeries, cctSeries] = await Promise.all([
+      ensureSeries(CHART_DEFINITIONS.Lux, range, forceCharts),
+      ensureSeries(CHART_DEFINITIONS.Farbtemperatur, range, forceCharts)
+    ]);
+
+    updateCircadianModalChart('lux', luxSeries?.Lux || [], phase.luxRange);
+    updateCircadianModalChart('cct', cctSeries?.Farbtemperatur || [], phase.cctRange);
+  }
+
+  function updateCircadianModalSummary(phase, luxValue, cctValue) {
+    if (ui.circadianModalSummary) {
+      const luxRange = formatRangeLabel(phase.luxRange, 'lx');
+      const cctRange = formatRangeLabel(phase.cctRange, 'K');
+      ui.circadianModalSummary.textContent = `Empfohlene Lichtumgebung für ${phase.window}: ${luxRange} und ${cctRange}`;
+    }
+
+    const badge = computeCircadianBadge(phase, luxValue, cctValue);
+    if (ui.circadianModalStatus) {
+      ui.circadianModalStatus.textContent = badge.text;
+      ui.circadianModalStatus.dataset.tone = badge.tone;
+    }
+
+    if (ui.circadianModalLuxValue) {
+      ui.circadianModalLuxValue.textContent = formatWithUnit(luxValue, 'lx', 0);
+    }
+    if (ui.circadianModalCctValue) {
+      ui.circadianModalCctValue.textContent = formatWithUnit(cctValue, 'K', 0);
+    }
+  }
+
+  function updateCircadianModalScales(phase, luxValue, cctValue) {
+    renderCircadianScale('lux', luxValue);
+    renderCircadianScale('cct', cctValue);
+  }
+
+  function updateCircadianModalChart(kind, data, targetRange) {
+    const definition = kind === 'lux' ? CHART_DEFINITIONS.Lux : CHART_DEFINITIONS.Farbtemperatur;
+    const metricKey = definition.metrics[0];
+    const chart = ensureCircadianChart(kind, definition, metricKey);
+    if (!chart) return;
+    chart.data.datasets[0].data = data;
+    const unit = METRIC_CONFIG[metricKey]?.unit || '';
+    chart.options.plugins.targetGuides = chart.options.plugins.targetGuides || {};
+    chart.options.plugins.targetGuides.guides = [
+      {
+        min: targetRange[0],
+        max: targetRange[1],
+        color: STATUS_TONES.good,
+        label: `Ziel ${formatRangeLabel(targetRange, unit)}`
+      }
+    ];
+    chart.update('none');
+  }
+
+  function ensureCircadianChart(kind, definition, metricKey) {
+    if (state.circadianCharts[kind]) {
+      return state.circadianCharts[kind];
+    }
+    const canvas = kind === 'lux' ? ui.circadianLuxCanvas : ui.circadianCctCanvas;
+    if (!canvas) return null;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    const color = definition.colors?.[0] || '#0ea5e9';
+    const limits = CIRCADIAN_SCALE_LIMITS[kind];
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        datasets: [
+          {
+            label: METRIC_CONFIG[metricKey]?.label || metricKey,
+            data: [],
+            borderColor: color,
+            backgroundColor: colorWithAlpha(color, 0.2),
+            borderWidth: 2,
+            tension: 0.35,
+            pointRadius: 0,
+            fill: 'origin',
+            spanGaps: true
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            displayColors: false,
+            backgroundColor: 'rgba(15, 23, 42, 0.92)',
+            padding: 8,
+            callbacks: {
+              label(context) {
+                const cfg = METRIC_CONFIG[metricKey];
+                return formatWithUnit(context.parsed.y, cfg?.unit || '', cfg?.decimals ?? 0);
+              }
+            }
+          },
+          targetGuides: { guides: [] }
+        },
+        scales: {
+          x: {
+            type: 'time',
+            display: false
+          },
+          y: {
+            display: false,
+            suggestedMin: limits?.min ?? definition.yBounds?.min,
+            suggestedMax: limits?.max ?? definition.yBounds?.max
+          }
+        }
+      }
+    });
+    state.circadianCharts[kind] = chart;
+    return chart;
+  }
+
+  function renderCircadianScale(kind, value) {
+    const bands = CIRCADIAN_SCALE_BANDS[kind] || [];
+    const limits = CIRCADIAN_SCALE_LIMITS[kind];
+    const scale = { min: limits.min, max: limits.max, unit: kind === 'lux' ? 'lx' : 'K' };
+    const segmentsEl = ui.circadianScaleSegments.get(kind);
+    const labelsEl = ui.circadianScaleLabels.get(kind);
+    const markerEl = ui.circadianScaleMarkers.get(kind);
+    const currentEl = ui.circadianScaleValues.get(kind);
+    if (currentEl) {
+      currentEl.textContent = formatWithUnit(value, scale.unit, 0);
+    }
+    if (segmentsEl) {
+      const html = bands
+        .map((band) => {
+          const start = computeScalePosition(band.min ?? scale.min, scale);
+          const end = computeScalePosition(band.max ?? scale.max, scale);
+          const color = colorWithAlpha(SCALE_TONES[band.tone] || '#0ea5e9', 0.28);
+          return `<span class="circadian-scale__segment" style="--start:${start};--end:${end};--segment-color:${color}"></span>`;
+        })
+        .join('');
+      segmentsEl.innerHTML = html;
+    }
+    if (labelsEl) {
+      if (bands.length) {
+        labelsEl.style.setProperty('--segment-template', buildSegmentTemplate(bands, scale));
+        labelsEl.innerHTML = bands
+          .map((band) => {
+            const display = buildBandDisplay(band, scale.unit);
+            return `<span>${band.label}${display ? `<small>${display}</small>` : ''}</span>`;
+          })
+          .join('');
+      } else {
+        labelsEl.style.removeProperty('--segment-template');
+        labelsEl.innerHTML = '';
+      }
+    }
+    if (markerEl) {
+      const percent = computeMarkerPosition(value, scale);
+      markerEl.style.left = `${percent}%`;
+      const toneStops = bands.map((band) => ({ value: band.max, tone: band.tone }));
+      markerEl.dataset.tone = value == null ? 'neutral' : resolveScaleTone(value, toneStops);
+      const labelEl = markerEl.querySelector('.circadian-scale__marker-label');
+      if (labelEl) {
+        labelEl.textContent = formatWithUnit(value, scale.unit, 0);
+      }
+      clampMarkerToTrack(markerEl, markerEl.parentElement, percent, '--offset');
+    }
+  }
+
+  function computeCircadianBadge(phase, luxValue, cctValue) {
+    const luxAssessment = assessCircadianDimension(luxValue, phase.luxRange, 'Zu dunkel', 'Zu hell');
+    const cctAssessment = assessCircadianDimension(cctValue, phase.cctRange, 'Zu warm', 'Zu kühl');
+    const assessments = [luxAssessment, cctAssessment].filter(Boolean);
+    if (assessments.length === 0) {
+      return { text: 'Neutral', tone: 'neutral', weight: 0 };
+    }
+    let winner = { text: 'Im Ziel', tone: 'excellent', weight: 0 };
+    assessments.forEach((assessment) => {
+      if (assessment.weight > winner.weight) {
+        winner = assessment;
+      }
+    });
+    if (winner.weight === 0) {
+      return { text: 'Im Ziel', tone: 'excellent', weight: 0 };
+    }
+    return winner;
+  }
+
+  function assessCircadianDimension(value, range, belowLabel, aboveLabel) {
+    if (!Array.isArray(range) || range.length < 2 || !Number.isFinite(value)) {
+      return null;
+    }
+    if (value < range[0]) {
+      return { text: belowLabel, tone: 'elevated', weight: 1 };
+    }
+    if (value > range[1]) {
+      return { text: aboveLabel, tone: 'poor', weight: 2 };
+    }
+    return { text: 'Im Ziel', tone: 'excellent', weight: 0 };
+  }
+
+  function buildSegmentTemplate(bands, scale) {
+    const span = Math.max((scale.max ?? scale.min) - (scale.min ?? 0), 1);
+    return bands
+      .map((band) => {
+        const start = Number.isFinite(band.min) ? band.min : scale.min;
+        const end = Number.isFinite(band.max) ? band.max : scale.max;
+        const width = clamp(((end - start) / span) * 100, 6, 100);
+        return `${width.toFixed(2)}%`;
+      })
+      .join(' ');
+  }
+
+  function buildBandDisplay(band, unit) {
+    if (band.display) return band.display;
+    const hasMin = Number.isFinite(band.min);
+    const hasMax = Number.isFinite(band.max);
+    if (hasMin && hasMax) {
+      return `${formatNumber(band.min, 0)}–${formatNumber(band.max, 0)}${NARROW_SPACE}${unit}`;
+    }
+    if (hasMin) {
+      return `≥ ${formatNumber(band.min, 0)}${NARROW_SPACE}${unit}`;
+    }
+    if (hasMax) {
+      return `≤ ${formatNumber(band.max, 0)}${NARROW_SPACE}${unit}`;
+    }
+    return '';
+  }
+
+  function buildBandTicks(bands, scale) {
+    const values = new Set();
+    if (Number.isFinite(scale.min)) values.add(scale.min);
+    if (Number.isFinite(scale.max)) values.add(scale.max);
+    bands.forEach((band) => {
+      if (Number.isFinite(band.min)) values.add(band.min);
+      if (Number.isFinite(band.max)) values.add(band.max);
+    });
+    return Array.from(values).sort((a, b) => a - b);
+  }
+
+  function formatRangeLabel(range, unit) {
+    if (!Array.isArray(range) || range.length < 2) {
+      return `—${unit ? `${NARROW_SPACE}${unit}` : ''}`;
+    }
+    const [min, max] = range;
+    return `${formatNumber(min, 0)}–${formatNumber(max, 0)}${unit ? `${NARROW_SPACE}${unit}` : ''}`;
+  }
+
   function updateBarTrack(track, value, targetRange, bounds, tone) {
     if (!track) return;
     const scale = { min: bounds.min, max: bounds.max };
@@ -1615,12 +2162,20 @@
         win: range.win
       });
       const response = await fetch(`/api/series?${params.toString()}`);
-      if (!response.ok) {
-        throw new Error(`Fehler beim Laden der Serie ${metric}`);
+      let payload = null;
+      try {
+        payload = await response.clone().json();
+      } catch (error) {
+        payload = null;
       }
-      const payload = await response.json();
+      if (!response.ok) {
+        throw buildSeriesError(metric, range, payload);
+      }
+      if (!payload) {
+        payload = await response.json();
+      }
       if (!payload || !payload.ok) {
-        throw new Error(payload?.error || `Serie ${metric} ungültig`);
+        throw buildSeriesError(metric, range, payload);
       }
       const values = normalizeSeriesValues(payload.data);
       const points = values
@@ -1631,6 +2186,21 @@
 
     const entries = await Promise.all(promises);
     return Object.fromEntries(entries);
+  }
+
+  function buildSeriesError(metric, range, payload) {
+    const label = METRIC_CONFIG[metric]?.label || metric;
+    const rangeLabel = typeof range?.label === 'string'
+      ? range.label
+      : typeof range?.range === 'string'
+        ? range.range
+        : '24 h';
+    if (payload?.error === 'unknown_metric' && Array.isArray(payload?.known)) {
+      console.warn(`Unbekannte Serie angefordert: ${metric}`, payload.known);
+    } else if (payload?.error) {
+      console.warn(`Serie ${metric} antwortete mit Fehler:`, payload.error);
+    }
+    return new Error(`Fehler beim Laden der Serie ${label} (${rangeLabel}). Bitte später erneut versuchen.`);
   }
 
   function updateSparklines() {
@@ -1759,19 +2329,43 @@
     ui.modalScale.hidden = false;
     const config = METRIC_CONFIG[metric];
     const scale = { ...scaleConfig };
-    const stops = Array.isArray(scaleConfig.stops)
+    const bands = Array.isArray(scaleConfig.bands)
+      ? scaleConfig.bands.map((band) => ({ ...band }))
+      : [];
+    const stops = !bands.length && Array.isArray(scaleConfig.stops)
       ? scaleConfig.stops.map((stop) => ({ ...stop })).slice(0, 6)
       : [];
-    ui.modalScale.style.setProperty('--scale-columns', Math.max(stops.length, 1));
-    ui.modalScaleLabels.innerHTML = stops.map((stop) => `<span>${stop.label}</span>`).join('');
-    const tickValues = Array.from(new Set([scale.min, ...stops.map((stop) => stop.value), scale.max].filter((v) => v != null)))
-      .sort((a, b) => a - b);
-    ui.modalScale.style.setProperty('--scale-ticks', Math.max(tickValues.length, 1));
-    ui.modalScaleValues.innerHTML = tickValues
-      .map((value) => `<span>${formatScaleTick(value, scale.unit)}</span>`)
-      .join('');
-    if (ui.modalScaleGradient) {
-      ui.modalScaleGradient.style.background = buildScaleGradient(scale, stops);
+
+    if (bands.length) {
+      ui.modalScale.style.setProperty('--scale-columns', Math.max(bands.length, 1));
+      ui.modalScaleLabels.style.setProperty('--scale-columns-template', buildSegmentTemplate(bands, scale));
+      ui.modalScaleLabels.innerHTML = bands
+        .map((band) => {
+          const display = buildBandDisplay(band, scale.unit);
+          return `<span>${band.label}${display ? `<small>${display}</small>` : ''}</span>`;
+        })
+        .join('');
+      const tickValues = buildBandTicks(bands, scale);
+      ui.modalScale.style.setProperty('--scale-ticks', Math.max(tickValues.length, 1));
+      ui.modalScaleValues.innerHTML = tickValues
+        .map((value) => `<span>${formatScaleTick(value, scale.unit)}</span>`)
+        .join('');
+      if (ui.modalScaleGradient) {
+        ui.modalScaleGradient.style.background = buildBandGradient(scale, bands);
+      }
+    } else {
+      ui.modalScale.style.setProperty('--scale-columns', Math.max(stops.length, 1));
+      ui.modalScaleLabels.style.removeProperty('--scale-columns-template');
+      ui.modalScaleLabels.innerHTML = stops.map((stop) => `<span>${stop.label}</span>`).join('');
+      const tickValues = Array.from(new Set([scale.min, ...stops.map((stop) => stop.value), scale.max].filter((v) => v != null)))
+        .sort((a, b) => a - b);
+      ui.modalScale.style.setProperty('--scale-ticks', Math.max(tickValues.length, 1));
+      ui.modalScaleValues.innerHTML = tickValues
+        .map((value) => `<span>${formatScaleTick(value, scale.unit)}</span>`)
+        .join('');
+      if (ui.modalScaleGradient) {
+        ui.modalScaleGradient.style.background = buildScaleGradient(scale, stops);
+      }
     }
     const sample = state.now?.[metric];
     const value = sample && isFinite(sample.value) ? sample.value : null;
@@ -1783,13 +2377,15 @@
         ui.modalScaleMarkerValue.textContent = formatWithUnit(null, scale.unit || '', config?.decimals ?? 0);
       }
     } else {
-      const tone = resolveScaleTone(value, stops);
+      const toneStops = bands.length ? bands.map((band) => ({ value: band.max, tone: band.tone })) : stops;
+      const tone = toneStops.length ? resolveScaleTone(value, toneStops) : 'neutral';
       ui.modalScaleMarker.dataset.tone = tone || 'neutral';
       if (ui.modalScaleMarkerValue) {
         const decimals = config?.decimals ?? 1;
         ui.modalScaleMarkerValue.textContent = formatWithUnit(value, scale.unit || '', decimals);
       }
     }
+    clampMarkerToTrack(ui.modalScaleMarker, ui.modalScaleMarker.parentElement, markerPercent, '--marker-offset');
     if (ui.modalScale) {
       ui.modalScale.style.removeProperty('--target-start');
       ui.modalScale.style.removeProperty('--target-end');
@@ -1835,6 +2431,30 @@
     return clamp(percent, 3, 97);
   }
 
+  function clampMarkerToTrack(marker, track, percent, offsetVar = '--marker-offset') {
+    if (!marker || !track) return;
+    window.requestAnimationFrame(() => {
+      marker.style.setProperty(offsetVar, '0px');
+      const markerRect = marker.getBoundingClientRect();
+      const trackRect = track.getBoundingClientRect();
+      if (!markerRect.width || !trackRect.width) {
+        return;
+      }
+      const minPadding = 4;
+      const center = (percent / 100) * trackRect.width;
+      const half = markerRect.width / 2;
+      const leftEdge = center - half;
+      const rightEdge = center + half;
+      let offset = 0;
+      if (leftEdge < minPadding) {
+        offset = minPadding - leftEdge;
+      } else if (rightEdge > trackRect.width - minPadding) {
+        offset = (trackRect.width - minPadding) - rightEdge;
+      }
+      marker.style.setProperty(offsetVar, `${offset}px`);
+    });
+  }
+
   function resolveScaleTone(value, stops) {
     if (!Array.isArray(stops) || stops.length === 0) {
       return 'neutral';
@@ -1875,6 +2495,59 @@
     return `linear-gradient(90deg, ${segments.join(', ')})`;
   }
 
+  function buildBandGradient(scale, bands) {
+    if (!Array.isArray(bands) || bands.length === 0) {
+      return buildScaleGradient(scale, []);
+    }
+    const minCandidate = Number.isFinite(scale.min) ? scale.min : bands[0]?.min;
+    const maxCandidate = Number.isFinite(scale.max)
+      ? scale.max
+      : bands[bands.length - 1]?.max;
+    const min = Number.isFinite(minCandidate) ? minCandidate : 0;
+    const max = Number.isFinite(maxCandidate) ? maxCandidate : min + 1;
+    const span = Math.max(max - min, 1);
+    const segments = [];
+    bands.forEach((band, index) => {
+      const color = SCALE_TONES[band.tone] || '#0ea5e9';
+      const startValue = Number.isFinite(band.min)
+        ? band.min
+        : index === 0
+          ? min
+          : Number.isFinite(bands[index - 1].max)
+            ? bands[index - 1].max
+            : min;
+      const endValue = Number.isFinite(band.max)
+        ? band.max
+        : index === bands.length - 1
+          ? max
+          : Number.isFinite(band.max)
+            ? band.max
+            : max;
+      const start = clamp(((startValue - min) / span) * 100, 0, 100);
+      const end = clamp(((endValue - min) / span) * 100, start, 100);
+      if (index === 0) {
+        segments.push(`${color} ${start}%`);
+      } else {
+        const prevColor = SCALE_TONES[bands[index - 1].tone] || color;
+        segments.push(`${prevColor} ${start}%`);
+      }
+      segments.push(`${color} ${start}%`);
+      segments.push(`${color} ${end}%`);
+      if (index === bands.length - 1 && end < 100) {
+        segments.push(`${color} 100%`);
+      }
+    });
+    if (segments.length === 0) {
+      return buildScaleGradient(scale, []);
+    }
+    const lastSegment = segments[segments.length - 1];
+    if (!/100%$/.test(lastSegment)) {
+      const lastColor = lastSegment.split(' ')[0];
+      segments.push(`${lastColor} 100%`);
+    }
+    return `linear-gradient(90deg, ${segments.join(', ')})`;
+  }
+
   function formatScaleTick(value, unit) {
     if (!Number.isFinite(value)) {
       return formatWithUnit(null, unit, 0);
@@ -1901,7 +2574,7 @@
     lockBodyScroll();
     ui.modalRoot.hidden = false;
     attachModalResizeHandlers();
-    activateModalFocusTrap();
+    activateModalFocusTrap(ui.modalRoot, ui.modalContent);
     queueModalLayoutSync();
     loadModalChart(metric, false).catch(handleError);
   }
@@ -1909,7 +2582,7 @@
   function closeChartModal() {
     if (!ui.modalRoot || ui.modalRoot.hidden) return;
     ui.modalRoot.hidden = true;
-    releaseModalFocusTrap();
+    releaseModalFocusTrap(ui.modalRoot);
     detachModalResizeHandlers();
     if (state.modalLayoutFrame) {
       window.cancelAnimationFrame(state.modalLayoutFrame);
@@ -1918,7 +2591,9 @@
     if (ui.modalTabList) {
       ui.modalTabList.style.removeProperty('--tabs-offset');
     }
-    unlockBodyScroll();
+    if (!ui.circadianModal || ui.circadianModal.hidden) {
+      unlockBodyScroll();
+    }
     if (state.modalChart) {
       state.modalChart.destroy();
       state.modalChart = null;
@@ -2074,6 +2749,7 @@
   function handleGlobalKeydown(event) {
     if (event.key === 'Escape') {
       closeChartModal();
+      closeCircadianModal();
     }
   }
 
@@ -2228,18 +2904,30 @@
 
   function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
-    const { protocol, hostname } = window.location;
-    const host = typeof hostname === 'string' ? hostname.toLowerCase() : '';
-    const isLocalhost = ['localhost', '127.0.0.1', '::1'].includes(host);
-    if (protocol !== 'https:' && !isLocalhost) {
-      console.info('Service Worker übersprungen: unsichere Umgebung.');
+    const host = typeof window.location.hostname === 'string' ? window.location.hostname.toLowerCase() : '';
+    const allowLocalhost = host === 'localhost';
+    if (!window.isSecureContext && !allowLocalhost) {
+      console.info('Service Worker nicht registriert: Zertifikat oder sicherer Kontext fehlt.');
+      if (ui.pwaStatusBadge) {
+        ui.pwaStatusBadge.hidden = false;
+      }
       return;
     }
 
     navigator.serviceWorker
       .register('/sw.js')
-      .then(() => console.info('Service Worker registriert'))
-      .catch((error) => console.error('Service Worker Fehler', error));
+      .then(() => {
+        console.info('Service Worker registriert');
+        if (ui.pwaStatusBadge) {
+          ui.pwaStatusBadge.hidden = true;
+        }
+      })
+      .catch((error) => {
+        console.error('Service Worker Fehler', error);
+        if (ui.pwaStatusBadge) {
+          ui.pwaStatusBadge.hidden = false;
+        }
+      });
   }
 
   function setupInstallPrompt() {

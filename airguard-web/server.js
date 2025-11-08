@@ -10,29 +10,125 @@ if (typeof fetch !== 'function') {
 }
 
 const METRICS = [
-  { key: 'CO2', label: 'CO\u2082', unit: 'ppm', decimals: 0 },
-  { key: 'PM1.0', label: 'PM1.0', unit: '\u00b5g/m\u00b3', decimals: 1 },
-  { key: 'PM2.5', label: 'PM2.5', unit: '\u00b5g/m\u00b3', decimals: 1 },
-  { key: 'PM10', label: 'PM10', unit: '\u00b5g/m\u00b3', decimals: 1 },
   {
-    key: 'temperatur',
+    key: 'CO2',
+    label: 'CO\u2082',
+    unit: 'ppm',
+    decimals: 0,
+    promNames: ['CO2', 'co2'],
+    queryNames: ['CO\u2082', 'CO2', 'co2'],
+    slug: 'co2'
+  },
+  {
+    key: 'PM1.0',
+    label: 'PM1',
+    unit: '\u00b5g/m\u00b3',
+    decimals: 1,
+    promNames: ['PM1.0', 'pm1.0', 'pm1'],
+    queryNames: ['PM1', 'PM1.0', 'pm1'],
+    slug: 'pm1'
+  },
+  {
+    key: 'PM2.5',
+    label: 'PM2.5',
+    unit: '\u00b5g/m\u00b3',
+    decimals: 1,
+    promNames: ['PM2.5', 'pm2_5', 'pm2.5'],
+    queryNames: ['PM2.5', 'pm2.5', 'pm25'],
+    slug: 'pm25'
+  },
+  {
+    key: 'PM10',
+    label: 'PM10',
+    unit: '\u00b5g/m\u00b3',
+    decimals: 1,
+    promNames: ['PM10', 'pm10'],
+    queryNames: ['PM10', 'pm10'],
+    slug: 'pm10'
+  },
+  {
+    key: 'Temperatur',
     label: 'Temperatur',
     unit: '\u00b0C',
     decimals: 1,
-    promName: 'temperatur'
+    promNames: [
+      'temperatur',
+      'temperatur_kalibriert',
+      'temperatur__bme_kalibriert_',
+      'temperature',
+      'temp',
+      'temp_final'
+    ],
+    queryNames: ['Temperatur', 'temperatur', 'temperature', 'temp', 'temp_final', 'temperature_final'],
+    slug: 'temperatur'
   },
-  { key: 'rel. Feuchte', label: 'rel. Feuchte', unit: '%', decimals: 1 },
-  { key: 'Luftdruck', label: 'Luftdruck', unit: 'hPa', decimals: 1 },
-  { key: 'TVOC', label: 'TVOC', unit: 'ppb', decimals: 0 },
-  { key: 'Lux', label: 'Lux', unit: 'lx', decimals: 0 },
-  { key: 'Farbtemperatur', label: 'Farbtemperatur', unit: 'K', decimals: 0 }
+  {
+    key: 'rel. Feuchte',
+    label: 'rel. Feuchte',
+    unit: '%',
+    decimals: 1,
+    promNames: ['rel. Feuchte', 'rel_feuchte', 'humidity'],
+    queryNames: ['rel. Feuchte', 'relfeuchte', 'luftfeuchte'],
+    slug: 'relfeuchte'
+  },
+  {
+    key: 'Lux',
+    label: 'Lux',
+    unit: 'lx',
+    decimals: 0,
+    promNames: ['Lux', 'beleuchtungsstaerke', 'lx'],
+    queryNames: ['Lux', 'lux'],
+    slug: 'lux'
+  },
+  {
+    key: 'Farbtemperatur',
+    label: 'CCT',
+    unit: 'K',
+    decimals: 0,
+    promNames: ['Farbtemperatur', 'cct', 'farbtemperatur'],
+    queryNames: ['CCT', 'Farbtemperatur', 'cct'],
+    slug: 'cct'
+  },
+  {
+    key: 'Luftdruck',
+    label: 'Luftdruck',
+    unit: 'hPa',
+    decimals: 1,
+    promNames: ['Luftdruck', 'pressure', 'luftdruck'],
+    queryNames: ['Luftdruck', 'druck'],
+    slug: 'luftdruck'
+  },
+  {
+    key: 'TVOC',
+    label: 'TVOC',
+    unit: 'ppb',
+    decimals: 0,
+    promNames: ['TVOC', 'tvoc'],
+    queryNames: ['TVOC', 'voc'],
+    slug: 'tvoc'
+  }
 ];
 
-const METRIC_LOOKUP = new Map();
+const QUERY_LOOKUP = new Map();
+const KNOWN_QUERY_KEYS = new Set();
+
 for (const metric of METRICS) {
-  METRIC_LOOKUP.set(metric.key, metric);
-  if (metric.promName && metric.promName !== metric.key) {
-    METRIC_LOOKUP.set(metric.promName, metric);
+  const promList = Array.isArray(metric.promNames) && metric.promNames.length > 0 ? metric.promNames : [metric.key];
+  metric.promNames = promList;
+  metric.promQueryName = promList[0];
+
+  const aliases = new Set([metric.key, metric.label, ...(metric.queryNames || [])]);
+  for (const alias of aliases) {
+    if (!alias) continue;
+    const normalized = normalizeQueryName(alias);
+    if (!normalized) continue;
+    QUERY_LOOKUP.set(normalized, metric);
+  }
+
+  const slug = metric.slug || normalizeQueryName(metric.key);
+  if (slug) {
+    metric.slug = slug;
+    KNOWN_QUERY_KEYS.add(slug);
   }
 }
 
@@ -145,8 +241,16 @@ app.get('/api/now', async (req, res, next) => {
     const data = {};
 
     for (const metric of METRICS) {
-      const promName = metric.promName || metric.key;
-      const match = results.find((entry) => entry?.metric?.name === promName);
+      const match = results.find((entry) => {
+        const name = typeof entry?.metric?.name === 'string' ? entry.metric.name : '';
+        if (!name) return false;
+        const normalized = normalizeQueryName(name);
+        return metric.promNames.some((candidate) => {
+          if (!candidate) return false;
+          if (candidate === name) return true;
+          return normalizeQueryName(candidate) === normalized;
+        });
+      });
       if (!match || !Array.isArray(match.value) || match.value.length < 2) {
         data[metric.key] = null;
         continue;
@@ -184,11 +288,15 @@ app.get('/api/now', async (req, res, next) => {
 
 app.get('/api/series', async (req, res, next) => {
   try {
-    const name = String(req.query.name || '');
-    const metric = METRIC_LOOKUP.get(name);
+    const nameLiteral = String(req.query.name || '');
+    const metric = QUERY_LOOKUP.get(normalizeQueryName(nameLiteral));
 
     if (!metric) {
-      return sendJSON(res, { ok: false, error: `Unbekannte Metrik: ${name}` }, 400);
+      return sendJSON(
+        res,
+        { ok: false, error: 'unknown_metric', known: Array.from(KNOWN_QUERY_KEYS).sort() },
+        400
+      );
     }
 
     const rangeLiteral = req.query.range ? String(req.query.range) : '24h';
@@ -228,7 +336,7 @@ app.get('/api/series', async (req, res, next) => {
 
     const endSeconds = Math.floor(Date.now() / 1000);
     const startSeconds = Math.max(0, endSeconds - rangeSeconds);
-    const promNameEscaped = escapePromString(metric.key);
+    const promNameEscaped = escapePromString(metric.promQueryName || metric.key);
     const baseQuery = `esphome_sensor_value{name="${promNameEscaped}"}`;
     const seriesQuery = `avg_over_time(${baseQuery}[${windowLiteral}])`;
 
@@ -389,4 +497,32 @@ function parseDuration(input) {
 
 function escapePromString(value) {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+function normalizeQueryName(value) {
+  if (!value || typeof value !== 'string') {
+    return '';
+  }
+  const subscripts = {
+    '₀': '0',
+    '₁': '1',
+    '₂': '2',
+    '₃': '3',
+    '₄': '4',
+    '₅': '5',
+    '₆': '6',
+    '₇': '7',
+    '₈': '8',
+    '₉': '9'
+  };
+  let normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[₀₁₂₃₄₅₆₇₈₉]/g, (char) => subscripts[char] || '')
+    .replace(/(\d)\.0\b/g, '$1')
+    .replace(/[^a-z0-9]/g, '');
+  if (!normalized) {
+    return '';
+  }
+  return normalized;
 }
