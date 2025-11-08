@@ -953,7 +953,6 @@
         return { tone: 'neutral', intent: 'neutral', label: '', note: '', tip: '' };
     }
     }
-  }
 
   function buildStatus(intent, label, note, tip) {
     return { intent, tone: intent, label, note, tip };
