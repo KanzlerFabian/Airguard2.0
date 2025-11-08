@@ -82,6 +82,7 @@
         <div class="hero-actions">
           <button id="install-btn" type="button" class="ghost-btn" hidden>App installieren</button>
           <button id="notify-btn" type="button" class="ghost-btn" hidden>Benachrichtigungen aktivieren</button>
+          <span id="pwa-status-badge" class="settings-badge" hidden>Offline nicht aktiv (Zertifikat)</span>
         </div>
       </div>
       <div class="hero-right" aria-labelledby="hero-metrics-title">
@@ -102,6 +103,28 @@
             <span class="mini-icon" aria-hidden="true"><svg><use href="#icon-dots" /></svg></span>
             <div class="mini-meta">
               <h3>PM2.5</h3>
+              <p class="mini-value">—</p>
+              <span class="mini-unit">µg/m³</span>
+            </div>
+            <div class="mini-chart" aria-hidden="true">
+              <canvas></canvas>
+            </div>
+          </article>
+          <article class="mini-card skeleton" data-metric="PM1.0">
+            <span class="mini-icon" aria-hidden="true"><svg><use href="#icon-dots" /></svg></span>
+            <div class="mini-meta">
+              <h3>PM1</h3>
+              <p class="mini-value">—</p>
+              <span class="mini-unit">µg/m³</span>
+            </div>
+            <div class="mini-chart" aria-hidden="true">
+              <canvas></canvas>
+            </div>
+          </article>
+          <article class="mini-card skeleton" data-metric="PM10">
+            <span class="mini-icon" aria-hidden="true"><svg><use href="#icon-dots" /></svg></span>
+            <div class="mini-meta">
+              <h3>PM10</h3>
               <p class="mini-value">—</p>
               <span class="mini-unit">µg/m³</span>
             </div>
@@ -169,6 +192,32 @@
             <p class="status-note">—</p>
             <p class="status-tip">—</p>
           </article>
+          <article class="status-card skeleton" data-metric="PM1.0" data-chart-target="PM">
+            <header>
+              <span class="metric-icon" aria-hidden="true"><svg><use href="#icon-dots" /></svg></span>
+              <div class="metric-head">
+                <h3>PM1</h3>
+                <span class="badge" data-tone="neutral">Lädt …</span>
+              </div>
+              <span class="trend" aria-live="polite">—</span>
+            </header>
+            <p class="status-value"><span class="value">—</span> <span class="unit">µg/m³</span></p>
+            <p class="status-note">—</p>
+            <p class="status-tip">—</p>
+          </article>
+          <article class="status-card skeleton" data-metric="PM10" data-chart-target="PM">
+            <header>
+              <span class="metric-icon" aria-hidden="true"><svg><use href="#icon-dots" /></svg></span>
+              <div class="metric-head">
+                <h3>PM10</h3>
+                <span class="badge" data-tone="neutral">Lädt …</span>
+              </div>
+              <span class="trend" aria-live="polite">—</span>
+            </header>
+            <p class="status-value"><span class="value">—</span> <span class="unit">µg/m³</span></p>
+            <p class="status-note">—</p>
+            <p class="status-tip">—</p>
+          </article>
           <article class="status-card skeleton" data-metric="TVOC" data-chart-target="TVOC">
             <header>
               <span class="metric-icon" aria-hidden="true"><svg><use href="#icon-flask" /></svg></span>
@@ -205,32 +254,6 @@
               <span class="trend" aria-live="polite">—</span>
             </header>
             <p class="status-value"><span class="value">—</span> <span class="unit">%</span></p>
-            <p class="status-note">—</p>
-            <p class="status-tip">—</p>
-          </article>
-          <article class="status-card skeleton" data-metric="Lux">
-            <header>
-              <span class="metric-icon" aria-hidden="true"><svg><use href="#icon-sun" /></svg></span>
-              <div class="metric-head">
-                <h3>Lux</h3>
-                <span class="badge" data-tone="neutral">Lädt …</span>
-              </div>
-              <span class="trend" aria-live="polite">—</span>
-            </header>
-            <p class="status-value"><span class="value">—</span> <span class="unit">lx</span></p>
-            <p class="status-note">—</p>
-            <p class="status-tip">—</p>
-          </article>
-          <article class="status-card skeleton" data-metric="Farbtemperatur">
-            <header>
-              <span class="metric-icon" aria-hidden="true"><svg><use href="#icon-gradient-sun" /></svg></span>
-              <div class="metric-head">
-                <h3>CCT</h3>
-                <span class="badge" data-tone="neutral">Lädt …</span>
-              </div>
-              <span class="trend" aria-live="polite">—</span>
-            </header>
-            <p class="status-value"><span class="value">—</span> <span class="unit">K</span></p>
             <p class="status-note">—</p>
             <p class="status-tip">—</p>
           </article>
@@ -354,9 +377,90 @@
             <span id="chart-modal-scale-marker-value" class="chart-modal__scale-marker-value">—</span>
           </div>
         </div>
-        <div id="chart-modal-scale-values" class="chart-modal__scale-values"></div>
-        <p id="chart-modal-scale-caption" class="chart-modal__scale-caption">—</p>
+      <div id="chart-modal-scale-values" class="chart-modal__scale-values"></div>
+      <p id="chart-modal-scale-caption" class="chart-modal__scale-caption">—</p>
+    </div>
+  </div>
+  </div>
+
+  <div class="circadian-modal" id="circadian-modal" role="dialog" aria-modal="true" hidden>
+    <div class="circadian-modal__backdrop" aria-hidden="true" data-close="true"></div>
+    <div class="circadian-modal__content" tabindex="-1">
+      <button type="button" class="circadian-modal__close" aria-label="Schließen" data-close="true">×</button>
+      <header class="circadian-modal__header">
+        <div class="circadian-modal__title-row">
+          <h3 id="circadian-modal-title">Circadian Light</h3>
+          <span id="circadian-modal-status" class="badge" data-tone="neutral">—</span>
+        </div>
+        <p id="circadian-modal-summary" class="circadian-modal__summary">Empfehlungen werden geladen …</p>
+      </header>
+      <div class="circadian-modal__charts">
+        <article class="circadian-modal__chart" data-kind="lux">
+          <header>
+            <h4>Lux</h4>
+            <span id="circadian-modal-lux-value" class="circadian-modal__value">—</span>
+          </header>
+          <canvas id="circadian-modal-lux-canvas" aria-label="Lux Verlauf (24 h)"></canvas>
+        </article>
+        <article class="circadian-modal__chart" data-kind="cct">
+          <header>
+            <h4>CCT</h4>
+            <span id="circadian-modal-cct-value" class="circadian-modal__value">—</span>
+          </header>
+          <canvas id="circadian-modal-cct-canvas" aria-label="CCT Verlauf (24 h)"></canvas>
+        </article>
       </div>
+      <div class="circadian-modal__info">
+        <section>
+          <h4>Bedeutung</h4>
+          <p>Lichtstärke (Lux) und Farbtemperatur (CCT) steuern Wachheit und Entspannung – wichtig für deinen Tagesrhythmus.</p>
+        </section>
+        <section>
+          <h4>Empfehlung (nach Tageszeit)</h4>
+          <ul>
+            <li>Morgen (07–11 Uhr): 500–1 000 lx, 5 000–6 000 K</li>
+            <li>Tag (11–17 Uhr): 500–1 000 lx, 4 000–5 000 K</li>
+            <li>Abend (17–22 Uhr): 50–300 lx, 2 700–3 500 K</li>
+          </ul>
+        </section>
+        <section>
+          <h4>Verbessern</h4>
+          <p>Tagsüber hell und neutral/kühl beleuchten; abends Licht dimmen und wärmer wählen. Mischlicht vermeiden; blendfrei ausrichten.</p>
+        </section>
+      </div>
+      <div class="circadian-modal__scales">
+        <div class="circadian-scale" data-kind="lux">
+          <div class="circadian-scale__title-row">
+            <span class="circadian-scale__title">Lux-Skala</span>
+            <span id="circadian-scale-lux-value" class="circadian-scale__current">—</span>
+          </div>
+          <div class="circadian-scale__track">
+            <div class="circadian-scale__segments" data-kind="lux"></div>
+            <div id="circadian-scale-lux-marker" class="circadian-scale__marker" data-tone="neutral">
+              <span class="circadian-scale__marker-dot"></span>
+              <span class="circadian-scale__marker-label">—</span>
+            </div>
+          </div>
+          <div class="circadian-scale__labels" data-kind="lux"></div>
+        </div>
+        <div class="circadian-scale" data-kind="cct">
+          <div class="circadian-scale__title-row">
+            <span class="circadian-scale__title">CCT-Skala</span>
+            <span id="circadian-scale-cct-value" class="circadian-scale__current">—</span>
+          </div>
+          <div class="circadian-scale__track">
+            <div class="circadian-scale__segments" data-kind="cct"></div>
+            <div id="circadian-scale-cct-marker" class="circadian-scale__marker" data-tone="neutral">
+              <span class="circadian-scale__marker-dot"></span>
+              <span class="circadian-scale__marker-label">—</span>
+            </div>
+          </div>
+          <div class="circadian-scale__labels" data-kind="cct"></div>
+        </div>
+      </div>
+      <footer class="circadian-modal__footer">
+        <p>Empfehlungen basieren auf üblichen Innenraum-Leitlinien für komfortables Arbeiten und Entspannen.</p>
+      </footer>
     </div>
   </div>
 </body>
