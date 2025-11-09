@@ -324,6 +324,7 @@ a {
 }
 
 .mini-chart {
+  position: relative;
   grid-column: 1 / -1;
   width: 100%;
   height: 54px;
@@ -336,6 +337,21 @@ a {
 .mini-chart canvas {
   width: 100% !important;
   height: 100% !important;
+}
+
+.mini-chart.is-empty::after {
+  content: '';
+  position: absolute;
+  inset: 12px 10px;
+  border-radius: 999px;
+  background: linear-gradient(120deg, rgba(226, 232, 240, 0.48) 20%, rgba(248, 250, 252, 0.8) 50%, rgba(226, 232, 240, 0.48) 80%);
+  animation: shimmer 1.4s ease infinite;
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.mini-chart.is-empty canvas {
+  opacity: 0;
 }
 
 .hero-update {
@@ -650,7 +666,7 @@ a {
 .cycle-marker {
   position: absolute;
   top: 50%;
-  left: var(--cycle-pos, 50%);
+  left: var(--pos, var(--cycle-pos, 50%));
   transform: translate(-50%, -50%);
   width: 28px;
   height: 28px;
@@ -980,6 +996,55 @@ a {
   height: 100% !important;
 }
 
+.chart-modal__state {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  gap: 0.75rem;
+  padding: 1.4rem;
+  text-align: center;
+  background: rgba(241, 245, 249, 0.72);
+  backdrop-filter: blur(3px);
+  border-radius: inherit;
+  color: var(--text-muted);
+  z-index: 2;
+  transition: opacity var(--transition-base);
+}
+
+.chart-modal__state[hidden] {
+  display: none;
+}
+
+.chart-modal__state.is-error {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+}
+
+.chart-modal__state.is-empty {
+  background: rgba(148, 163, 184, 0.18);
+}
+
+.chart-modal__state.is-loading::before {
+  content: '';
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 3px solid rgba(148, 163, 184, 0.35);
+  border-top-color: var(--tone-teal);
+  animation: spin 0.9s linear infinite;
+}
+
+.chart-modal__state p {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.chart-modal__retry {
+  justify-self: center;
+}
+
 .chart-modal__info {
   background: rgba(148, 163, 184, 0.08);
   border-radius: var(--radius-md);
@@ -1104,12 +1169,16 @@ a {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: linear-gradient(90deg, rgba(148, 163, 184, 0.4), rgba(148, 163, 184, 0.6));
+  background: var(
+    --scale-gradient,
+    linear-gradient(90deg, rgba(148, 163, 184, 0.4), rgba(148, 163, 184, 0.6))
+  );
 }
 
 .chart-modal__scale-marker {
   position: absolute;
   top: 50%;
+  left: var(--marker-pos, 50%);
   transform: translate(calc(-50% + var(--marker-offset, 0px)), -50%);
   display: inline-flex;
   flex-direction: column;
@@ -1367,14 +1436,15 @@ a {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: calc(var(--start, 0) * 1%);
-  width: calc((var(--end, 100) - var(--start, 0)) * 1%);
+  left: var(--start, 0%);
+  width: calc(var(--end, 100%) - var(--start, 0%));
   background: var(--segment-color, rgba(14, 165, 233, 0.18));
 }
 
 .circadian-scale__marker {
   position: absolute;
   top: 50%;
+  left: var(--pos, 50%);
   transform: translate(calc(-50% + var(--offset, 0px)), -50%);
   display: inline-flex;
   flex-direction: column;
@@ -1635,6 +1705,15 @@ a {
   }
   100% {
     transform: translateX(100%);
+  }
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
   }
 }
 

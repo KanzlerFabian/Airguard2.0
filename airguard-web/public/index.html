@@ -8,8 +8,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>AirGuard Dashboard</title>
   <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="icon" type="image/png" href="/icons/icon-192.png">
-  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <link rel="icon" type="image/png" href="/assets/logo.png">
+  <link rel="apple-touch-icon" href="/assets/logo.png">
   <link rel="stylesheet" href="./styles.css">
   <script defer src="./lib/chart.umd.min.js"></script>
   <script defer src="./lib/chartjs-adapter-date-fns.bundle.min.js"></script>
@@ -364,6 +364,10 @@
       </nav>
       <div class="chart-modal__canvas">
         <canvas id="chart-modal-canvas" aria-describedby="chart-modal-sub"></canvas>
+        <div class="chart-modal__state" id="chart-modal-state" hidden>
+          <p id="chart-modal-state-text">Lade Diagramm …</p>
+          <button type="button" class="ghost-btn chart-modal__retry" id="chart-modal-retry">Erneut laden</button>
+        </div>
       </div>
       <div class="chart-modal__info">
         <dl id="chart-modal-insight" class="chart-modal__insight"></dl>
