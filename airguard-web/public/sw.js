@@ -1,4 +1,4 @@
-const SHELL_CACHE = 'airguard-shell-v2';
+const SHELL_CACHE = 'airguard-shell-v3';
 const DATA_CACHE = 'airguard-data-v1';
 
 const SHELL_ASSETS = [
@@ -9,10 +9,7 @@ const SHELL_ASSETS = [
   '/manifest.webmanifest',
   '/lib/chart.umd.min.js',
   '/lib/chartjs-adapter-date-fns.bundle.min.js',
-  '/icons/icon-192.png',
-  '/icons/icon-256.png',
-  '/icons/icon-384.png',
-  '/icons/icon-512.png'
+  '/assets/logo.png'
 ];
 
 const DATA_ENDPOINTS = new Set([
