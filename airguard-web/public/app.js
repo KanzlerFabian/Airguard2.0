@@ -88,6 +88,46 @@
     Chart.defaults.plugins.tooltip.cornerRadius = 10;
   }
 
+  if (Chart?.Tooltip) {
+    const tooltipProto = Chart.Tooltip.prototype;
+    const originalHandleEvent = typeof tooltipProto.handleEvent === 'function'
+      ? tooltipProto.handleEvent
+      : null;
+    tooltipProto.handleEvent = function patchedHandleEvent(event, ...args) {
+      const chart = this?.chart;
+      const active = typeof chart?.getActiveElements === 'function' ? chart.getActiveElements() : [];
+      const hasActive = Array.isArray(active) && active.length > 0;
+      if (!hasActive) {
+        this._active = [];
+        this.opacity = 0;
+        return false;
+      }
+      if (this.caretX == null || this.caretY == null) {
+        return false;
+      }
+      if (!originalHandleEvent) {
+        return false;
+      }
+      return originalHandleEvent.call(this, event, ...args);
+    };
+
+    if (typeof tooltipProto._positionChanged === 'function') {
+      const originalPositionChanged = tooltipProto._positionChanged;
+      tooltipProto._positionChanged = function patchedPositionChanged(previous, caretPosition) {
+        const chart = this?.chart;
+        const active = typeof chart?.getActiveElements === 'function' ? chart.getActiveElements() : [];
+        const hasActive = Array.isArray(active) && active.length > 0;
+        if (!hasActive) {
+          return false;
+        }
+        if (this.caretX == null || this.caretY == null) {
+          return false;
+        }
+        return originalPositionChanged.call(this, previous, caretPosition);
+      };
+    }
+  }
+
   const scheduledChartUpdates = new WeakMap();
 
   function scheduleChartUpdate(chart, mode = 'none') {
@@ -245,10 +285,32 @@
   };
 
   const TIME_RANGES = {
-    '24h': { label: '24 h', range: '24h', step: '120s', win: '5m', samples: 28 },
-    '7d': { label: '7 Tage', range: '7d', step: '45m', win: '2h', samples: 40 },
-    '30d': { label: '30 Tage', range: '30d', step: '3h', win: '6h', samples: 45 }
+    '24h': { label: '24 h', range: '24h', step: '120s', win: '10m', samples: 48 },
+    '7d': { label: '7 Tage', range: '7d', step: '15m', win: '45m', samples: 72 },
+    '30d': { label: '30 Tage', range: '30d', step: '30m', win: '2h', samples: 96 }
   };
+
+  const SPARKLINE_RANGE_KEY = '24h';
+  const FETCH_RETRY_DELAYS = [500, 1000, 2000];
+  const ENABLE_FETCH_DEBUG = (() => {
+    try {
+      if (window?.AIRGUARD_DEBUG_FETCH) return true;
+      if (window?.localStorage?.getItem('airguard:debugFetch') === '1') return true;
+      if (window?.sessionStorage?.getItem('airguard:debugFetch') === '1') return true;
+    } catch (error) {
+      /* no-op */
+    }
+    return false;
+  })();
+
+  function logFetchDebug(...args) {
+    if (!ENABLE_FETCH_DEBUG) return;
+    try {
+      console.debug('[fetch]', ...args);
+    } catch (error) {
+      console.log('[fetch]', ...args);
+    }
+  }
 
   const SERIES_NAME_ALIASES = new Map([
     ['Temperatur', ['Temperatur', 'temp_final', 'temperature_final', 'temp']],
@@ -334,6 +396,58 @@
   };
 
   const SCALE_TONES = { ...STATUS_TONES };
+
+  const VALUE_SCALE_PRESETS = {
+    CO2: {
+      unit: 'ppm',
+      min: 400,
+      max: 2000,
+      segments: [
+        { from: 400, to: 800, label: 'Optimal', tone: 'excellent' },
+        { from: 800, to: 1000, label: 'Stabil', tone: 'good' },
+        { from: 1000, to: 1400, label: 'Lüften', tone: 'elevated' },
+        { from: 1400, to: 2000, label: 'Alarm', tone: 'poor' }
+      ],
+      ticks: [{ at: 400 }, { at: 800 }, { at: 1000 }, { at: 1400 }, { at: 2000 }]
+    },
+    Temperatur: {
+      unit: '°C',
+      min: 16,
+      max: 30,
+      segments: [
+        { from: 16, to: 19, label: 'Kühl', tone: 'elevated', detail: `< 19${NARROW_SPACE}°C` },
+        { from: 19, to: 22, label: 'Komfort', tone: 'excellent' },
+        { from: 22, to: 28, label: 'Warm', tone: 'elevated' },
+        { from: 28, to: 30, label: 'Heiß', tone: 'poor', detail: `≥ 30${NARROW_SPACE}°C` }
+      ],
+      ticks: [{ at: 16 }, { at: 19 }, { at: 22 }, { at: 25 }, { at: 28 }, { at: 30 }]
+    },
+    'Luftdruck': {
+      unit: 'hPa',
+      min: 960,
+      max: 1040,
+      segments: [
+        { from: 960, to: 980, label: 'Tiefdruck', tone: 'elevated' },
+        { from: 980, to: 1005, label: 'Neutral', tone: 'excellent' },
+        { from: 1005, to: 1030, label: 'Hoch', tone: 'good' },
+        { from: 1030, to: 1040, label: 'Sehr hoch', tone: 'excellent', detail: `≥ 1${NARROW_SPACE}030${NARROW_SPACE}hPa` }
+      ],
+      ticks: [{ at: 960 }, { at: 980 }, { at: 1005 }, { at: 1030 }, { at: 1040 }]
+    },
+    'rel. Feuchte': {
+      unit: '%',
+      min: 20,
+      max: 80,
+      segments: [
+        { from: 20, to: 35, label: 'Trocken', tone: 'poor' },
+        { from: 35, to: 40, label: 'Übergang', tone: 'elevated' },
+        { from: 40, to: 55, label: 'Wohlfühl', tone: 'excellent' },
+        { from: 55, to: 60, label: 'Übergang', tone: 'elevated' },
+        { from: 60, to: 80, label: 'Feucht/Nass', tone: 'poor' }
+      ],
+      ticks: [{ at: 20 }, { at: 35 }, { at: 40 }, { at: 55 }, { at: 60 }, { at: 80 }]
+    }
+  };
 
   const METRIC_INSIGHTS = {
     CO2: {
@@ -718,7 +832,8 @@
     activeModalReturnFocus: null,
     bodyScrollLock: null,
     circadianCharts: { lux: null, cct: null },
-    modalRequestToken: 0
+    modalRequestToken: 0,
+    modalAbortController: null
   };
 
   const ui = {
@@ -766,11 +881,7 @@
     modalCurrentLabel: null,
     modalInsight: null,
     modalScale: null,
-    modalScaleLabels: null,
-    modalScaleValues: null,
-    modalScaleGradient: null,
-    modalScaleMarker: null,
-    modalScaleMarkerValue: null,
+    modalScaleSvg: null,
     modalScaleCaption: null,
     modalState: null,
     modalStateText: null,
@@ -878,11 +989,7 @@
     ui.modalCurrentLabel = document.getElementById('chart-modal-current-label');
     ui.modalInsight = document.getElementById('chart-modal-insight');
     ui.modalScale = document.getElementById('chart-modal-scale');
-    ui.modalScaleLabels = document.getElementById('chart-modal-scale-labels');
-    ui.modalScaleValues = document.getElementById('chart-modal-scale-values');
-    ui.modalScaleGradient = document.getElementById('chart-modal-scale-gradient');
-    ui.modalScaleMarker = document.getElementById('chart-modal-scale-marker');
-    ui.modalScaleMarkerValue = document.getElementById('chart-modal-scale-marker-value');
+    ui.modalScaleSvg = document.getElementById('chart-modal-scale-svg');
     ui.modalScaleCaption = document.getElementById('chart-modal-scale-caption');
     ui.modalState = document.getElementById('chart-modal-state');
     ui.modalStateText = document.getElementById('chart-modal-state-text');
@@ -1223,7 +1330,7 @@
             tension: 0.4,
             fill: 'start',
             pointRadius: 0,
-            borderWidth: 2,
+            borderWidth: 1,
             spanGaps: true
           }
         ]
@@ -2048,6 +2155,8 @@
           }
         ]
       : [];
+    chart.options.plugins.tooltip = chart.options.plugins.tooltip || {};
+    chart.options.plugins.tooltip.enabled = Array.isArray(data) && data.length > 0;
     scheduleChartUpdate(chart, 'none');
   }
 
@@ -2085,6 +2194,7 @@
         plugins: {
           legend: { display: false },
           tooltip: {
+            enabled: false,
             displayColors: false,
             backgroundColor: 'rgba(15, 23, 42, 0.92)',
             padding: 8,
@@ -2237,6 +2347,65 @@
     return Array.from(values).sort((a, b) => a - b);
   }
 
+  function computeScalePosition(value, scale) {
+    const min = Number.isFinite(scale.min) ? scale.min : 0;
+    const max = Number.isFinite(scale.max) ? scale.max : min + 1;
+    const span = max - min;
+    if (!Number.isFinite(value) || span <= 0) {
+      return 0;
+    }
+    const ratio = (value - min) / span;
+    return clamp(ratio * 100, 0, 100);
+  }
+
+  function computeMarkerPosition(value, scale) {
+    const fallback = Number.isFinite(scale.min)
+      ? scale.min
+      : Number.isFinite(scale.max)
+        ? scale.max
+        : 0;
+    const numeric = Number.isFinite(value) ? value : fallback;
+    return clamp(computeScalePosition(numeric, scale), 4, 96);
+  }
+
+  function clampMarkerToTrack(marker, track, percent, offsetVar = '--marker-offset') {
+    if (!marker || !track) return;
+    window.requestAnimationFrame(() => {
+      marker.style.setProperty(offsetVar, '0px');
+      const markerRect = marker.getBoundingClientRect();
+      const trackRect = track.getBoundingClientRect();
+      if (!markerRect.width || !trackRect.width) {
+        return;
+      }
+      const minPadding = 4;
+      const center = (percent / 100) * trackRect.width;
+      const half = markerRect.width / 2;
+      const leftEdge = center - half;
+      const rightEdge = center + half;
+      let offset = 0;
+      if (leftEdge < minPadding) {
+        offset = minPadding - leftEdge;
+      } else if (rightEdge > trackRect.width - minPadding) {
+        offset = (trackRect.width - minPadding) - rightEdge;
+      }
+      marker.style.setProperty(offsetVar, `${offset}px`);
+    });
+  }
+
+  function resolveScaleTone(value, stops) {
+    if (!Number.isFinite(value) || !Array.isArray(stops) || stops.length === 0) {
+      return 'neutral';
+    }
+    for (const stop of stops) {
+      if (!Number.isFinite(stop.value)) continue;
+      if (value <= stop.value) {
+        return stop.tone || 'neutral';
+      }
+    }
+    const last = stops[stops.length - 1];
+    return last?.tone || 'neutral';
+  }
+
   function formatRangeLabel(range, unit) {
     if (!Array.isArray(range) || range.length < 2) {
       return `—${unit ? `${NARROW_SPACE}${unit}` : ''}`;
@@ -2294,42 +2463,169 @@
     return unit ? `${number}${NARROW_SPACE}${unit}` : number;
   }
 
+  function delay(ms, signal) {
+    if (!Number.isFinite(ms) || ms <= 0) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve, reject) => {
+      const timer = window.setTimeout(() => {
+        cleanup();
+        resolve();
+      }, ms);
+      const cleanup = () => {
+        window.clearTimeout(timer);
+        if (signal) {
+          signal.removeEventListener('abort', onAbort);
+        }
+      };
+      const onAbort = () => {
+        cleanup();
+        reject(new DOMException('Aborted', 'AbortError'));
+      };
+      if (signal) {
+        if (signal.aborted) {
+          cleanup();
+          reject(new DOMException('Aborted', 'AbortError'));
+          return;
+        }
+        signal.addEventListener('abort', onAbort, { once: true });
+      }
+    });
+  }
+
+  function durationToSeconds(literal, fallbackSeconds = NaN) {
+    if (typeof literal === 'number') {
+      return Number.isFinite(literal) ? literal : fallbackSeconds;
+    }
+    if (typeof literal !== 'string') {
+      return fallbackSeconds;
+    }
+    const trimmed = literal.trim();
+    if (!trimmed) return fallbackSeconds;
+    const match = trimmed.match(/^(-?\d+(?:\.\d+)?)([smhd])$/i);
+    if (!match) {
+      const numeric = Number(trimmed);
+      return Number.isFinite(numeric) ? numeric : fallbackSeconds;
+    }
+    const value = Number(match[1]);
+    const unit = match[2].toLowerCase();
+    if (!Number.isFinite(value)) {
+      return fallbackSeconds;
+    }
+    const factor = unit === 's' ? 1 : unit === 'm' ? 60 : unit === 'h' ? 3600 : 86400;
+    return value * factor;
+  }
+
+  function secondsToDuration(seconds, fallbackLiteral = '60s') {
+    if (!Number.isFinite(seconds) || seconds <= 0) {
+      return fallbackLiteral;
+    }
+    if (seconds % 86400 === 0) {
+      return `${Math.round(seconds / 86400)}d`;
+    }
+    if (seconds % 3600 === 0) {
+      return `${Math.round(seconds / 3600)}h`;
+    }
+    if (seconds % 60 === 0) {
+      return `${Math.round(seconds / 60)}m`;
+    }
+    return `${Math.round(seconds)}s`;
+  }
+
+  function resolveRangeParams(range) {
+    const base = typeof range === 'object' && range ? range : {};
+    const rangeLiteral = String(base.range || '24h');
+    const stepLiteral = String(base.step || '120s');
+    const winLiteral = String(base.win || stepLiteral);
+    let stepSeconds = durationToSeconds(stepLiteral, 120);
+    if (!Number.isFinite(stepSeconds) || stepSeconds <= 0) {
+      stepSeconds = 120;
+    }
+    let windowSeconds = durationToSeconds(winLiteral, stepSeconds * 2);
+    if (!Number.isFinite(windowSeconds) || windowSeconds <= 0) {
+      windowSeconds = stepSeconds * 2;
+    }
+    if (windowSeconds < stepSeconds * 2) {
+      windowSeconds = stepSeconds * 2;
+    }
+    return {
+      range: rangeLiteral,
+      step: secondsToDuration(stepSeconds, stepLiteral),
+      win: secondsToDuration(windowSeconds, winLiteral)
+    };
+  }
+
+  async function fetchWithRetry(url, init = {}, context = {}) {
+    const { signal, label } = context;
+    const attempts = FETCH_RETRY_DELAYS.length + 1;
+    for (let index = 0; index < attempts; index++) {
+      if (signal?.aborted) {
+        logFetchDebug(label || url, 'aborted before request');
+        throw new DOMException('Aborted', 'AbortError');
+      }
+      try {
+        logFetchDebug(label || url, 'request', index + 1, '/', attempts);
+        const response = await fetch(url, { ...init, signal });
+        logFetchDebug(label || url, 'response', response.status);
+        return response;
+      } catch (error) {
+        if (error?.name === 'AbortError') {
+          logFetchDebug(label || url, 'abort signal');
+          throw error;
+        }
+        const isLast = index >= attempts - 1;
+        if (isLast) {
+          logFetchDebug(label || url, 'network failed', error);
+          throw error;
+        }
+        const delayMs = FETCH_RETRY_DELAYS[index];
+        logFetchDebug(label || url, 'retry in', delayMs, 'ms');
+        await delay(delayMs, signal);
+      }
+    }
+    throw new Error('Unreachable');
+  }
+
   async function preloadSeries(force) {
     const definitions = Object.values(CHART_DEFINITIONS).filter((definition) => !definition.optional);
-    await Promise.all(definitions.map((definition) => ensureSeries(definition, state.range, force)));
+    const baseRange = TIME_RANGES[SPARKLINE_RANGE_KEY] || TIME_RANGES['24h'];
+    state.range = baseRange;
+    await Promise.all(definitions.map((definition) => ensureSeries(definition, baseRange, force)));
     updateSparklines();
     if (state.now) {
       updateStatusCards(state.now);
     }
   }
 
-  async function ensureSeries(definition, range, force) {
-    const cacheKey = `${definition.key}_${range.range}`;
+  async function ensureSeries(definition, range, force, options = {}) {
+    const normalizedRange = { ...range, ...resolveRangeParams(range) };
+    const cacheKey = `${definition.key}_${normalizedRange.range}`;
     if (!force && state.chartDataCache.has(cacheKey)) {
       return state.chartDataCache.get(cacheKey);
     }
-    const series = await fetchSeries(definition.metrics, range);
+    const series = await fetchSeries(definition.metrics, normalizedRange, options);
     const smoothed = smoothSeries(series);
     state.chartDataCache.set(cacheKey, smoothed);
     return smoothed;
   }
 
-  async function fetchSeries(metrics, range = state.range) {
+  async function fetchSeries(metrics, range = state.range, options = {}) {
+    const normalizedRange = { ...range, ...resolveRangeParams(range) };
     const entries = await Promise.all(
       metrics.map(async (metric) => {
-        const series = await fetchSeriesForMetric(metric, range);
+        const series = await fetchSeriesForMetric(metric, normalizedRange, options);
         return [metric, series];
       })
     );
     return Object.fromEntries(entries);
   }
 
-  async function fetchSeriesForMetric(metric, range) {
+  async function fetchSeriesForMetric(metric, range, options = {}) {
     const candidates = resolveSeriesNames(metric);
     let lastError = null;
     for (const name of candidates) {
       try {
-        return await requestSeries(metric, name, range);
+        return await requestSeries(metric, name, range, options);
       } catch (error) {
         if (error?.code === 'unknown_metric') {
           lastError = error;
@@ -2352,14 +2648,27 @@
     return Array.from(new Set([metric, ...list]));
   }
 
-  async function requestSeries(metric, queryName, range) {
+  async function requestSeries(metric, queryName, range, options = {}) {
     const params = new URLSearchParams({
       name: queryName,
       range: range.range,
       step: range.step,
       win: range.win
     });
-    const response = await fetch(`/api/series?${params.toString()}`);
+    let response;
+    try {
+      response = await fetchWithRetry(`/api/series?${params.toString()}`, {
+        headers: { Accept: 'application/json' }
+      }, { signal: options.signal, label: `${metric}:${queryName}:${range.range}` });
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        throw error;
+      }
+      const err = buildNetworkError(metric, range, error);
+      err.code = 'network_error';
+      err.cause = error;
+      throw err;
+    }
     let payload = null;
     try {
       payload = await response.clone().json();
@@ -2410,13 +2719,27 @@
     return new Error(`Die Daten für ${label} konnten nicht geladen werden (${rangeLabel}). Bitte später erneut versuchen.`);
   }
 
+  function buildNetworkError(metric, range, originalError) {
+    const label = METRIC_CONFIG[metric]?.label || metric;
+    const rangeLabel = typeof range?.label === 'string'
+      ? range.label
+      : typeof range?.range === 'string'
+        ? range.range
+        : '24 h';
+    const message = `Netzwerkfehler: ${label} (${rangeLabel}) konnte nicht geladen werden. Bitte Verbindung prüfen und erneut versuchen.`;
+    if (originalError) {
+      console.warn('Netzwerkfehler beim Laden der Serien', originalError);
+    }
+    return new Error(message);
+  }
+
   function updateSparklines() {
     HERO_METRICS.forEach((metric) => {
       const sparkline = state.sparklines.get(metric);
       if (!sparkline) return;
       const definition = getDefinitionForMetric(metric);
       if (!definition) return;
-      const cacheKey = `${definition.key}_${state.range.range}`;
+      const cacheKey = `${definition.key}_${SPARKLINE_RANGE_KEY}`;
       const cached = state.chartDataCache.get(cacheKey);
       if (!cached) return;
       const data = prepareSparklineData(cached[metric] || []);
@@ -2581,233 +2904,300 @@
   }
 
   function updateModalScale(metric) {
-    if (!ui.modalScale || !ui.modalScaleLabels || !ui.modalScaleValues || !ui.modalScaleMarker) return;
-    const scaleConfig = METRIC_INSIGHTS[metric]?.scale;
-    if (!scaleConfig) {
+    if (!ui.modalScale || !ui.modalScaleSvg) return;
+    const normalized = normalizeScaleConfig(metric);
+    if (!normalized) {
       ui.modalScale.hidden = true;
+      if (ui.modalScaleCaption) {
+        ui.modalScaleCaption.textContent = '';
+      }
       queueModalLayoutSync();
       return;
     }
     ui.modalScale.hidden = false;
-    const config = METRIC_CONFIG[metric];
-    const scale = { ...scaleConfig };
-    const bands = Array.isArray(scaleConfig.bands)
-      ? scaleConfig.bands.map((band) => ({ ...band }))
-      : [];
-    const stops = !bands.length && Array.isArray(scaleConfig.stops)
-      ? scaleConfig.stops.map((stop) => ({ ...stop })).slice(0, 6)
-      : [];
-
-    if (bands.length) {
-      ui.modalScale.style.setProperty('--scale-columns', Math.max(bands.length, 1));
-      ui.modalScaleLabels.style.setProperty('--scale-columns-template', buildSegmentTemplate(bands, scale));
-      ui.modalScaleLabels.innerHTML = bands
-        .map((band) => {
-          const display = buildBandDisplay(band, scale.unit);
-          return `<span>${band.label}${display ? `<small>${display}</small>` : ''}</span>`;
-        })
-        .join('');
-      const tickValues = buildBandTicks(bands, scale);
-      ui.modalScale.style.setProperty('--scale-ticks', Math.max(tickValues.length, 1));
-      ui.modalScaleValues.innerHTML = tickValues
-        .map((value) => `<span>${formatScaleTick(value, scale.unit)}</span>`)
-        .join('');
-      if (ui.modalScaleGradient) {
-        ui.modalScaleGradient.style.setProperty('--scale-gradient', buildBandGradient(scale, bands));
-      }
-    } else {
-      ui.modalScale.style.setProperty('--scale-columns', Math.max(stops.length, 1));
-      ui.modalScaleLabels.style.removeProperty('--scale-columns-template');
-      ui.modalScaleLabels.innerHTML = stops.map((stop) => `<span>${stop.label}</span>`).join('');
-      const tickValues = Array.from(new Set([scale.min, ...stops.map((stop) => stop.value), scale.max].filter((v) => v != null)))
-        .sort((a, b) => a - b);
-      ui.modalScale.style.setProperty('--scale-ticks', Math.max(tickValues.length, 1));
-      ui.modalScaleValues.innerHTML = tickValues
-        .map((value) => `<span>${formatScaleTick(value, scale.unit)}</span>`)
-        .join('');
-      if (ui.modalScaleGradient) {
-        ui.modalScaleGradient.style.setProperty('--scale-gradient', buildScaleGradient(scale, stops));
-      }
-    }
     const sample = state.now?.[metric];
+    const config = METRIC_CONFIG[metric];
     const value = sample && isFinite(sample.value) ? sample.value : null;
-    const markerPercent = computeMarkerPosition(value, scale);
-    ui.modalScaleMarker.style.setProperty('--marker-pos', `${markerPercent}%`);
-    if (value == null) {
-      ui.modalScaleMarker.dataset.tone = 'neutral';
-      if (ui.modalScaleMarkerValue) {
-        ui.modalScaleMarkerValue.textContent = formatWithUnit(null, scale.unit || '', config?.decimals ?? 0);
-      }
-    } else {
-      const toneStops = bands.length ? bands.map((band) => ({ value: band.max, tone: band.tone })) : stops;
-      const tone = toneStops.length ? resolveScaleTone(value, toneStops) : 'neutral';
-      ui.modalScaleMarker.dataset.tone = tone || 'neutral';
-      if (ui.modalScaleMarkerValue) {
-        const decimals = config?.decimals ?? 1;
-        ui.modalScaleMarkerValue.textContent = formatWithUnit(value, scale.unit || '', decimals);
-      }
-    }
-    clampMarkerToTrack(ui.modalScaleMarker, ui.modalScaleMarker.parentElement, markerPercent, '--marker-offset');
-    if (ui.modalScale) {
-      ui.modalScale.style.removeProperty('--target-start');
-      ui.modalScale.style.removeProperty('--target-end');
-      ui.modalScale.style.removeProperty('--target-visible');
-    }
-    let caption = scale.caption || '';
+    const decimals = config?.decimals ?? 0;
+    let caption = normalized.caption || '';
+    let highlight = null;
     if (metric === 'Lux' || metric === 'Farbtemperatur') {
       const phase = resolveCircadianPhase();
       const range = metric === 'Lux' ? phase.luxRange : phase.cctRange;
-      if (ui.modalScale) {
-        ui.modalScale.style.setProperty('--target-start', `${computeScalePosition(range[0], scale)}%`);
-        ui.modalScale.style.setProperty('--target-end', `${computeScalePosition(range[1], scale)}%`);
-        ui.modalScale.style.setProperty('--target-visible', '1');
+      if (Array.isArray(range) && range.length >= 2) {
+        highlight = { from: range[0], to: range[1] };
+        const formattedRange = `${formatNumber(range[0], 0)}–${formatNumber(range[1], 0)}${NARROW_SPACE}${normalized.unit}`;
+        caption = `${phase.title}: Ziel ${formattedRange}`;
       }
-      const formattedRange = `${formatNumber(range[0], 0)}–${formatNumber(range[1], 0)}${NARROW_SPACE}${scale.unit}`;
-      caption = `${phase.title}: Ziel ${formattedRange}`;
     }
+    renderScaleGraphic(ui.modalScaleSvg, normalized, value, {
+      unit: normalized.unit,
+      decimals,
+      highlight
+    });
     if (ui.modalScaleCaption) {
       ui.modalScaleCaption.textContent = caption;
     }
     queueModalLayoutSync();
   }
 
-  function computeScalePosition(value, scale) {
-    const min = Number.isFinite(scale.min) ? scale.min : 0;
-    const max = Number.isFinite(scale.max) ? scale.max : min + 1;
-    const span = max - min;
-    if (span <= 0) {
-      return 0;
+  function normalizeScaleConfig(metric) {
+    const preset = VALUE_SCALE_PRESETS[metric];
+    const base = METRIC_INSIGHTS[metric]?.scale || {};
+    const unit = preset?.unit || base.unit || '';
+    const minCandidate = Number.isFinite(preset?.min) ? preset.min : Number(base.min);
+    const maxCandidate = Number.isFinite(preset?.max) ? preset.max : Number(base.max);
+    const min = Number.isFinite(minCandidate) ? minCandidate : 0;
+    const max = Number.isFinite(maxCandidate) && maxCandidate > min ? maxCandidate : min + 1;
+    const caption = preset?.caption || base.caption || '';
+    const segments = preset?.segments
+      ? preset.segments.map((segment) => ({ ...segment }))
+      : buildSegmentsFromScale(base, min, max);
+    const ticks = preset?.ticks
+      ? preset.ticks.map((tick) => ({ ...tick }))
+      : buildTicksFromScale(base, min, max);
+    return { unit, min, max, caption, segments, ticks };
+  }
+
+  function buildSegmentsFromScale(scale, min, max) {
+    if (Array.isArray(scale?.bands) && scale.bands.length) {
+      return scale.bands.map((band) => ({
+        from: Number.isFinite(band.min) ? band.min : min,
+        to: Number.isFinite(band.max) ? band.max : max,
+        label: band.label,
+        detail: band.display || null,
+        tone: band.tone || 'neutral'
+      }));
     }
-    const percent = ((value - min) / span) * 100;
-    return clamp(percent, 0, 100);
+    if (Array.isArray(scale?.stops) && scale.stops.length) {
+      const sorted = scale.stops
+        .filter((stop) => Number.isFinite(stop.value))
+        .map((stop) => ({ ...stop }))
+        .sort((a, b) => a.value - b.value);
+      const segments = [];
+      let start = min;
+      sorted.forEach((stop) => {
+        if (stop.value > start) {
+          segments.push({ from: start, to: stop.value, label: stop.label, tone: stop.tone || 'neutral' });
+          start = stop.value;
+        }
+      });
+      if (start < max) {
+        const last = sorted[sorted.length - 1];
+        segments.push({ from: start, to: max, label: last?.label, tone: last?.tone || 'neutral' });
+      }
+      if (!segments.length) {
+        segments.push({ from: min, to: max, label: '', tone: 'neutral' });
+      }
+      return segments;
+    }
+    return [{ from: min, to: max, label: '', tone: 'neutral' }];
   }
 
-  function computeMarkerPosition(value, scale) {
-    const fallback = Number.isFinite(scale.min)
-      ? scale.min
-      : Number.isFinite(scale.max)
-        ? scale.max
-        : 0;
-    const numeric = Number.isFinite(value) ? value : fallback;
-    const percent = computeScalePosition(numeric, scale);
-    return clamp(percent, 4, 96);
+  function buildTicksFromScale(scale, min, max) {
+    const values = new Set();
+    values.add(min);
+    if (Array.isArray(scale?.bands)) {
+      scale.bands.forEach((band) => {
+        if (Number.isFinite(band.min)) values.add(band.min);
+        if (Number.isFinite(band.max)) values.add(band.max);
+      });
+    }
+    if (Array.isArray(scale?.stops)) {
+      scale.stops.forEach((stop) => {
+        if (Number.isFinite(stop.value)) values.add(stop.value);
+      });
+    }
+    values.add(max);
+    return Array.from(values)
+      .filter((value) => Number.isFinite(value))
+      .sort((a, b) => a - b)
+      .map((at) => ({ at }));
   }
 
-  function clampMarkerToTrack(marker, track, percent, offsetVar = '--marker-offset') {
-    if (!marker || !track) return;
-    window.requestAnimationFrame(() => {
-      marker.style.setProperty(offsetVar, '0px');
-      const markerRect = marker.getBoundingClientRect();
-      const trackRect = track.getBoundingClientRect();
-      if (!markerRect.width || !trackRect.width) {
-        return;
-      }
-      const minPadding = 4;
-      const center = (percent / 100) * trackRect.width;
-      const half = markerRect.width / 2;
-      const leftEdge = center - half;
-      const rightEdge = center + half;
-      let offset = 0;
-      if (leftEdge < minPadding) {
-        offset = minPadding - leftEdge;
-      } else if (rightEdge > trackRect.width - minPadding) {
-        offset = (trackRect.width - minPadding) - rightEdge;
-      }
-      marker.style.setProperty(offsetVar, `${offset}px`);
+  function renderScaleGraphic(svg, config, value, options = {}) {
+    if (!svg) return;
+    const unit = options.unit || config.unit || '';
+    const decimals = options.decimals ?? 0;
+    const highlight = options.highlight;
+    const min = Number.isFinite(config.min) ? config.min : 0;
+    const max = Number.isFinite(config.max) ? config.max : min + 1;
+    const span = Math.max(max - min, 1);
+    const viewBoxWidth = 100;
+    const viewBoxHeight = 48;
+    const trackStart = 6;
+    const trackEnd = viewBoxWidth - 6;
+    const trackY = 26;
+    const trackHeight = 6;
+    svg.setAttribute('viewBox', `0 0 ${viewBoxWidth} ${viewBoxHeight}`);
+    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    while (svg.firstChild) {
+      svg.removeChild(svg.firstChild);
+    }
+
+    const mapValue = (val) => {
+      const ratio = clamp((val - min) / span, 0, 1);
+      return trackStart + ratio * (trackEnd - trackStart);
+    };
+
+    const track = createSvgElement('rect', {
+      class: 'chart-scale__track',
+      x: trackStart,
+      y: trackY - trackHeight / 2,
+      width: trackEnd - trackStart,
+      height: trackHeight,
+      rx: trackHeight / 2,
+      ry: trackHeight / 2
     });
+    svg.append(track);
+
+    if (highlight && Number.isFinite(highlight.from) && Number.isFinite(highlight.to)) {
+      const startValue = Math.min(highlight.from, highlight.to);
+      const endValue = Math.max(highlight.from, highlight.to);
+      const x = mapValue(startValue);
+      const width = Math.max(mapValue(endValue) - x, 0);
+      const highlightRect = createSvgElement('rect', {
+        class: 'chart-scale__highlight',
+        x,
+        y: trackY - trackHeight / 2,
+        width,
+        height: trackHeight,
+        rx: trackHeight / 2,
+        ry: trackHeight / 2
+      });
+      svg.append(highlightRect);
+    }
+
+    const segments = Array.isArray(config.segments) ? config.segments.slice().sort((a, b) => {
+      const aVal = Number.isFinite(a.from) ? a.from : min;
+      const bVal = Number.isFinite(b.from) ? b.from : min;
+      return aVal - bVal;
+    }) : [];
+
+    segments.forEach((segment) => {
+      const from = Number.isFinite(segment.from) ? segment.from : min;
+      const to = Number.isFinite(segment.to) ? segment.to : max;
+      const startX = mapValue(Math.min(to, Math.max(from, min)));
+      const endX = mapValue(Math.max(to, from));
+      const width = Math.max(endX - startX, 0.6);
+      const rect = createSvgElement('rect', {
+        class: `chart-scale__segment chart-scale__segment--${segment.tone || 'neutral'}`,
+        x: startX,
+        y: trackY - trackHeight / 2,
+        width,
+        height: trackHeight,
+        rx: trackHeight / 2,
+        ry: trackHeight / 2
+      });
+      svg.append(rect);
+      if (segment.label) {
+        const text = createSvgElement('text', {
+          class: 'chart-scale__segment-label',
+          x: startX + width / 2,
+          y: trackY - trackHeight / 2 - 3.5
+        });
+        text.textContent = segment.label;
+        if (segment.detail) {
+          const detail = createSvgElement('tspan', {
+            class: 'chart-scale__segment-sub',
+            x: startX + width / 2,
+            dy: 4.2
+          });
+          detail.textContent = segment.detail;
+          text.append(detail);
+        }
+        svg.append(text);
+      }
+    });
+
+    const ticksGroup = createSvgElement('g');
+    const ticks = Array.isArray(config.ticks) ? config.ticks : [];
+    ticks.forEach((tick) => {
+      if (!Number.isFinite(tick.at)) return;
+      const x = mapValue(tick.at);
+      const line = createSvgElement('line', {
+        class: 'chart-scale__tick',
+        x1: x,
+        y1: trackY + trackHeight / 2,
+        x2: x,
+        y2: trackY + trackHeight / 2 + 4
+      });
+      ticksGroup.append(line);
+      const label = createSvgElement('text', {
+        class: 'chart-scale__tick-label',
+        x,
+        y: trackY + trackHeight / 2 + 8
+      });
+      label.textContent = formatScaleTickLabel(tick.label, tick.at, unit);
+      ticksGroup.append(label);
+    });
+    svg.append(ticksGroup);
+
+    const hasValue = Number.isFinite(value);
+    const clampedValue = hasValue ? clamp(value, min, max) : min;
+    const markerX = clamp(mapValue(clampedValue), trackStart + 2, trackEnd - 2);
+    const markerTone = determineSegmentTone(segments, hasValue ? value : null);
+    const markerGroup = createSvgElement('g', {
+      class: `chart-scale__marker chart-scale__marker--${markerTone}`,
+      transform: `translate(${markerX} ${trackY})`
+    });
+    const markerLine = createSvgElement('line', { class: 'chart-scale__marker-line', x1: 0, y1: 0, x2: 0, y2: -10 });
+    const markerDot = createSvgElement('circle', { class: 'chart-scale__marker-dot', cx: 0, cy: 0, r: 3.2 });
+    const labelGroup = createSvgElement('g', { class: 'chart-scale__marker-label', transform: 'translate(0,-14)' });
+    const labelBg = createSvgElement('rect', { class: 'chart-scale__marker-label-bg', x: -20, y: -6, width: 40, height: 12 });
+    const labelText = createSvgElement('text', { class: 'chart-scale__marker-value', x: 0, y: 0 });
+    labelText.textContent = formatWithUnit(value, unit, decimals);
+    labelGroup.append(labelBg, labelText);
+    markerGroup.append(markerLine, markerDot, labelGroup);
+    svg.append(markerGroup);
+    adjustMarkerLabel(labelGroup);
   }
 
-  function resolveScaleTone(value, stops) {
-    if (!Array.isArray(stops) || stops.length === 0) {
+  function formatScaleTickLabel(label, fallbackValue, unit) {
+    if (typeof label === 'string' && label.trim().length) {
+      return label;
+    }
+    return formatScaleTick(fallbackValue, unit);
+  }
+
+  function determineSegmentTone(segments, value) {
+    if (!Number.isFinite(value)) {
       return 'neutral';
     }
-    for (const stop of stops) {
-      if (value <= stop.value) {
-        return stop.tone;
+    for (const segment of segments) {
+      const from = Number.isFinite(segment.from) ? segment.from : -Infinity;
+      const to = Number.isFinite(segment.to) ? segment.to : Infinity;
+      if (value >= from && value <= to) {
+        return segment.tone || 'neutral';
       }
     }
-    return stops[stops.length - 1].tone;
-  }
-
-  function buildScaleGradient(scale, stops) {
-    if (!Array.isArray(stops) || stops.length === 0) {
-      return 'linear-gradient(90deg, rgba(148, 163, 184, 0.4), rgba(148, 163, 184, 0.6))';
-    }
-    const min = Number.isFinite(scale.min) ? scale.min : 0;
-    const max = Number.isFinite(scale.max) ? scale.max : min + 1;
-    const span = Math.max(max - min, 1);
-    const segments = [];
-    let previousPercent = 0;
-    stops.forEach((stop, index) => {
-      const color = SCALE_TONES[stop.tone] || '#0ea5e9';
-      const percent = clamp(((stop.value - min) / span) * 100, 0, 100);
-      if (index === 0) {
-        segments.push(`${color} 0%`);
-      } else {
-        const prevColor = SCALE_TONES[stops[index - 1].tone] || color;
-        segments.push(`${prevColor} ${percent}%`);
-      }
-      segments.push(`${color} ${percent}%`);
-      previousPercent = percent;
-    });
-    const lastColor = SCALE_TONES[stops[stops.length - 1].tone] || '#0ea5e9';
-    if (previousPercent < 100) {
-      segments.push(`${lastColor} 100%`);
-    }
-    return `linear-gradient(90deg, ${segments.join(', ')})`;
-  }
-
-  function buildBandGradient(scale, bands) {
-    if (!Array.isArray(bands) || bands.length === 0) {
-      return buildScaleGradient(scale, []);
-    }
-    const minCandidate = Number.isFinite(scale.min) ? scale.min : bands[0]?.min;
-    const maxCandidate = Number.isFinite(scale.max)
-      ? scale.max
-      : bands[bands.length - 1]?.max;
-    const min = Number.isFinite(minCandidate) ? minCandidate : 0;
-    const max = Number.isFinite(maxCandidate) ? maxCandidate : min + 1;
-    const span = Math.max(max - min, 1);
-    const segments = [];
-    bands.forEach((band, index) => {
-      const color = SCALE_TONES[band.tone] || '#0ea5e9';
-      const startValue = Number.isFinite(band.min)
-        ? band.min
-        : index === 0
-          ? min
-          : Number.isFinite(bands[index - 1].max)
-            ? bands[index - 1].max
-            : min;
-      const endValue = Number.isFinite(band.max)
-        ? band.max
-        : index === bands.length - 1
-          ? max
-          : Number.isFinite(band.max)
-            ? band.max
-            : max;
-      const start = clamp(((startValue - min) / span) * 100, 0, 100);
-      const end = clamp(((endValue - min) / span) * 100, start, 100);
-      if (index === 0) {
-        segments.push(`${color} ${start}%`);
-      } else {
-        const prevColor = SCALE_TONES[bands[index - 1].tone] || color;
-        segments.push(`${prevColor} ${start}%`);
-      }
-      segments.push(`${color} ${start}%`);
-      segments.push(`${color} ${end}%`);
-      if (index === bands.length - 1 && end < 100) {
-        segments.push(`${color} 100%`);
-      }
-    });
     if (segments.length === 0) {
-      return buildScaleGradient(scale, []);
+      return 'neutral';
     }
-    const lastSegment = segments[segments.length - 1];
-    if (!/100%$/.test(lastSegment)) {
-      const lastColor = lastSegment.split(' ')[0];
-      segments.push(`${lastColor} 100%`);
-    }
-    return `linear-gradient(90deg, ${segments.join(', ')})`;
+    return value < (segments[0].from ?? value) ? segments[0].tone || 'neutral' : segments[segments.length - 1].tone || 'neutral';
+  }
+
+  function createSvgElement(tag, attributes = {}) {
+    const element = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    Object.entries(attributes).forEach(([key, value]) => {
+      if (value == null) return;
+      element.setAttribute(key, String(value));
+    });
+    return element;
+  }
+
+  function adjustMarkerLabel(group) {
+    if (!group) return;
+    const rect = group.querySelector('rect');
+    const text = group.querySelector('text');
+    if (!rect || !text) return;
+    const box = text.getBBox();
+    const paddingX = 3.6;
+    const paddingY = 2.6;
+    rect.setAttribute('x', (box.x - paddingX).toFixed(2));
+    rect.setAttribute('y', (box.y - paddingY).toFixed(2));
+    rect.setAttribute('width', (box.width + paddingX * 2).toFixed(2));
+    rect.setAttribute('height', (box.height + paddingY * 2).toFixed(2));
   }
 
   function formatScaleTick(value, unit) {
@@ -2845,6 +3235,14 @@
 
   function closeChartModal() {
     if (!ui.modalRoot || ui.modalRoot.hidden) return;
+    if (state.modalAbortController) {
+      try {
+        state.modalAbortController.abort();
+      } catch (error) {
+        /* ignore */
+      }
+      state.modalAbortController = null;
+    }
     ui.modalRoot.hidden = true;
     releaseModalFocusTrap(ui.modalRoot);
     detachModalResizeHandlers();
@@ -2875,18 +3273,45 @@
     const range = TIME_RANGES[rangeKey];
     state.modalRequestToken += 1;
     const requestId = state.modalRequestToken;
+    if (state.modalAbortController) {
+      try {
+        state.modalAbortController.abort();
+      } catch (error) {
+        /* ignore */
+      }
+    }
+    const controller = new AbortController();
+    state.modalAbortController = controller;
     modalConfig.assign({ loading: true, error: null, empty: false });
     try {
-      const data = await ensureSeries(definition, range, force);
+      const data = await ensureSeries(definition, range, force, { signal: controller.signal });
       if (state.modalRequestToken !== requestId) {
+        if (state.modalAbortController === controller) {
+          state.modalAbortController = null;
+        }
         return;
       }
       renderModalChart(definition, data, range, activeMetric);
       const hasData = definition.metrics.some((metricKey) => (data[metricKey] || []).length > 1);
       modalConfig.assign({ loading: false, error: null, empty: !hasData });
+      if (state.modalAbortController === controller) {
+        state.modalAbortController = null;
+      }
     } catch (error) {
       if (state.modalRequestToken !== requestId) {
+        if (state.modalAbortController === controller) {
+          state.modalAbortController = null;
+        }
         return;
+      }
+      if (error?.name === 'AbortError') {
+        if (state.modalAbortController === controller) {
+          state.modalAbortController = null;
+        }
+        return;
+      }
+      if (state.modalAbortController === controller) {
+        state.modalAbortController = null;
       }
       handleModalError(error);
     }
@@ -2912,6 +3337,7 @@
         spanGaps: true
       };
     });
+    const tooltipEnabled = datasets.some((dataset) => Array.isArray(dataset.data) && dataset.data.length > 0);
 
     const timeUnit = range.range === '24h' ? 'hour' : range.range === '7d' ? 'day' : 'week';
     const guides = buildTargetGuides(activeMetric || definition.metrics[0]);
@@ -2937,6 +3363,7 @@
           plugins: {
             legend: { labels: { color: '#475569', boxWidth: 12, boxHeight: 12, padding: 12 } },
             tooltip: {
+              enabled: tooltipEnabled,
               callbacks: { label: tooltipLabel }
             },
             targetGuides: { guides }
@@ -2973,6 +3400,7 @@
       state.modalChart.options.plugins.tooltip.callbacks =
         state.modalChart.options.plugins.tooltip.callbacks || {};
       state.modalChart.options.plugins.tooltip.callbacks.label = tooltipLabel;
+      state.modalChart.options.plugins.tooltip.enabled = tooltipEnabled;
       state.modalChart.options.scales.x.time.unit = timeUnit;
       state.modalChart.options.scales.y.title.text = definition.yTitle;
       state.modalChart.options.scales.y.suggestedMin = definition.yBounds?.min;
@@ -3301,9 +3729,7 @@
     const secureContext = Boolean(window.isSecureContext);
     const isAllowedHost = allowedHosts.has(host);
     if (!secureContext && !isAllowedHost) {
-      console.info(
-        `Service Worker nicht registriert: unsicherer Kontext für ${host || 'unbekannten Host'}.`
-      );
+      console.info('SW skipped (insecure)');
       if (ui.pwaStatusBadge) {
         ui.pwaStatusBadge.textContent = 'Offline-Cache deaktiviert (kein gültiges Zertifikat)';
         ui.pwaStatusBadge.hidden = false;
@@ -3320,9 +3746,9 @@
         }
       })
       .catch((error) => {
-        console.warn('Service Worker nicht aktiv: Registrierung fehlgeschlagen.', error);
+        console.info('Service Worker Registrierung fehlgeschlagen', error?.message || 'Unbekannter Fehler');
         if (ui.pwaStatusBadge) {
-          ui.pwaStatusBadge.textContent = 'Offline-Cache deaktiviert (kein gültiges Zertifikat)';
+          ui.pwaStatusBadge.textContent = 'Offline-Cache deaktiviert (Registrierung fehlgeschlagen)';
           ui.pwaStatusBadge.hidden = false;
         }
       });

@@ -373,18 +373,11 @@
         <dl id="chart-modal-insight" class="chart-modal__insight"></dl>
       </div>
       <div class="chart-modal__scale" id="chart-modal-scale">
-        <div id="chart-modal-scale-labels" class="chart-modal__scale-labels"></div>
-        <div class="chart-modal__scale-track">
-          <div id="chart-modal-scale-gradient" class="chart-modal__scale-gradient"></div>
-          <div id="chart-modal-scale-marker" class="chart-modal__scale-marker" data-tone="neutral">
-            <span class="chart-modal__scale-marker-dot"></span>
-            <span id="chart-modal-scale-marker-value" class="chart-modal__scale-marker-value">—</span>
-          </div>
-        </div>
-      <div id="chart-modal-scale-values" class="chart-modal__scale-values"></div>
-      <p id="chart-modal-scale-caption" class="chart-modal__scale-caption">—</p>
+        <svg id="chart-modal-scale-svg" class="chart-scale" viewBox="0 0 100 48" role="presentation" aria-hidden="true"></svg>
+        <p id="chart-modal-scale-caption" class="chart-modal__scale-caption">—</p>
+      </div>
+
     </div>
-  </div>
   </div>
 
   <div class="circadian-modal" id="circadian-modal" role="dialog" aria-modal="true" hidden>
