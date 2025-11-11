@@ -58,7 +58,136 @@
     }
   };
 
-  Chart.register(targetGuidePlugin);
+  const safeInteractionPlugin = {
+    id: 'safeInteraction',
+    afterInit(chart) {
+      const hasData = chartHasUsableData(chart);
+      syncChartInteractionState(chart, hasData);
+      if (!hasData) {
+        clearActiveElements(chart);
+      }
+    },
+    afterDatasetsUpdate(chart) {
+      const hasData = chartHasUsableData(chart);
+      syncChartInteractionState(chart, hasData);
+      if (!hasData) {
+        clearActiveElements(chart);
+      }
+    },
+    beforeEvent(chart, args) {
+      const hasData = chartHasUsableData(chart);
+      if (!hasData) {
+        syncChartInteractionState(chart, false);
+        clearActiveElements(chart);
+        if (args && typeof args === 'object') {
+          args.cancel = true;
+        }
+        return;
+      }
+      const active = typeof chart?.getActiveElements === 'function' ? chart.getActiveElements() : [];
+      if (!Array.isArray(active) || active.length === 0) {
+        resetTooltipState(chart);
+      }
+    }
+  };
+
+  function chartHasUsableData(chart) {
+    const datasets = chart?.data?.datasets;
+    if (!Array.isArray(datasets) || datasets.length === 0) {
+      return false;
+    }
+    return datasets.some((dataset) => {
+      const data = Array.isArray(dataset?.data) ? dataset.data : [];
+      return data.some((point) => {
+        if (point == null) return false;
+        if (typeof point === 'number') {
+          return Number.isFinite(point);
+        }
+        if (typeof point === 'object') {
+          const value = 'y' in point ? Number(point.y) : 'value' in point ? Number(point.value) : NaN;
+          return Number.isFinite(value);
+        }
+        return false;
+      });
+    });
+  }
+
+  function ensureInteractionBackups(chart) {
+    if (!chart) return;
+    if (!chart.$_safeInteraction) {
+      chart.$_safeInteraction = {
+        events: Array.isArray(chart.options?.events) ? chart.options.events.slice() : null,
+        tooltip: chart.options?.plugins?.tooltip && Object.prototype.hasOwnProperty.call(chart.options.plugins.tooltip, 'enabled')
+          ? chart.options.plugins.tooltip.enabled
+          : undefined,
+        preferredTooltip: undefined
+      };
+    }
+  }
+
+  function syncChartInteractionState(chart, hasData) {
+    if (!chart || !chart.options) return;
+    ensureInteractionBackups(chart);
+    const store = chart.$_safeInteraction;
+    const options = chart.options;
+    options.plugins = options.plugins || {};
+    options.plugins.tooltip = options.plugins.tooltip || {};
+    if (hasData) {
+      if (store.events) {
+        options.events = store.events.slice();
+      } else {
+        delete options.events;
+      }
+      const target = store.preferredTooltip ?? store.tooltip;
+      if (target === undefined) {
+        delete options.plugins.tooltip.enabled;
+      } else {
+        options.plugins.tooltip.enabled = target;
+      }
+    } else {
+      if (Array.isArray(options.events) && options.events.length) {
+        store.events = options.events.slice();
+      }
+      options.events = [];
+      if (store.preferredTooltip === undefined) {
+        store.preferredTooltip = options.plugins.tooltip.enabled;
+      }
+      options.plugins.tooltip.enabled = false;
+    }
+  }
+
+  function clearActiveElements(chart) {
+    if (!chart) return;
+    if (typeof chart.setActiveElements === 'function') {
+      try {
+        chart.setActiveElements([]);
+      } catch (error) {
+        console.debug('Aktive Elemente konnten nicht zurückgesetzt werden', error);
+      }
+    }
+    resetTooltipState(chart);
+  }
+
+  function resetTooltipState(chart) {
+    if (!chart?.tooltip || typeof chart.tooltip.setActiveElements !== 'function') {
+      return;
+    }
+    try {
+      chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+    } catch (error) {
+      console.debug('Tooltip konnte nicht zurückgesetzt werden', error);
+    }
+  }
+
+  function recordTooltipPreference(chart, enabled) {
+    if (!chart) return;
+    ensureInteractionBackups(chart);
+    if (chart.$_safeInteraction) {
+      chart.$_safeInteraction.preferredTooltip = enabled;
+    }
+  }
+
+  Chart.register(targetGuidePlugin, safeInteractionPlugin);
   Chart.defaults.font.family = "'Inter','Segoe UI',system-ui,sans-serif";
   Chart.defaults.color = '#6b7280';
   Chart.defaults.plugins.legend.labels.usePointStyle = true;
@@ -296,6 +425,12 @@
 
   const SPARKLINE_RANGE_KEY = '24h';
   const FETCH_RETRY_DELAYS = [500, 1000, 2000];
+  const EMPTY_SERIES_RETRY_DELAYS = [500, 1000];
+  const RANGE_RULES = {
+    '24h': { stepMin: 120, stepMax: 300, windowMin: 240 },
+    '7d': { stepMin: 600, stepMax: 900, windowMin: 1800 },
+    '30d': { stepMin: 1800, stepMax: 3600, windowMin: 3600 }
+  };
   const ENABLE_FETCH_DEBUG = (() => {
     try {
       if (window?.AIRGUARD_DEBUG_FETCH) return true;
@@ -2549,6 +2684,16 @@
     if (!Number.isFinite(windowSeconds) || windowSeconds <= 0) {
       windowSeconds = stepSeconds * 2;
     }
+    const rule = RANGE_RULES[rangeLiteral];
+    if (rule) {
+      const minStep = Number.isFinite(rule.stepMin) ? rule.stepMin : stepSeconds;
+      const maxStep = Number.isFinite(rule.stepMax) ? rule.stepMax : stepSeconds;
+      stepSeconds = clamp(stepSeconds, minStep, maxStep);
+      const ruleWindowMin = Number.isFinite(rule.windowMin) ? rule.windowMin : stepSeconds * 2;
+      if (windowSeconds < ruleWindowMin) {
+        windowSeconds = ruleWindowMin;
+      }
+    }
     if (windowSeconds < stepSeconds * 2) {
       windowSeconds = stepSeconds * 2;
     }
@@ -2659,53 +2804,73 @@
       step: range.step,
       win: range.win
     });
-    let response;
-    try {
-      response = await fetchWithRetry(`/api/series?${params.toString()}`, {
-        headers: { Accept: 'application/json' }
-      }, { signal: options.signal, label: `${metric}:${queryName}:${range.range}` });
-    } catch (error) {
-      if (error?.name === 'AbortError') {
-        throw error;
+    const maxAttempts = EMPTY_SERIES_RETRY_DELAYS.length + 1;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (options.signal?.aborted) {
+        throw new DOMException('Aborted', 'AbortError');
       }
-      const err = buildNetworkError(metric, range, error);
-      err.code = 'network_error';
-      err.cause = error;
-      throw err;
-    }
-    let payload = null;
-    try {
-      payload = await response.clone().json();
-    } catch (error) {
-      payload = null;
-    }
-    if (!response.ok) {
-      const err = buildSeriesError(metric, range, payload);
-      if (payload?.error === 'unknown_metric') {
-        err.code = 'unknown_metric';
-      }
-      throw err;
-    }
-    if (!payload || !payload.ok) {
-      const err = buildSeriesError(metric, range, payload);
-      if (payload?.error === 'unknown_metric') {
-        err.code = 'unknown_metric';
-      }
-      throw err;
-    }
-    const values = normalizeSeriesValues(payload.data);
-    const rawPoints = values
-      .map((row) => {
-        const ts = Number(row[0]);
-        const val = Number(row[1]);
-        if (!Number.isFinite(ts) || !Number.isFinite(val)) {
-          return null;
+      let response;
+      try {
+        response = await fetchWithRetry(`/api/series?${params.toString()}`, {
+          headers: { Accept: 'application/json' }
+        }, { signal: options.signal, label: `${metric}:${queryName}:${range.range}#${attempt + 1}` });
+      } catch (error) {
+        if (error?.name === 'AbortError') {
+          throw error;
         }
-        return { x: ts * 1000, y: val };
-      })
-      .filter(Boolean);
-    const cleaned = dedupePoints(rawPoints);
-    return limitPoints(cleaned);
+        const err = buildNetworkError(metric, range, error);
+        err.code = 'network_error';
+        err.cause = error;
+        throw err;
+      }
+      let payload = null;
+      try {
+        payload = await response.clone().json();
+      } catch (error) {
+        payload = null;
+      }
+      if (!response.ok) {
+        const err = buildSeriesError(metric, range, payload);
+        if (payload?.error === 'unknown_metric') {
+          err.code = 'unknown_metric';
+        }
+        throw err;
+      }
+      if (!payload || !payload.ok) {
+        const err = buildSeriesError(metric, range, payload);
+        if (payload?.error === 'unknown_metric') {
+          err.code = 'unknown_metric';
+        }
+        throw err;
+      }
+      const values = normalizeSeriesValues(payload.data);
+      const rawPoints = values
+        .map((row) => {
+          const ts = Number(row[0]);
+          const val = Number(row[1]);
+          if (!Number.isFinite(ts) || !Number.isFinite(val)) {
+            return null;
+          }
+          return { x: ts * 1000, y: val };
+        })
+        .filter(Boolean);
+      const cleaned = dedupePoints(rawPoints);
+      const limited = limitPoints(cleaned);
+      if (limited.length === 0 && attempt < EMPTY_SERIES_RETRY_DELAYS.length) {
+        const delayMs = EMPTY_SERIES_RETRY_DELAYS[attempt];
+        try {
+          await delay(delayMs, options.signal);
+        } catch (error) {
+          if (error?.name === 'AbortError') {
+            throw error;
+          }
+          throw error;
+        }
+        continue;
+      }
+      return limited;
+    }
+    return [];
   }
 
   function buildSeriesError(metric, range, payload) {
@@ -2805,6 +2970,11 @@
     ui.modalState.classList.toggle('is-loading', loading);
     ui.modalState.classList.toggle('is-error', Boolean(error));
     ui.modalState.classList.toggle('is-empty', empty);
+    const canvasContainer = ui.modalCanvas?.closest('.chart-modal__canvas');
+    if (canvasContainer) {
+      canvasContainer.classList.toggle('is-loading', loading);
+      canvasContainer.classList.toggle('is-empty', empty);
+    }
     if (ui.modalStateText) {
       let text = '';
       if (loading) {
@@ -2817,7 +2987,7 @@
       ui.modalStateText.textContent = text;
     }
     if (ui.modalRetry) {
-      ui.modalRetry.hidden = !error;
+      ui.modalRetry.hidden = !(error || empty);
     }
     if (ui.modalCanvas) {
       if (loading) {
@@ -3025,14 +3195,21 @@
     const decimals = options.decimals ?? 0;
     const highlight = options.highlight;
     const min = Number.isFinite(config.min) ? config.min : 0;
-    const max = Number.isFinite(config.max) ? config.max : min + 1;
+    const rawMax = Number.isFinite(config.max) ? config.max : min + 1;
+    const max = rawMax > min ? rawMax : min + 1;
     const span = Math.max(max - min, 1);
-    const viewBoxWidth = 100;
-    const viewBoxHeight = 48;
-    const trackStart = 6;
-    const trackEnd = viewBoxWidth - 6;
-    const trackY = 26;
-    const trackHeight = 6;
+    const viewBoxWidth = 320;
+    const viewBoxHeight = 68;
+    const trackPadding = 6;
+    const markerPadding = 6;
+    const trackStart = trackPadding;
+    const trackEnd = viewBoxWidth - trackPadding;
+    const trackHeight = 10;
+    const trackY = 36;
+    const labelY = trackY - trackHeight / 2 - 8;
+    const tickBaseY = trackY + trackHeight / 2;
+    const tickLabelY = tickBaseY + 12;
+
     svg.setAttribute('viewBox', `0 0 ${viewBoxWidth} ${viewBoxHeight}`);
     svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
     while (svg.firstChild) {
@@ -3040,7 +3217,7 @@
     }
 
     const mapValue = (val) => {
-      const ratio = clamp((val - min) / span, 0, 1);
+      const ratio = clamp((Number(val) - min) / span, 0, 1);
       return trackStart + ratio * (trackEnd - trackStart);
     };
 
@@ -3056,13 +3233,14 @@
     svg.append(track);
 
     if (highlight && Number.isFinite(highlight.from) && Number.isFinite(highlight.to)) {
-      const startValue = Math.min(highlight.from, highlight.to);
-      const endValue = Math.max(highlight.from, highlight.to);
-      const x = mapValue(startValue);
-      const width = Math.max(mapValue(endValue) - x, 0);
+      const from = Math.min(highlight.from, highlight.to);
+      const to = Math.max(highlight.from, highlight.to);
+      const startX = mapValue(from);
+      const endX = mapValue(to);
+      const width = Math.max(endX - startX, 1);
       const highlightRect = createSvgElement('rect', {
         class: 'chart-scale__highlight',
-        x,
+        x: startX,
         y: trackY - trackHeight / 2,
         width,
         height: trackHeight,
@@ -3073,17 +3251,17 @@
     }
 
     const segments = Array.isArray(config.segments) ? config.segments.slice().sort((a, b) => {
-      const aVal = Number.isFinite(a.from) ? a.from : min;
-      const bVal = Number.isFinite(b.from) ? b.from : min;
+      const aVal = Number.isFinite(a.from) ? a.from : Number.isFinite(a.to) ? a.to : min;
+      const bVal = Number.isFinite(b.from) ? b.from : Number.isFinite(b.to) ? b.to : min;
       return aVal - bVal;
     }) : [];
 
     segments.forEach((segment) => {
       const from = Number.isFinite(segment.from) ? segment.from : min;
       const to = Number.isFinite(segment.to) ? segment.to : max;
-      const startX = mapValue(Math.min(to, Math.max(from, min)));
-      const endX = mapValue(Math.max(to, from));
-      const width = Math.max(endX - startX, 0.6);
+      const startX = mapValue(Math.min(Math.max(from, min), max));
+      const endX = mapValue(Math.max(Math.min(to, max), min));
+      const width = Math.max(endX - startX, 1);
       const rect = createSvgElement('rect', {
         class: `chart-scale__segment chart-scale__segment--${segment.tone || 'neutral'}`,
         x: startX,
@@ -3094,67 +3272,73 @@
         ry: trackHeight / 2
       });
       svg.append(rect);
-      if (segment.label) {
+      const labelText = segment.label || '';
+      const detailText = segment.detail || '';
+      if (labelText || detailText) {
         const text = createSvgElement('text', {
           class: 'chart-scale__segment-label',
           x: startX + width / 2,
-          y: trackY - trackHeight / 2 - 3.5
+          y: labelY
         });
-        text.textContent = segment.label;
-        if (segment.detail) {
+        if (labelText) {
+          text.textContent = labelText;
+        }
+        if (detailText) {
           const detail = createSvgElement('tspan', {
             class: 'chart-scale__segment-sub',
             x: startX + width / 2,
-            dy: 4.2
+            dy: labelText ? 4.5 : 0
           });
-          detail.textContent = segment.detail;
+          detail.textContent = detailText;
           text.append(detail);
         }
         svg.append(text);
       }
     });
 
-    const ticksGroup = createSvgElement('g');
-    const ticks = Array.isArray(config.ticks) ? config.ticks : [];
-    ticks.forEach((tick) => {
-      if (!Number.isFinite(tick.at)) return;
+    const tickGroup = createSvgElement('g');
+    const seenTicks = new Set();
+    (Array.isArray(config.ticks) ? config.ticks : []).forEach((tick) => {
+      if (!Number.isFinite(tick.at) || seenTicks.has(tick.at)) return;
+      seenTicks.add(tick.at);
       const x = mapValue(tick.at);
       const line = createSvgElement('line', {
         class: 'chart-scale__tick',
         x1: x,
-        y1: trackY + trackHeight / 2,
+        y1: tickBaseY,
         x2: x,
-        y2: trackY + trackHeight / 2 + 4
+        y2: tickBaseY + 6
       });
-      ticksGroup.append(line);
+      tickGroup.append(line);
       const label = createSvgElement('text', {
         class: 'chart-scale__tick-label',
         x,
-        y: trackY + trackHeight / 2 + 8
+        y: tickLabelY
       });
       label.textContent = formatScaleTickLabel(tick.label, tick.at, unit);
-      ticksGroup.append(label);
+      tickGroup.append(label);
     });
-    svg.append(ticksGroup);
+    svg.append(tickGroup);
 
     const hasValue = Number.isFinite(value);
     const clampedValue = hasValue ? clamp(value, min, max) : min;
-    const markerX = clamp(mapValue(clampedValue), trackStart + 2, trackEnd - 2);
+    const mapped = mapValue(clampedValue);
+    const markerX = clamp(mapped, trackStart + markerPadding, trackEnd - markerPadding);
     const markerTone = determineSegmentTone(segments, hasValue ? value : null);
     const markerGroup = createSvgElement('g', {
       class: `chart-scale__marker chart-scale__marker--${markerTone}`,
       transform: `translate(${markerX} ${trackY})`
     });
-    const markerLine = createSvgElement('line', { class: 'chart-scale__marker-line', x1: 0, y1: 0, x2: 0, y2: -10 });
+    const markerLine = createSvgElement('line', { class: 'chart-scale__marker-line', x1: 0, y1: 0, x2: 0, y2: -12 });
     const markerDot = createSvgElement('circle', { class: 'chart-scale__marker-dot', cx: 0, cy: 0, r: 3.2 });
-    const labelGroup = createSvgElement('g', { class: 'chart-scale__marker-label', transform: 'translate(0,-14)' });
-    const labelBg = createSvgElement('rect', { class: 'chart-scale__marker-label-bg', x: -20, y: -6, width: 40, height: 12 });
+    const labelGroup = createSvgElement('g', { class: 'chart-scale__marker-label', transform: 'translate(0,-16)' });
+    const labelBg = createSvgElement('rect', { class: 'chart-scale__marker-label-bg', x: -24, y: -8, width: 48, height: 16 });
     const labelText = createSvgElement('text', { class: 'chart-scale__marker-value', x: 0, y: 0 });
-    labelText.textContent = formatWithUnit(value, unit, decimals);
+    labelText.textContent = formatWithUnit(hasValue ? value : null, unit, decimals);
     labelGroup.append(labelBg, labelText);
     markerGroup.append(markerLine, markerDot, labelGroup);
     svg.append(markerGroup);
-    adjustMarkerLabel(labelGroup);
+    adjustMarkerLabel(labelGroup, markerX, viewBoxWidth, trackPadding);
   }
 
   function formatScaleTickLabel(label, fallbackValue, unit) {
@@ -3190,18 +3374,29 @@
     return element;
   }
 
-  function adjustMarkerLabel(group) {
+  function adjustMarkerLabel(group, markerX, viewBoxWidth, padding) {
     if (!group) return;
     const rect = group.querySelector('rect');
     const text = group.querySelector('text');
     if (!rect || !text) return;
     const box = text.getBBox();
-    const paddingX = 3.6;
-    const paddingY = 2.6;
-    rect.setAttribute('x', (box.x - paddingX).toFixed(2));
+    const paddingX = 6;
+    const paddingY = 3;
+    const width = box.width + paddingX * 2;
+    const height = box.height + paddingY * 2;
+    rect.setAttribute('x', (-width / 2).toFixed(2));
     rect.setAttribute('y', (box.y - paddingY).toFixed(2));
-    rect.setAttribute('width', (box.width + paddingX * 2).toFixed(2));
-    rect.setAttribute('height', (box.height + paddingY * 2).toFixed(2));
+    rect.setAttribute('width', width.toFixed(2));
+    rect.setAttribute('height', height.toFixed(2));
+    const leftEdge = markerX - width / 2;
+    const rightEdge = markerX + width / 2;
+    let shift = 0;
+    if (leftEdge < padding) {
+      shift = padding - leftEdge;
+    } else if (rightEdge > viewBoxWidth - padding) {
+      shift = (viewBoxWidth - padding) - rightEdge;
+    }
+    group.setAttribute('transform', `translate(${shift.toFixed(2)},-16)`);
   }
 
   function formatScaleTick(value, unit) {
@@ -3260,10 +3455,7 @@
     if (!ui.circadianModal || ui.circadianModal.hidden) {
       unlockBodyScroll();
     }
-    if (state.modalChart) {
-      state.modalChart.destroy();
-      state.modalChart = null;
-    }
+    teardownModalChart();
     modalConfig.assign({ metric: null, loading: false, error: null, empty: false });
   }
 
@@ -3295,9 +3487,20 @@
         }
         return;
       }
+      const hasData = definition.metrics.some(
+        (metricKey) => Array.isArray(data[metricKey]) && data[metricKey].length > 1
+      );
+      applyModalHeading(definition, range, activeMetric);
+      if (!hasData) {
+        teardownModalChart();
+        modalConfig.assign({ loading: false, error: null, empty: true });
+        if (state.modalAbortController === controller) {
+          state.modalAbortController = null;
+        }
+        return;
+      }
       renderModalChart(definition, data, range, activeMetric);
-      const hasData = definition.metrics.some((metricKey) => (data[metricKey] || []).length > 1);
-      modalConfig.assign({ loading: false, error: null, empty: !hasData });
+      modalConfig.assign({ loading: false, error: null, empty: false });
       if (state.modalAbortController === controller) {
         state.modalAbortController = null;
       }
@@ -3325,6 +3528,7 @@
     if (!ui.modalCanvas) return;
     const ctx = ui.modalCanvas.getContext('2d');
     if (!ctx) return;
+    applyModalHeading(definition, range, activeMetric);
     const datasets = definition.metrics.map((metric, index) => {
       const color = definition.colors[index % definition.colors.length];
       return {
@@ -3341,7 +3545,11 @@
         spanGaps: true
       };
     });
-    const tooltipEnabled = datasets.some((dataset) => Array.isArray(dataset.data) && dataset.data.length > 0);
+    const tooltipEnabled = datasets.some((dataset) => Array.isArray(dataset.data) && dataset.data.length > 1);
+    const container = ui.modalCanvas.closest('.chart-modal__canvas');
+    if (container) {
+      container.classList.toggle('is-empty', !tooltipEnabled);
+    }
 
     const timeUnit = range.range === '24h' ? 'hour' : range.range === '7d' ? 'day' : 'week';
     const guides = buildTargetGuides(activeMetric || definition.metrics[0]);
@@ -3397,7 +3605,9 @@
           }
         }
       });
+      recordTooltipPreference(state.modalChart, tooltipEnabled);
     } else {
+      resetTooltipState(state.modalChart);
       state.modalChart.data.datasets = datasets;
       state.modalChart.options.plugins.targetGuides = { guides };
       state.modalChart.options.plugins.tooltip = state.modalChart.options.plugins.tooltip || {};
@@ -3409,17 +3619,9 @@
       state.modalChart.options.scales.y.title.text = definition.yTitle;
       state.modalChart.options.scales.y.suggestedMin = definition.yBounds?.min;
       state.modalChart.options.scales.y.suggestedMax = definition.yBounds?.max;
+      recordTooltipPreference(state.modalChart, tooltipEnabled);
     }
-
-    const label = METRIC_CONFIG[activeMetric || definition.metrics[0]]?.label || definition.title || definition.key;
-    ui.modalTitle.textContent = label;
-    const subParts = [range.label];
-    if (definition.sub) {
-      subParts.push(definition.sub);
-    } else if (definition.yTitle) {
-      subParts.push(definition.yTitle);
-    }
-    ui.modalSub.textContent = subParts.join(' • ');
+    syncChartInteractionState(state.modalChart, tooltipEnabled);
     scheduleChartUpdate(state.modalChart);
     scheduleModalResize();
     queueModalLayoutSync();
@@ -3441,6 +3643,49 @@
     queueMicrotask(() => {
       loadModalChart(snapshot.metric, true).catch(handleModalError);
     });
+  }
+
+  function applyModalHeading(definition, range, activeMetric) {
+    if (!definition) return;
+    const label = METRIC_CONFIG[activeMetric || definition.metrics[0]]?.label
+      || definition.title
+      || definition.key;
+    if (ui.modalTitle) {
+      ui.modalTitle.textContent = label;
+    }
+    if (ui.modalSub) {
+      const parts = [];
+      if (typeof range?.label === 'string' && range.label.trim().length) {
+        parts.push(range.label);
+      } else if (typeof range?.range === 'string' && range.range.trim().length) {
+        parts.push(range.range);
+      }
+      if (definition.sub) {
+        parts.push(definition.sub);
+      } else if (definition.yTitle) {
+        parts.push(definition.yTitle);
+      }
+      ui.modalSub.textContent = parts.filter(Boolean).join(' • ');
+    }
+  }
+
+  function teardownModalChart() {
+    if (state.modalChart) {
+      try {
+        state.modalChart.destroy();
+      } catch (error) {
+        console.warn('Diagramm konnte nicht bereinigt werden', error);
+      }
+      state.modalChart = null;
+    }
+    if (ui.modalCanvas) {
+      const ctx = ui.modalCanvas.getContext('2d');
+      if (ctx) {
+        ctx.save();
+        ctx.clearRect(0, 0, ui.modalCanvas.width || 0, ui.modalCanvas.height || 0);
+        ctx.restore();
+      }
+    }
   }
 
   function buildTargetGuides(metric) {

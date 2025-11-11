@@ -1010,6 +1010,17 @@ a {
 .chart-modal__canvas canvas {
   width: 100% !important;
   height: 100% !important;
+  transition: opacity var(--transition-base);
+}
+
+.chart-modal__canvas.is-loading canvas {
+  opacity: 0.4;
+  transition: opacity var(--transition-base);
+}
+
+.chart-modal__canvas.is-empty canvas {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .chart-modal__state {
