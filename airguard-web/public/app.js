@@ -2381,7 +2381,7 @@
       throw err;
     }
     const values = normalizeSeriesValues(payload.data);
-    const points = values
+    const rawPoints = values
       .map((row) => {
         const ts = Number(row[0]);
         const val = Number(row[1]);
@@ -2391,7 +2391,8 @@
         return { x: ts * 1000, y: val };
       })
       .filter(Boolean);
-    return limitPoints(points);
+    const cleaned = dedupePoints(rawPoints);
+    return limitPoints(cleaned);
   }
 
   function buildSeriesError(metric, range, payload) {
@@ -2442,10 +2443,11 @@
       return [];
     }
     if (points.length <= 3) {
-      return points;
+      return clonePoints(points);
     }
     const windowSize = points.length > 180 ? 5 : points.length > 90 ? 4 : 3;
-    return movingAverage(points, windowSize);
+    const averaged = movingAverage(points, windowSize);
+    return clonePoints(averaged);
   }
 
   function updateModalTabs(activeKey = modalConfig.get().rangeKey) {
@@ -2898,7 +2900,7 @@
       const color = definition.colors[index % definition.colors.length];
       return {
         label: METRIC_CONFIG[metric]?.label || metric,
-        data: data[metric] || [],
+        data: clonePoints(data[metric] || []),
         borderColor: color,
         backgroundColor: colorWithAlpha(color, 0.12),
         tension: 0.35,
@@ -3132,17 +3134,25 @@
   }
 
   function limitPoints(points) {
-    if (!Array.isArray(points) || points.length <= MAX_POINTS) {
-      return points;
+    if (!Array.isArray(points) || points.length === 0) {
+      return [];
     }
-    const step = Math.ceil(points.length / MAX_POINTS);
+    if (points.length <= MAX_POINTS) {
+      return clonePoints(points);
+    }
+    const step = Math.max(1, Math.ceil(points.length / MAX_POINTS));
     const limited = [];
     for (let index = 0; index < points.length; index += step) {
-      limited.push(points[index]);
+      const point = points[index];
+      if (!point) continue;
+      limited.push({ x: point.x, y: point.y });
     }
     const lastPoint = points[points.length - 1];
-    if (limited[limited.length - 1] !== lastPoint) {
-      limited.push(lastPoint);
+    if (lastPoint) {
+      const tail = limited[limited.length - 1];
+      if (!tail || tail.x !== lastPoint.x || tail.y !== lastPoint.y) {
+        limited.push({ x: lastPoint.x, y: lastPoint.y });
+      }
     }
     return limited;
   }
@@ -3159,6 +3169,52 @@
       smoothed.push({ x: points[i].x, y: sum / slice.length });
     }
     return smoothed;
+  }
+
+  function dedupePoints(points) {
+    if (!Array.isArray(points) || points.length === 0) {
+      return [];
+    }
+    const sorted = points
+      .filter((point) => point && Number.isFinite(point.x) && Number.isFinite(point.y))
+      .slice()
+      .sort((a, b) => a.x - b.x);
+    if (sorted.length === 0) {
+      return [];
+    }
+    const deduped = [];
+    let lastX = null;
+    for (const point of sorted) {
+      const x = Number(point.x);
+      const y = Number(point.y);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        continue;
+      }
+      if (lastX != null && Math.abs(x - lastX) < 1) {
+        deduped[deduped.length - 1] = { x, y };
+      } else {
+        deduped.push({ x, y });
+        lastX = x;
+      }
+    }
+    return deduped;
+  }
+
+  function clonePoints(points) {
+    if (!Array.isArray(points) || points.length === 0) {
+      return [];
+    }
+    const clones = [];
+    for (const point of points) {
+      if (!point) continue;
+      const x = Number(point.x);
+      const y = Number(point.y);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        continue;
+      }
+      clones.push({ x, y });
+    }
+    return clones;
   }
 
   async function refreshPressureTrend() {
