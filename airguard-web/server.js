@@ -157,11 +157,8 @@ const cspDirectives = {
   frameAncestors: ["'none'"]
 };
 
-if (isProduction) {
-  cspDirectives.styleSrc.push("'unsafe-inline'");
-} else {
+if (!isProduction) {
   cspDirectives.scriptSrc.push("'unsafe-inline'", "'unsafe-eval'");
-  cspDirectives.styleSrc.push("'unsafe-inline'");
 }
 
 
