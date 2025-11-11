@@ -81,14 +81,14 @@
     id: 'safeInteraction',
     afterInit(chart) {
       const hasData = chartHasUsableData(chart);
-      syncChartInteractionState(chart, hasData);
+      syncTooltipState(chart, hasData);
       if (!hasData) {
         clearActiveElements(chart);
       }
     },
     afterDatasetsUpdate(chart) {
       const hasData = chartHasUsableData(chart);
-      syncChartInteractionState(chart, hasData);
+      syncTooltipState(chart, hasData);
       if (!hasData) {
         clearActiveElements(chart);
       }
@@ -96,7 +96,7 @@
     beforeEvent(chart, args) {
       const hasData = chartHasUsableData(chart);
       if (!hasData) {
-        syncChartInteractionState(chart, false);
+        syncTooltipState(chart, false);
         clearActiveElements(chart);
         if (args && typeof args === 'object') {
           args.cancel = true;
@@ -135,43 +135,44 @@
     if (!chart) return;
     if (!chart.$_safeInteraction) {
       chart.$_safeInteraction = {
-        events: Array.isArray(chart.options?.events) ? chart.options.events.slice() : null,
-        tooltip: chart.options?.plugins?.tooltip && Object.prototype.hasOwnProperty.call(chart.options.plugins.tooltip, 'enabled')
-          ? chart.options.plugins.tooltip.enabled
-          : undefined,
+        tooltip: chart.options?.plugins?.tooltip
+          && Object.prototype.hasOwnProperty.call(chart.options.plugins.tooltip, 'enabled')
+            ? chart.options.plugins.tooltip.enabled
+            : undefined,
         preferredTooltip: undefined
       };
     }
   }
 
-  function syncChartInteractionState(chart, hasData) {
-    if (!chart || !chart.options) return;
+  function syncTooltipState(chart, hasData) {
+    if (!chart) return;
     ensureInteractionBackups(chart);
     const store = chart.$_safeInteraction;
-    const options = chart.options;
-    options.plugins = options.plugins || {};
-    options.plugins.tooltip = options.plugins.tooltip || {};
+    const tooltipOptions = chart.options?.plugins?.tooltip;
+    if (!tooltipOptions) {
+      return;
+    }
     if (hasData) {
-      if (store.events) {
-        options.events = store.events.slice();
-      } else {
-        delete options.events;
-      }
       const target = store.preferredTooltip ?? store.tooltip;
       if (target === undefined) {
-        delete options.plugins.tooltip.enabled;
+        delete tooltipOptions.enabled;
+        if (chart.tooltip?.options) {
+          delete chart.tooltip.options.enabled;
+        }
       } else {
-        options.plugins.tooltip.enabled = target;
+        tooltipOptions.enabled = target;
+        if (chart.tooltip?.options) {
+          chart.tooltip.options.enabled = target;
+        }
       }
     } else {
-      if (Array.isArray(options.events) && options.events.length) {
-        store.events = options.events.slice();
-      }
-      options.events = [];
       if (store.preferredTooltip === undefined) {
-        store.preferredTooltip = options.plugins.tooltip.enabled;
+        store.preferredTooltip = tooltipOptions.enabled;
       }
-      options.plugins.tooltip.enabled = false;
+      tooltipOptions.enabled = false;
+      if (chart.tooltip?.options) {
+        chart.tooltip.options.enabled = false;
+      }
     }
   }
 
@@ -3673,7 +3674,7 @@
       state.modalChart.options.scales.y.suggestedMax = definition.yBounds?.max;
       recordTooltipPreference(state.modalChart, tooltipEnabled);
     }
-    syncChartInteractionState(state.modalChart, tooltipEnabled);
+    syncTooltipState(state.modalChart, tooltipEnabled);
     scheduleChartUpdate(state.modalChart, 'none');
     scheduleModalResize();
     queueModalLayoutSync();
