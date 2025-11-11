@@ -66,6 +66,110 @@
   Chart.defaults.plugins.tooltip.mode = 'index';
   Chart.defaults.plugins.tooltip.intersect = false;
 
+  if (Chart?.Tooltip?.positioners) {
+    Chart.Tooltip.positioners.clamped = function (items) {
+      if (!items || !items.length) return null;
+      const pos = Chart.Tooltip.positioners.average(items);
+      if (!pos) return pos;
+      const { chart } = items[0];
+      const area = chart?.chartArea;
+      if (!area) return pos;
+      const margin = 12;
+      return {
+        x: clamp(pos.x, area.left + margin, area.right - margin),
+        y: clamp(pos.y, area.top + margin, area.bottom - margin)
+      };
+    };
+    Chart.defaults.plugins.tooltip.position = 'clamped';
+    Chart.defaults.plugins.tooltip.displayColors = false;
+    Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(15, 23, 42, 0.92)';
+    Chart.defaults.plugins.tooltip.padding = 10;
+    Chart.defaults.plugins.tooltip.caretSize = 6;
+    Chart.defaults.plugins.tooltip.cornerRadius = 10;
+  }
+
+  const scheduledChartUpdates = new WeakMap();
+
+  function scheduleChartUpdate(chart, mode = 'none') {
+    if (!chart || typeof chart.update !== 'function') return;
+    const pending = scheduledChartUpdates.get(chart);
+    if (pending) {
+      pending.mode = mode === 'none' ? pending.mode : mode;
+      return;
+    }
+    const entry = { mode };
+    scheduledChartUpdates.set(chart, entry);
+    queueMicrotask(() => {
+      scheduledChartUpdates.delete(chart);
+      try {
+        chart.update(entry.mode);
+      } catch (error) {
+        console.warn('Chart-Update fehlgeschlagen', error);
+      }
+    });
+  }
+
+  function createConfigStore(initialState = {}) {
+    let state = { ...initialState };
+    const listeners = new Set();
+    let notifying = false;
+
+    function get() {
+      return state;
+    }
+
+    function assign(patch) {
+      if (!patch || typeof patch !== 'object') {
+        return state;
+      }
+      const next = { ...state };
+      let changed = false;
+      Object.entries(patch).forEach(([key, value]) => {
+        if (next[key] !== value) {
+          next[key] = value;
+          changed = true;
+        }
+      });
+      if (!changed) return state;
+      state = next;
+      queueNotify();
+      return state;
+    }
+
+    function queueNotify() {
+      if (notifying) return;
+      notifying = true;
+      queueMicrotask(() => {
+        notifying = false;
+        const snapshot = state;
+        listeners.forEach((listener) => {
+          try {
+            listener(snapshot);
+          } catch (error) {
+            console.warn('Konfigurations-Listener Fehler', error);
+          }
+        });
+      });
+    }
+
+    function subscribe(listener, emitImmediately = false) {
+      if (typeof listener !== 'function') {
+        return () => {};
+      }
+      listeners.add(listener);
+      if (emitImmediately) {
+        try {
+          listener(state);
+        } catch (error) {
+          console.warn('Konfigurations-Listener Fehler', error);
+        }
+      }
+      return () => listeners.delete(listener);
+    }
+
+    return { get, assign, subscribe };
+  }
+
   const NARROW_SPACE = '\u202f';
   const CIRCUMFERENCE = 339.292;
   const NOW_REFRESH_MS = 60_000;
@@ -145,6 +249,26 @@
     '7d': { label: '7 Tage', range: '7d', step: '45m', win: '2h', samples: 40 },
     '30d': { label: '30 Tage', range: '30d', step: '3h', win: '6h', samples: 45 }
   };
+
+  const SERIES_NAME_ALIASES = new Map([
+    ['Temperatur', ['Temperatur', 'temp_final', 'temperature_final', 'temp']],
+    ['CO2', ['CO2', 'co2', 'co2_ppm']],
+    ['TVOC', ['TVOC', 'tvoc']],
+    ['Lux', ['Lux', 'lux']],
+    ['Farbtemperatur', ['Farbtemperatur', 'cct', 'cct_k']],
+    ['rel. Feuchte', ['rel. Feuchte', 'rel_feuchte', 'humidity']],
+    ['PM1.0', ['PM1.0', 'pm1', 'pm_1']],
+    ['PM2.5', ['PM2.5', 'pm2_5', 'pm25']],
+    ['PM10', ['PM10', 'pm10']]
+  ]);
+
+  const modalConfig = createConfigStore({
+    metric: null,
+    rangeKey: '24h',
+    loading: false,
+    error: null,
+    empty: false
+  });
 
   const METRIC_CONFIG = {
     CO2: { unit: 'ppm', decimals: 0, label: 'CO₂' },
@@ -348,7 +472,10 @@
     Temperatur: {
       sections: [
         { title: 'Bedeutung', text: 'Raumtemperatur beeinflusst direkt das Wohlbefinden, die Konzentration und den Schlaf.' },
-        { title: 'Gesunde Werte', text: '20–24 °C optimal, darunter kühl, darüber ermüdend.' },
+        {
+          title: 'Gesunde Werte',
+          text: '19–22 °C Komfort, darunter kühl, 22–28 °C warm und ab 30 °C deutlich zu heiß.'
+        },
         { title: 'Auswirkungen', text: 'Zu kalt: Unbehagen, trockene Luft. Zu warm: Müdigkeit, sinkende Leistungsfähigkeit.' },
         { title: 'Verbesserung', text: 'Heizen, Beschatten oder Lüften, um die Komfortzone zu halten; Schlafzimmer kühler, Arbeitsräume wärmer.' }
       ],
@@ -356,19 +483,19 @@
         unit: '°C',
         min: 16,
         max: 30,
-        caption: 'Komfortbereich nach Empfehlungen für Wohn- und Arbeitsräume.',
-        stops: [
-          { value: 19, label: 'Kühl', tone: 'elevated' },
-          { value: 22, label: 'Komfort', tone: 'excellent' },
-          { value: 25, label: 'Warm', tone: 'elevated' },
-          { value: 28, label: 'Heiß', tone: 'poor' }
+        caption: 'Bewertung orientiert sich an Empfehlungen für Innenraumtemperaturen.',
+        bands: [
+          { label: 'Kühl', min: 16, max: 19, tone: 'elevated', display: `< 19${NARROW_SPACE}°C` },
+          { label: 'Komfort', min: 19, max: 22, tone: 'excellent' },
+          { label: 'Warm', min: 22, max: 28, tone: 'elevated' },
+          { label: 'Heiß', min: 28, max: 30, tone: 'poor', display: `≥ 30${NARROW_SPACE}°C` }
         ]
       }
     },
     'rel. Feuchte': {
       sections: [
         { title: 'Bedeutung', text: 'Gibt an, wie viel Wasserdampf die Luft enthält – wichtig für Wohlbefinden und Schimmelprävention.' },
-        { title: 'Gesunde Werte', text: '40–55 % ideal.' },
+        { title: 'Gesunde Werte', text: '40–55 % ideal, 35–40 % leicht trocken, über 60 % deutlich feucht.' },
         { title: 'Auswirkungen', text: 'Unter 35 % trockene Schleimhäute; über 60 % Schimmelgefahr.' },
         { title: 'Verbesserung', text: 'Luftbefeuchter oder Pflanzen bei Trockenheit, Stoßlüften oder Entfeuchter bei hoher Feuchte.' }
       ],
@@ -377,11 +504,12 @@
         min: 20,
         max: 80,
         caption: 'Komfortband nach Innenraumempfehlungen für relative Feuchte.',
-        stops: [
-          { value: 35, label: 'Trocken', tone: 'poor' },
-          { value: 45, label: 'Wohlfühl', tone: 'excellent' },
-          { value: 60, label: 'Feucht', tone: 'elevated' },
-          { value: 70, label: 'Nass', tone: 'poor' }
+        bands: [
+          { label: 'Trocken', min: 20, max: 35, tone: 'poor' },
+          { label: 'Übergang', min: 35, max: 40, tone: 'elevated' },
+          { label: 'Wohlfühl', min: 40, max: 55, tone: 'excellent' },
+          { label: 'Übergang', min: 55, max: 60, tone: 'elevated' },
+          { label: 'Feucht/Nass', min: 60, max: 80, tone: 'poor' }
         ]
       }
     },
@@ -452,7 +580,7 @@
     Luftdruck: {
       sections: [
         { title: 'Bedeutung', text: 'Luftdruck schwankt mit dem Wetter und beeinflusst Kreislauf und Wohlbefinden.' },
-        { title: 'Gesunde Werte', text: '980–1030 hPa.' },
+        { title: 'Gesunde Werte', text: '980–1030 hPa normal, darunter Tiefdruck, darüber Hochdruck.' },
         { title: 'Auswirkungen', text: 'Sinkender Druck kann Kopfschmerzen oder Wetterfühligkeit auslösen.' },
         { title: 'Verbesserung', text: 'Keine direkte Steuerung möglich – dient zur Beobachtung von Wettertrends.' }
       ],
@@ -461,11 +589,11 @@
         min: 960,
         max: 1040,
         caption: 'Typischer Bereich für den mitteleuropäischen Luftdruck.',
-        stops: [
-          { value: 980, label: 'Tiefdruck', tone: 'elevated' },
-          { value: 1005, label: 'Neutral', tone: 'good' },
-          { value: 1030, label: 'Hoch', tone: 'excellent' },
-          { value: 1040, label: 'Sehr hoch', tone: 'elevated' }
+        bands: [
+          { label: 'Tiefdruck', min: 960, max: 980, tone: 'elevated' },
+          { label: 'Neutral', min: 980, max: 1005, tone: 'excellent' },
+          { label: 'Hoch', min: 1005, max: 1030, tone: 'good' },
+          { label: 'Sehr hoch', min: 1030, max: 1040, tone: 'excellent', display: `≥ 1 030${NARROW_SPACE}hPa` }
         ]
       }
     }
@@ -580,8 +708,6 @@
     lastUpdatedTs: null,
     sparklines: new Map(),
     modalChart: null,
-    modalMetric: null,
-    modalRangeKey: '24h',
     modalResizeObserver: null,
     modalResizeTarget: null,
     modalResizeTimer: 0,
@@ -591,7 +717,8 @@
     activeModalContent: null,
     activeModalReturnFocus: null,
     bodyScrollLock: null,
-    circadianCharts: { lux: null, cct: null }
+    circadianCharts: { lux: null, cct: null },
+    modalRequestToken: 0
   };
 
   const ui = {
@@ -645,6 +772,9 @@
     modalScaleMarker: null,
     modalScaleMarkerValue: null,
     modalScaleCaption: null,
+    modalState: null,
+    modalStateText: null,
+    modalRetry: null,
     circadianModal: null,
     circadianModalContent: null,
     circadianModalStatus: null,
@@ -754,22 +884,32 @@
     ui.modalScaleMarker = document.getElementById('chart-modal-scale-marker');
     ui.modalScaleMarkerValue = document.getElementById('chart-modal-scale-marker-value');
     ui.modalScaleCaption = document.getElementById('chart-modal-scale-caption');
+    ui.modalState = document.getElementById('chart-modal-state');
+    ui.modalStateText = document.getElementById('chart-modal-state-text');
+    ui.modalRetry = document.getElementById('chart-modal-retry');
+    if (ui.modalRetry) {
+      ui.modalRetry.addEventListener('click', retryModalChart);
+    }
     ui.modalTabList = document.querySelector('.modal-range-tabs');
     ui.modalTabs = Array.from(document.querySelectorAll('.modal-tab'));
     ui.modalCloseButtons = Array.from(ui.modalRoot?.querySelectorAll('[data-close="true"]') || []);
 
     ui.modalTabs.forEach((tab) => {
       tab.addEventListener('click', () => {
-        if (tab.getAttribute('aria-selected') === 'true') return;
-        ui.modalTabs.forEach((other) => other.setAttribute('aria-selected', 'false'));
-        tab.setAttribute('aria-selected', 'true');
         const key = tab.getAttribute('data-range');
-        state.modalRangeKey = key in TIME_RANGES ? key : '24h';
-        if (state.modalMetric) {
-          loadModalChart(state.modalMetric, true).catch(handleError);
+        const rangeKey = key in TIME_RANGES ? key : '24h';
+        const current = modalConfig.get();
+        if (current.rangeKey === rangeKey) return;
+        modalConfig.assign({ rangeKey });
+        const metric = modalConfig.get().metric;
+        if (metric) {
+          queueMicrotask(() => {
+            loadModalChart(metric, true).catch(handleModalError);
+          });
         }
       });
     });
+    modalConfig.subscribe(handleModalConfigChange, true);
 
     ui.modalCloseButtons.forEach((button) => {
       button.addEventListener('click', closeChartModal);
@@ -1003,12 +1143,12 @@
       if (!state.modalChart) return;
       try {
         state.modalChart.resize();
-        state.modalChart.update('none');
+        scheduleChartUpdate(state.modalChart);
         queueModalLayoutSync();
       } catch (error) {
         console.warn('Chart-Resize fehlgeschlagen', error);
       }
-    }, 100);
+    }, 160);
   }
 
   function attachModalResizeHandlers() {
@@ -1146,8 +1286,9 @@
     updateStatusCards(displayData);
     updateCircadian(displayData);
     checkAlerts(displayData);
-    if (state.modalMetric) {
-      refreshModalDetails(state.modalMetric);
+    const activeModalMetric = modalConfig.get().metric;
+    if (activeModalMetric) {
+      refreshModalDetails(activeModalMetric);
     }
     if (displayData['Luftdruck']) {
       refreshPressureTrend().catch((error) => console.warn('Drucktrend Fehler', error));
@@ -1720,7 +1861,7 @@
       ui.circadianCycleLabel.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
     if (ui.circadianCycleMarker) {
-      ui.circadianCycleMarker.style.left = `${bounded}%`;
+      ui.circadianCycleMarker.style.setProperty('--pos', `${bounded}%`);
       const isDaytime = minutes >= 360 && minutes < 1080;
       ui.circadianCycleMarker.dataset.period = isDaytime ? 'day' : 'night';
       ui.circadianCycleMarker.textContent = isDaytime ? '☀' : '☾';
@@ -1895,16 +2036,19 @@
     if (!chart) return;
     chart.data.datasets[0].data = data;
     const unit = METRIC_CONFIG[metricKey]?.unit || '';
+    const hasRange = Array.isArray(targetRange) && targetRange.length >= 2;
     chart.options.plugins.targetGuides = chart.options.plugins.targetGuides || {};
-    chart.options.plugins.targetGuides.guides = [
-      {
-        min: targetRange[0],
-        max: targetRange[1],
-        color: STATUS_TONES.good,
-        label: `Ziel ${formatRangeLabel(targetRange, unit)}`
-      }
-    ];
-    chart.update('none');
+    chart.options.plugins.targetGuides.guides = hasRange
+      ? [
+          {
+            min: targetRange[0],
+            max: targetRange[1],
+            color: STATUS_TONES.good,
+            label: `Ziel ${formatRangeLabel(targetRange, unit)}`
+          }
+        ]
+      : [];
+    scheduleChartUpdate(chart, 'none');
   }
 
   function ensureCircadianChart(kind, definition, metricKey) {
@@ -1982,15 +2126,18 @@
       currentEl.textContent = formatWithUnit(value, scale.unit, 0);
     }
     if (segmentsEl) {
-      const html = bands
-        .map((band) => {
-          const start = computeScalePosition(band.min ?? scale.min, scale);
-          const end = computeScalePosition(band.max ?? scale.max, scale);
-          const color = colorWithAlpha(SCALE_TONES[band.tone] || '#0ea5e9', 0.28);
-          return `<span class="circadian-scale__segment" style="--start:${start};--end:${end};--segment-color:${color}"></span>`;
-        })
-        .join('');
-      segmentsEl.innerHTML = html;
+      segmentsEl.textContent = '';
+      bands.forEach((band) => {
+        const start = computeScalePosition(band.min ?? scale.min, scale);
+        const end = computeScalePosition(band.max ?? scale.max, scale);
+        const color = colorWithAlpha(SCALE_TONES[band.tone] || '#0ea5e9', 0.28);
+        const segment = document.createElement('span');
+        segment.className = 'circadian-scale__segment';
+        segment.style.setProperty('--start', `${start}%`);
+        segment.style.setProperty('--end', `${end}%`);
+        segment.style.setProperty('--segment-color', color);
+        segmentsEl.appendChild(segment);
+      });
     }
     if (labelsEl) {
       if (bands.length) {
@@ -2008,7 +2155,7 @@
     }
     if (markerEl) {
       const percent = computeMarkerPosition(value, scale);
-      markerEl.style.left = `${percent}%`;
+      markerEl.style.setProperty('--pos', `${percent}%`);
       const toneStops = bands.map((band) => ({ value: band.max, tone: band.tone }));
       markerEl.dataset.tone = value == null ? 'neutral' : resolveScaleTone(value, toneStops);
       const labelEl = markerEl.querySelector('.circadian-scale__marker-label');
@@ -2168,38 +2315,83 @@
   }
 
   async function fetchSeries(metrics, range = state.range) {
-    const promises = metrics.map(async (metric) => {
-      const params = new URLSearchParams({
-        name: metric,
-        range: range.range,
-        step: range.step,
-        win: range.win
-      });
-      const response = await fetch(`/api/series?${params.toString()}`);
-      let payload = null;
-      try {
-        payload = await response.clone().json();
-      } catch (error) {
-        payload = null;
-      }
-      if (!response.ok) {
-        throw buildSeriesError(metric, range, payload);
-      }
-      if (!payload) {
-        payload = await response.json();
-      }
-      if (!payload || !payload.ok) {
-        throw buildSeriesError(metric, range, payload);
-      }
-      const values = normalizeSeriesValues(payload.data);
-      const points = values
-        .map((row) => ({ x: row[0] * 1000, y: Number(row[1]) }))
-        .filter((point) => Number.isFinite(point.y));
-      return [metric, limitPoints(points)];
-    });
-
-    const entries = await Promise.all(promises);
+    const entries = await Promise.all(
+      metrics.map(async (metric) => {
+        const series = await fetchSeriesForMetric(metric, range);
+        return [metric, series];
+      })
+    );
     return Object.fromEntries(entries);
+  }
+
+  async function fetchSeriesForMetric(metric, range) {
+    const candidates = resolveSeriesNames(metric);
+    let lastError = null;
+    for (const name of candidates) {
+      try {
+        return await requestSeries(metric, name, range);
+      } catch (error) {
+        if (error?.code === 'unknown_metric') {
+          lastError = error;
+          continue;
+        }
+        throw error;
+      }
+    }
+    if (lastError) {
+      throw lastError;
+    }
+    throw buildSeriesError(metric, range, null);
+  }
+
+  function resolveSeriesNames(metric) {
+    const list = SERIES_NAME_ALIASES.get(metric);
+    if (!Array.isArray(list) || !list.length) {
+      return [metric];
+    }
+    return Array.from(new Set([metric, ...list]));
+  }
+
+  async function requestSeries(metric, queryName, range) {
+    const params = new URLSearchParams({
+      name: queryName,
+      range: range.range,
+      step: range.step,
+      win: range.win
+    });
+    const response = await fetch(`/api/series?${params.toString()}`);
+    let payload = null;
+    try {
+      payload = await response.clone().json();
+    } catch (error) {
+      payload = null;
+    }
+    if (!response.ok) {
+      const err = buildSeriesError(metric, range, payload);
+      if (payload?.error === 'unknown_metric') {
+        err.code = 'unknown_metric';
+      }
+      throw err;
+    }
+    if (!payload || !payload.ok) {
+      const err = buildSeriesError(metric, range, payload);
+      if (payload?.error === 'unknown_metric') {
+        err.code = 'unknown_metric';
+      }
+      throw err;
+    }
+    const values = normalizeSeriesValues(payload.data);
+    const points = values
+      .map((row) => {
+        const ts = Number(row[0]);
+        const val = Number(row[1]);
+        if (!Number.isFinite(ts) || !Number.isFinite(val)) {
+          return null;
+        }
+        return { x: ts * 1000, y: val };
+      })
+      .filter(Boolean);
+    return limitPoints(points);
   }
 
   function buildSeriesError(metric, range, payload) {
@@ -2226,22 +2418,37 @@
       const cacheKey = `${definition.key}_${state.range.range}`;
       const cached = state.chartDataCache.get(cacheKey);
       if (!cached) return;
-      const data = cached[metric] || [];
+      const data = prepareSparklineData(cached[metric] || []);
       sparkline.data.datasets[0].data = data;
-      sparkline.update('none');
-      const tone = ui.heroCards.get(metric)?.dataset?.intent || 'neutral';
-      const color = definition.colors?.[0];
-      if (color) {
-        sparkline.data.datasets[0].borderColor = color;
-        sparkline.data.datasets[0].backgroundColor = colorWithAlpha(color, 0.2);
-      }
-      if (tone === 'warm') {
-        sparkline.data.datasets[0].borderColor = '#f97316';
+      const card = ui.heroCards.get(metric);
+      const sample = state.now?.[metric];
+      const status = sample && isFinite(sample.value) ? determineStatus(metric, sample.value) : null;
+      const tone = status?.tone || status?.intent || 'neutral';
+      const color = toneToColor(tone) || definition.colors?.[0] || '#0ea5e9';
+      sparkline.data.datasets[0].borderColor = color;
+      sparkline.data.datasets[0].backgroundColor = colorWithAlpha(color, 0.18);
+      scheduleChartUpdate(sparkline, 'none');
+      if (card) {
+        const container = card.querySelector('.mini-chart');
+        if (container) {
+          container.classList.toggle('is-empty', data.length < 2);
+        }
       }
     });
   }
 
-  function updateModalTabs(activeKey) {
+  function prepareSparklineData(points) {
+    if (!Array.isArray(points) || points.length === 0) {
+      return [];
+    }
+    if (points.length <= 3) {
+      return points;
+    }
+    const windowSize = points.length > 180 ? 5 : points.length > 90 ? 4 : 3;
+    return movingAverage(points, windowSize);
+  }
+
+  function updateModalTabs(activeKey = modalConfig.get().rangeKey) {
     const key = activeKey in TIME_RANGES ? activeKey : '24h';
     ui.modalTabs.forEach((tab) => {
       tab.setAttribute('aria-selected', tab.getAttribute('data-range') === key ? 'true' : 'false');
@@ -2249,9 +2456,48 @@
     queueModalLayoutSync();
   }
 
+  function handleModalConfigChange(snapshot) {
+    updateModalTabs(snapshot.rangeKey);
+    renderModalState(snapshot);
+  }
+
   function refreshModalDetails(metric) {
     updateModalCurrent(metric);
     updateModalScale(metric);
+  }
+
+  function renderModalState(snapshot = modalConfig.get()) {
+    if (!ui.modalState) return;
+    const loading = Boolean(snapshot.loading);
+    const error = snapshot.error;
+    const empty = Boolean(snapshot.empty) && !error && !loading;
+    const shouldShow = loading || Boolean(error) || empty;
+    ui.modalState.hidden = !shouldShow;
+    ui.modalState.classList.toggle('is-loading', loading);
+    ui.modalState.classList.toggle('is-error', Boolean(error));
+    ui.modalState.classList.toggle('is-empty', empty);
+    if (ui.modalStateText) {
+      let text = '';
+      if (loading) {
+        text = 'Diagramm wird geladen …';
+      } else if (error) {
+        text = error;
+      } else if (empty) {
+        text = 'Keine Daten für dieses Zeitfenster verfügbar.';
+      }
+      ui.modalStateText.textContent = text;
+    }
+    if (ui.modalRetry) {
+      ui.modalRetry.hidden = !error;
+    }
+    if (ui.modalCanvas) {
+      if (loading) {
+        ui.modalCanvas.setAttribute('aria-busy', 'true');
+      } else {
+        ui.modalCanvas.removeAttribute('aria-busy');
+      }
+    }
+    queueModalLayoutSync();
   }
 
   function updateModalInsight(metric) {
@@ -2365,7 +2611,7 @@
         .map((value) => `<span>${formatScaleTick(value, scale.unit)}</span>`)
         .join('');
       if (ui.modalScaleGradient) {
-        ui.modalScaleGradient.style.background = buildBandGradient(scale, bands);
+        ui.modalScaleGradient.style.setProperty('--scale-gradient', buildBandGradient(scale, bands));
       }
     } else {
       ui.modalScale.style.setProperty('--scale-columns', Math.max(stops.length, 1));
@@ -2378,13 +2624,13 @@
         .map((value) => `<span>${formatScaleTick(value, scale.unit)}</span>`)
         .join('');
       if (ui.modalScaleGradient) {
-        ui.modalScaleGradient.style.background = buildScaleGradient(scale, stops);
+        ui.modalScaleGradient.style.setProperty('--scale-gradient', buildScaleGradient(scale, stops));
       }
     }
     const sample = state.now?.[metric];
     const value = sample && isFinite(sample.value) ? sample.value : null;
     const markerPercent = computeMarkerPosition(value, scale);
-    ui.modalScaleMarker.style.left = `${markerPercent}%`;
+    ui.modalScaleMarker.style.setProperty('--marker-pos', `${markerPercent}%`);
     if (value == null) {
       ui.modalScaleMarker.dataset.tone = 'neutral';
       if (ui.modalScaleMarkerValue) {
@@ -2442,7 +2688,7 @@
         : 0;
     const numeric = Number.isFinite(value) ? value : fallback;
     const percent = computeScalePosition(numeric, scale);
-    return clamp(percent, 3, 97);
+    return clamp(percent, 4, 96);
   }
 
   function clampMarkerToTrack(marker, track, percent, offsetVar = '--marker-offset') {
@@ -2579,8 +2825,8 @@
   function openChartModal(metric) {
     const definition = getDefinitionForMetric(metric);
     if (!definition || !ui.modalRoot || !ui.modalCanvas) return;
-    state.modalMetric = metric;
-    updateModalTabs(state.modalRangeKey);
+    modalConfig.assign({ metric, loading: true, error: null, empty: false });
+    updateModalTabs(modalConfig.get().rangeKey);
     updateModalInsight(metric);
     refreshModalDetails(metric);
     ui.modalTitle.textContent = definition.title || metricLabel(metric);
@@ -2590,7 +2836,9 @@
     attachModalResizeHandlers();
     activateModalFocusTrap(ui.modalRoot, ui.modalContent);
     queueModalLayoutSync();
-    loadModalChart(metric, false).catch(handleError);
+    queueMicrotask(() => {
+      loadModalChart(metric, false).catch(handleModalError);
+    });
   }
 
   function closeChartModal() {
@@ -2612,106 +2860,124 @@
       state.modalChart.destroy();
       state.modalChart = null;
     }
-    state.modalMetric = null;
+    modalConfig.assign({ metric: null, loading: false, error: null, empty: false });
   }
 
   async function loadModalChart(metric, force) {
-    const definition = getDefinitionForMetric(metric);
-    if (!definition || !ui.modalCanvas) return;
-    const rangeKey = state.modalRangeKey in TIME_RANGES ? state.modalRangeKey : '24h';
+    const activeMetric = metric || modalConfig.get().metric;
+    if (!activeMetric || !ui.modalCanvas) return;
+    const definition = getDefinitionForMetric(activeMetric);
+    if (!definition) return;
+    const snapshot = modalConfig.get();
+    const rangeKey = snapshot.rangeKey in TIME_RANGES ? snapshot.rangeKey : '24h';
     const range = TIME_RANGES[rangeKey];
-    const data = await ensureSeries(definition, range, force);
-    if (state.modalMetric !== metric) {
-      // The user switched or closed the modal before this request resolved.
-      // Abort so we don't render stale data under the new metric's heading.
-      return;
+    state.modalRequestToken += 1;
+    const requestId = state.modalRequestToken;
+    modalConfig.assign({ loading: true, error: null, empty: false });
+    try {
+      const data = await ensureSeries(definition, range, force);
+      if (state.modalRequestToken !== requestId) {
+        return;
+      }
+      renderModalChart(definition, data, range, activeMetric);
+      const hasData = definition.metrics.some((metricKey) => (data[metricKey] || []).length > 1);
+      modalConfig.assign({ loading: false, error: null, empty: !hasData });
+    } catch (error) {
+      if (state.modalRequestToken !== requestId) {
+        return;
+      }
+      handleModalError(error);
     }
-    renderModalChart(definition, data, range);
   }
 
-  function renderModalChart(definition, data, range) {
+  function renderModalChart(definition, data, range, activeMetric) {
     if (!ui.modalCanvas) return;
     const ctx = ui.modalCanvas.getContext('2d');
     if (!ctx) return;
-    if (state.modalChart) {
-      state.modalChart.destroy();
-    }
-    const datasets = definition.metrics.map((metric, index) => ({
-      label: METRIC_CONFIG[metric]?.label || metric,
-      data: data[metric] || [],
-      borderColor: definition.colors[index % definition.colors.length],
-      backgroundColor: colorWithAlpha(definition.colors[index % definition.colors.length], 0.12),
-      tension: 0.35,
-      fill: 'start',
-      pointRadius: 0,
-      pointHitRadius: 18,
-      pointHoverRadius: 4,
-      borderWidth: 2,
-      spanGaps: true
-    }));
-
-    const timeUnit = range.range === '24h' ? 'hour' : range.range === '7d' ? 'day' : 'week';
-    const guides = buildTargetGuides(state.modalMetric || definition.metrics[0]);
-
-    state.modalChart = new Chart(ctx, {
-      type: 'line',
-      data: { datasets },
-      plugins: [targetGuidePlugin],
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        layout: { padding: { top: 8, right: 12, bottom: 8, left: 6 } },
-        plugins: {
-          legend: { labels: { color: '#475569', boxWidth: 12, boxHeight: 12, padding: 12 } },
-          tooltip: {
-            displayColors: false,
-            padding: 10,
-            boxPadding: 4,
-            cornerRadius: 10,
-            caretSize: 6,
-            backgroundColor: 'rgba(15, 23, 42, 0.92)',
-            position: 'nearest',
-            callbacks: {
-              label(context) {
-                const metricKey = definition.metrics[context.datasetIndex];
-                const cfg = METRIC_CONFIG[metricKey];
-                const valueLabel = formatWithUnit(context.parsed.y, cfg?.unit || '', cfg?.decimals ?? 0);
-                const status = determineStatus(metricKey, context.parsed.y);
-                const suffix = status?.label ? ` – ${status.label}` : '';
-                return `${context.dataset.label}: ${valueLabel}${suffix}`;
-              }
-            }
-          },
-          targetGuides: { guides }
-        },
-        scales: {
-          x: {
-            type: 'time',
-            time: { unit: timeUnit, tooltipFormat: 'dd.MM.yyyy HH:mm' },
-            ticks: { maxRotation: 0, maxTicksLimit: 6, color: '#94a3b8' },
-            grid: { display: false, drawBorder: false },
-            border: { display: false }
-          },
-          y: {
-            title: { display: true, text: definition.yTitle, color: '#9ca3af' },
-            ticks: {
-              color: '#94a3b8',
-              maxTicksLimit: 6,
-              callback(value) {
-                return formatScaleTick(value, definition.yTitle);
-              }
-            },
-            grid: { color: 'rgba(148, 163, 184, 0.12)', lineWidth: 1, drawBorder: false },
-            border: { display: false },
-            suggestedMin: definition.yBounds?.min,
-            suggestedMax: definition.yBounds?.max
-          }
-        }
-      }
+    const datasets = definition.metrics.map((metric, index) => {
+      const color = definition.colors[index % definition.colors.length];
+      return {
+        label: METRIC_CONFIG[metric]?.label || metric,
+        data: data[metric] || [],
+        borderColor: color,
+        backgroundColor: colorWithAlpha(color, 0.12),
+        tension: 0.35,
+        fill: 'start',
+        pointRadius: 0,
+        pointHitRadius: 18,
+        pointHoverRadius: 4,
+        borderWidth: 2,
+        spanGaps: true
+      };
     });
 
-    const label = METRIC_CONFIG[state.modalMetric || definition.metrics[0]]?.label || definition.title || definition.key;
+    const timeUnit = range.range === '24h' ? 'hour' : range.range === '7d' ? 'day' : 'week';
+    const guides = buildTargetGuides(activeMetric || definition.metrics[0]);
+    const tooltipLabel = (context) => {
+      const metricKey = definition.metrics[context.datasetIndex];
+      const cfg = METRIC_CONFIG[metricKey];
+      const valueLabel = formatWithUnit(context.parsed.y, cfg?.unit || '', cfg?.decimals ?? 0);
+      const status = determineStatus(metricKey, context.parsed.y);
+      const suffix = status?.label ? ` – ${status.label}` : '';
+      return `${context.dataset.label}: ${valueLabel}${suffix}`;
+    };
+
+    if (!state.modalChart) {
+      state.modalChart = new Chart(ctx, {
+        type: 'line',
+        data: { datasets },
+        plugins: [targetGuidePlugin],
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          layout: { padding: { top: 8, right: 12, bottom: 8, left: 6 } },
+          plugins: {
+            legend: { labels: { color: '#475569', boxWidth: 12, boxHeight: 12, padding: 12 } },
+            tooltip: {
+              callbacks: { label: tooltipLabel }
+            },
+            targetGuides: { guides }
+          },
+          scales: {
+            x: {
+              type: 'time',
+              time: { unit: timeUnit, tooltipFormat: 'dd.MM.yyyy HH:mm' },
+              ticks: { maxRotation: 0, maxTicksLimit: 6, color: '#94a3b8' },
+              grid: { display: false, drawBorder: false },
+              border: { display: false }
+            },
+            y: {
+              title: { display: true, text: definition.yTitle, color: '#9ca3af' },
+              ticks: {
+                color: '#94a3b8',
+                maxTicksLimit: 6,
+                callback(value) {
+                  return formatScaleTick(value, definition.yTitle);
+                }
+              },
+              grid: { color: 'rgba(148, 163, 184, 0.12)', lineWidth: 1, drawBorder: false },
+              border: { display: false },
+              suggestedMin: definition.yBounds?.min,
+              suggestedMax: definition.yBounds?.max
+            }
+          }
+        }
+      });
+    } else {
+      state.modalChart.data.datasets = datasets;
+      state.modalChart.options.plugins.targetGuides = { guides };
+      state.modalChart.options.plugins.tooltip = state.modalChart.options.plugins.tooltip || {};
+      state.modalChart.options.plugins.tooltip.callbacks =
+        state.modalChart.options.plugins.tooltip.callbacks || {};
+      state.modalChart.options.plugins.tooltip.callbacks.label = tooltipLabel;
+      state.modalChart.options.scales.x.time.unit = timeUnit;
+      state.modalChart.options.scales.y.title.text = definition.yTitle;
+      state.modalChart.options.scales.y.suggestedMin = definition.yBounds?.min;
+      state.modalChart.options.scales.y.suggestedMax = definition.yBounds?.max;
+    }
+
+    const label = METRIC_CONFIG[activeMetric || definition.metrics[0]]?.label || definition.title || definition.key;
     ui.modalTitle.textContent = label;
     const subParts = [range.label];
     if (definition.sub) {
@@ -2720,8 +2986,27 @@
       subParts.push(definition.yTitle);
     }
     ui.modalSub.textContent = subParts.join(' • ');
+    scheduleChartUpdate(state.modalChart);
     scheduleModalResize();
     queueModalLayoutSync();
+  }
+
+  function handleModalError(error) {
+    console.warn('Modal-Chart konnte nicht geladen werden', error);
+    const message = typeof error === 'string' ? error : error?.message || 'Diagramm konnte nicht geladen werden.';
+    modalConfig.assign({ loading: false, error: message, empty: false });
+    showToast(message);
+  }
+
+  function retryModalChart() {
+    const snapshot = modalConfig.get();
+    if (!snapshot.metric) {
+      return;
+    }
+    modalConfig.assign({ error: null, loading: true });
+    queueMicrotask(() => {
+      loadModalChart(snapshot.metric, true).catch(handleModalError);
+    });
   }
 
   function buildTargetGuides(metric) {
@@ -2776,14 +3061,14 @@
       .map((entry) => {
         if (!entry) return null;
         if (Array.isArray(entry) && entry.length >= 2) {
-          return [Number(entry[0]), Number(entry[1])];
+          const ts = coerceTimestamp(entry[0]);
+          const val = coerceNumeric(entry[1]);
+          return Number.isFinite(ts) && Number.isFinite(val) ? [ts, val] : null;
         }
         if (typeof entry === 'object') {
-          const ts = 'x' in entry ? Number(entry.x) : Number(entry.ts);
-          const val = 'y' in entry ? Number(entry.y) : Number(entry.value);
-          if (Number.isFinite(ts) && Number.isFinite(val)) {
-            return [ts, val];
-          }
+          const ts = coerceTimestamp('x' in entry ? entry.x : entry.ts);
+          const val = coerceNumeric('y' in entry ? entry.y : entry.value);
+          return Number.isFinite(ts) && Number.isFinite(val) ? [ts, val] : null;
         }
         return null;
       })
@@ -2792,6 +3077,43 @@
     return containsMilliseconds
       ? normalized.map(([ts, val]) => [ts / 1000, val])
       : normalized;
+  }
+
+  function coerceTimestamp(value) {
+    if (value == null) return NaN;
+    if (value instanceof Date) {
+      const time = value.getTime();
+      return Number.isFinite(time) ? time / 1000 : NaN;
+    }
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : NaN;
+    }
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      const numeric = Number(trimmed);
+      if (Number.isFinite(numeric)) {
+        return numeric;
+      }
+      const parsed = Date.parse(trimmed);
+      if (Number.isFinite(parsed)) {
+        return parsed / 1000;
+      }
+    }
+    return NaN;
+  }
+
+  function coerceNumeric(value) {
+    if (value == null) return NaN;
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : NaN;
+    }
+    if (typeof value === 'string') {
+      const cleaned = value.replace(/\u202f/g, '').replace(/\s+/g, '');
+      const normalized = cleaned.replace(/,/g, '.');
+      const numeric = Number(normalized);
+      return Number.isFinite(numeric) ? numeric : NaN;
+    }
+    return NaN;
   }
 
   function smoothSeries(series) {
@@ -2804,9 +3126,9 @@
   }
 
   function resolveWindowSize(length) {
-    if (length > 400) return 7;
-    if (length > 120) return 6;
-    return 5;
+    if (length > 400) return 5;
+    if (length > 120) return 4;
+    return 3;
   }
 
   function limitPoints(points) {
@@ -2888,7 +3210,7 @@
         navigator.serviceWorker.ready.then((registration) => {
           registration.showNotification('AirGuard Hinweis', {
             body: message,
-            icon: '/icons/icon-192.png',
+            icon: '/assets/logo.png',
             tag: 'airguard-alert'
           });
         });
