@@ -11,8 +11,27 @@
   if (Array.isArray(Chart.registerables)) {
     Chart.register(...Chart.registerables);
   }
+  function assignGuides(options, guides) {
+    if (!options) {
+      return;
+    }
+    const target = Array.isArray(options.guides) ? options.guides : (options.guides = []);
+    target.length = 0;
+    if (!Array.isArray(guides) || guides.length === 0) {
+      return;
+    }
+    guides.forEach((guide) => {
+      if (guide && typeof guide === 'object') {
+        target.push({ ...guide });
+      }
+    });
+  }
+
   const targetGuidePlugin = {
     id: 'targetGuides',
+    defaults: {
+      guides: []
+    },
     afterDraw(chart, _args, opts) {
       const guides = opts?.guides;
       if (!Array.isArray(guides) || guides.length === 0) return;
@@ -2283,8 +2302,9 @@
     chart.data.datasets[0].data = data;
     const unit = METRIC_CONFIG[metricKey]?.unit || '';
     const hasRange = Array.isArray(targetRange) && targetRange.length >= 2;
-    chart.options.plugins.targetGuides = chart.options.plugins.targetGuides || {};
-    chart.options.plugins.targetGuides.guides = hasRange
+    const targetGuideOptions = chart.options.plugins.targetGuides
+      || (chart.options.plugins.targetGuides = {});
+    const rangeGuides = hasRange
       ? [
           {
             min: targetRange[0],
@@ -2294,6 +2314,7 @@
           }
         ]
       : [];
+    assignGuides(targetGuideOptions, rangeGuides);
     chart.options.plugins.tooltip = chart.options.plugins.tooltip || {};
     chart.options.plugins.tooltip.enabled = Array.isArray(data) && data.length > 0;
     scheduleChartUpdate(chart, 'none');
@@ -3609,7 +3630,9 @@
     } else {
       resetTooltipState(state.modalChart);
       state.modalChart.data.datasets = datasets;
-      state.modalChart.options.plugins.targetGuides = { guides };
+      const targetGuideOptions = state.modalChart.options.plugins.targetGuides
+        || (state.modalChart.options.plugins.targetGuides = {});
+      assignGuides(targetGuideOptions, guides);
       state.modalChart.options.plugins.tooltip = state.modalChart.options.plugins.tooltip || {};
       state.modalChart.options.plugins.tooltip.callbacks =
         state.modalChart.options.plugins.tooltip.callbacks || {};
