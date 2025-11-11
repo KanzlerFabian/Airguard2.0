@@ -89,42 +89,46 @@
   }
 
   if (Chart?.Tooltip) {
-    const tooltipProto = Chart.Tooltip.prototype;
-    const originalHandleEvent = typeof tooltipProto.handleEvent === 'function'
-      ? tooltipProto.handleEvent
-      : null;
-    tooltipProto.handleEvent = function patchedHandleEvent(event, ...args) {
-      const chart = this?.chart;
-      const active = typeof chart?.getActiveElements === 'function' ? chart.getActiveElements() : [];
-      const hasActive = Array.isArray(active) && active.length > 0;
-      if (!hasActive) {
-        this._active = [];
-        this.opacity = 0;
-        return false;
-      }
-      if (this.caretX == null || this.caretY == null) {
-        return false;
-      }
-      if (!originalHandleEvent) {
-        return false;
-      }
-      return originalHandleEvent.call(this, event, ...args);
-    };
-
-    if (typeof tooltipProto._positionChanged === 'function') {
-      const originalPositionChanged = tooltipProto._positionChanged;
-      tooltipProto._positionChanged = function patchedPositionChanged(previous, caretPosition) {
+    const tooltipProto = Chart.Tooltip?.prototype;
+    if (!tooltipProto) {
+      console.info('Tooltip patch übersprungen: Prototyp nicht verfügbar.');
+    } else {
+      const originalHandleEvent = typeof tooltipProto.handleEvent === 'function'
+        ? tooltipProto.handleEvent
+        : null;
+      tooltipProto.handleEvent = function patchedHandleEvent(event, ...args) {
         const chart = this?.chart;
         const active = typeof chart?.getActiveElements === 'function' ? chart.getActiveElements() : [];
         const hasActive = Array.isArray(active) && active.length > 0;
         if (!hasActive) {
+          this._active = [];
+          this.opacity = 0;
           return false;
         }
         if (this.caretX == null || this.caretY == null) {
           return false;
         }
-        return originalPositionChanged.call(this, previous, caretPosition);
+        if (!originalHandleEvent) {
+          return false;
+        }
+        return originalHandleEvent.call(this, event, ...args);
       };
+
+      if (typeof tooltipProto._positionChanged === 'function') {
+        const originalPositionChanged = tooltipProto._positionChanged;
+        tooltipProto._positionChanged = function patchedPositionChanged(previous, caretPosition) {
+          const chart = this?.chart;
+          const active = typeof chart?.getActiveElements === 'function' ? chart.getActiveElements() : [];
+          const hasActive = Array.isArray(active) && active.length > 0;
+          if (!hasActive) {
+            return false;
+          }
+          if (this.caretX == null || this.caretY == null) {
+            return false;
+          }
+          return originalPositionChanged.call(this, previous, caretPosition);
+        };
+      }
     }
   }
 
