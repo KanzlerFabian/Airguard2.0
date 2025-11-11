@@ -101,7 +101,7 @@
         if (args && typeof args === 'object') {
           args.cancel = true;
         }
-        return;
+        return false;
       }
       const active = typeof chart?.getActiveElements === 'function' ? chart.getActiveElements() : [];
       if (!Array.isArray(active) || active.length === 0) {
@@ -192,7 +192,7 @@
       return;
     }
     try {
-      chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+      chart.tooltip.setActiveElements([]);
     } catch (error) {
       console.debug('Tooltip konnte nicht zurückgesetzt werden', error);
     }
@@ -236,50 +236,6 @@
     Chart.defaults.plugins.tooltip.cornerRadius = 10;
   }
 
-  if (Chart?.Tooltip) {
-    const tooltipProto = Chart.Tooltip?.prototype;
-    if (!tooltipProto) {
-      console.info('Tooltip patch übersprungen: Prototyp nicht verfügbar.');
-    } else {
-      const originalHandleEvent = typeof tooltipProto.handleEvent === 'function'
-        ? tooltipProto.handleEvent
-        : null;
-      tooltipProto.handleEvent = function patchedHandleEvent(event, ...args) {
-        const chart = this?.chart;
-        const active = typeof chart?.getActiveElements === 'function' ? chart.getActiveElements() : [];
-        const hasActive = Array.isArray(active) && active.length > 0;
-        if (!hasActive) {
-          this._active = [];
-          this.opacity = 0;
-          return false;
-        }
-        if (this.caretX == null || this.caretY == null) {
-          return false;
-        }
-        if (!originalHandleEvent) {
-          return false;
-        }
-        return originalHandleEvent.call(this, event, ...args);
-      };
-
-      if (typeof tooltipProto._positionChanged === 'function') {
-        const originalPositionChanged = tooltipProto._positionChanged;
-        tooltipProto._positionChanged = function patchedPositionChanged(previous, caretPosition) {
-          const chart = this?.chart;
-          const active = typeof chart?.getActiveElements === 'function' ? chart.getActiveElements() : [];
-          const hasActive = Array.isArray(active) && active.length > 0;
-          if (!hasActive) {
-            return false;
-          }
-          if (this.caretX == null || this.caretY == null) {
-            return false;
-          }
-          return originalPositionChanged.call(this, previous, caretPosition);
-        };
-      }
-    }
-  }
-
   const scheduledChartUpdates = new WeakMap();
 
   function scheduleChartUpdate(chart, mode = 'none') {
@@ -304,7 +260,26 @@
   function createConfigStore(initialState = {}) {
     let state = { ...initialState };
     const listeners = new Set();
-    let notifying = false;
+    let notifyScheduled = false;
+    let emitDepth = 0;
+    let updating = false;
+    let pendingPatch = null;
+    let flushScheduled = false;
+    const DEV_ASSERTS = (() => {
+      try {
+        if (window?.AIRGUARD_DISABLE_ASSERTS) return false;
+        const host = window?.location?.hostname || '';
+        return host === 'localhost' || host.endsWith('.local') || host === '';
+      } catch (error) {
+        return false;
+      }
+    })();
+
+    /**
+     * Hinweis für Listener: Subscriber dürfen den Store innerhalb einer Benachrichtigung
+     * nicht erneut mutieren. Das Zeichnen/Lesen ist erlaubt, Mutationen lösen jedoch
+     * in der Entwicklungsumgebung einen Assert aus und werden in Produktion ignoriert.
+     */
 
     function get() {
       return state;
@@ -322,26 +297,84 @@
           changed = true;
         }
       });
-      if (!changed) return state;
+      if (!changed) {
+        return state;
+      }
       state = next;
-      queueNotify();
+      scheduleNotify();
       return state;
     }
 
-    function queueNotify() {
-      if (notifying) return;
-      notifying = true;
+    function scheduleNotify() {
+      if (notifyScheduled) return;
+      notifyScheduled = true;
       queueMicrotask(() => {
-        notifying = false;
+        notifyScheduled = false;
+        if (!listeners.size) {
+          return;
+        }
         const snapshot = state;
-        listeners.forEach((listener) => {
-          try {
-            listener(snapshot);
-          } catch (error) {
-            console.warn('Konfigurations-Listener Fehler', error);
-          }
-        });
+        listeners.forEach((listener) => invokeListener(listener, snapshot));
       });
+    }
+
+    function invokeListener(listener, snapshot) {
+      if (typeof listener !== 'function') {
+        return;
+      }
+      emitDepth += 1;
+      try {
+        listener(snapshot);
+      } catch (error) {
+        console.warn('Konfigurations-Listener Fehler', error);
+      } finally {
+        emitDepth = Math.max(emitDepth - 1, 0);
+      }
+    }
+
+    function schedulePendingFlush() {
+      if (flushScheduled) {
+        return;
+      }
+      flushScheduled = true;
+      queueMicrotask(() => {
+        flushScheduled = false;
+        if (!pendingPatch) {
+          return;
+        }
+        const patch = pendingPatch;
+        pendingPatch = null;
+        set(patch);
+      });
+    }
+
+    function set(patch) {
+      if (!patch || typeof patch !== 'object') {
+        return state;
+      }
+      if (emitDepth > 0) {
+        const message = 'Konfigurations-Listener dürfen createConfigStore.set nicht aufrufen.';
+        if (DEV_ASSERTS) {
+          throw new Error(message);
+        }
+        console.warn(message);
+        return state;
+      }
+      if (updating) {
+        pendingPatch = { ...(pendingPatch || {}), ...patch };
+        schedulePendingFlush();
+        return state;
+      }
+      updating = true;
+      try {
+        assign(patch);
+      } finally {
+        updating = false;
+      }
+      if (pendingPatch) {
+        schedulePendingFlush();
+      }
+      return state;
     }
 
     function subscribe(listener, emitImmediately = false) {
@@ -350,16 +383,12 @@
       }
       listeners.add(listener);
       if (emitImmediately) {
-        try {
-          listener(state);
-        } catch (error) {
-          console.warn('Konfigurations-Listener Fehler', error);
-        }
+        invokeListener(listener, state);
       }
       return () => listeners.delete(listener);
     }
 
-    return { get, assign, subscribe };
+    return { get, set, assign, subscribe };
   }
 
   const NARROW_SPACE = '\u202f';
@@ -1165,7 +1194,7 @@
         const rangeKey = key in TIME_RANGES ? key : '24h';
         const current = modalConfig.get();
         if (current.rangeKey === rangeKey) return;
-        modalConfig.assign({ rangeKey });
+        modalConfig.set({ rangeKey });
         const metric = modalConfig.get().metric;
         if (metric) {
           queueMicrotask(() => {
@@ -3437,7 +3466,7 @@
   function openChartModal(metric) {
     const definition = getDefinitionForMetric(metric);
     if (!definition || !ui.modalRoot || !ui.modalCanvas) return;
-    modalConfig.assign({ metric, loading: true, error: null, empty: false });
+    modalConfig.set({ metric, loading: true, error: null, empty: false });
     updateModalTabs(modalConfig.get().rangeKey);
     updateModalInsight(metric);
     refreshModalDetails(metric);
@@ -3477,7 +3506,7 @@
       unlockBodyScroll();
     }
     teardownModalChart();
-    modalConfig.assign({ metric: null, loading: false, error: null, empty: false });
+    modalConfig.set({ metric: null, loading: false, error: null, empty: false });
   }
 
   async function loadModalChart(metric, force) {
@@ -3499,7 +3528,7 @@
     }
     const controller = new AbortController();
     state.modalAbortController = controller;
-    modalConfig.assign({ loading: true, error: null, empty: false });
+    modalConfig.set({ loading: true, error: null, empty: false });
     try {
       const data = await ensureSeries(definition, range, force, { signal: controller.signal });
       if (state.modalRequestToken !== requestId) {
@@ -3514,14 +3543,14 @@
       applyModalHeading(definition, range, activeMetric);
       if (!hasData) {
         teardownModalChart();
-        modalConfig.assign({ loading: false, error: null, empty: true });
+        modalConfig.set({ loading: false, error: null, empty: true });
         if (state.modalAbortController === controller) {
           state.modalAbortController = null;
         }
         return;
       }
       renderModalChart(definition, data, range, activeMetric);
-      modalConfig.assign({ loading: false, error: null, empty: false });
+      modalConfig.set({ loading: false, error: null, empty: false });
       if (state.modalAbortController === controller) {
         state.modalAbortController = null;
       }
@@ -3628,7 +3657,7 @@
       });
       recordTooltipPreference(state.modalChart, tooltipEnabled);
     } else {
-      resetTooltipState(state.modalChart);
+      clearActiveElements(state.modalChart);
       state.modalChart.data.datasets = datasets;
       const targetGuideOptions = state.modalChart.options.plugins.targetGuides
         || (state.modalChart.options.plugins.targetGuides = {});
@@ -3645,7 +3674,7 @@
       recordTooltipPreference(state.modalChart, tooltipEnabled);
     }
     syncChartInteractionState(state.modalChart, tooltipEnabled);
-    scheduleChartUpdate(state.modalChart);
+    scheduleChartUpdate(state.modalChart, 'none');
     scheduleModalResize();
     queueModalLayoutSync();
   }
@@ -3653,7 +3682,7 @@
   function handleModalError(error) {
     console.warn('Modal-Chart konnte nicht geladen werden', error);
     const message = typeof error === 'string' ? error : error?.message || 'Diagramm konnte nicht geladen werden.';
-    modalConfig.assign({ loading: false, error: message, empty: false });
+    modalConfig.set({ loading: false, error: message, empty: false });
     showToast(message);
   }
 
@@ -3662,7 +3691,7 @@
     if (!snapshot.metric) {
       return;
     }
-    modalConfig.assign({ error: null, loading: true });
+    modalConfig.set({ error: null, loading: true });
     queueMicrotask(() => {
       loadModalChart(snapshot.metric, true).catch(handleModalError);
     });
