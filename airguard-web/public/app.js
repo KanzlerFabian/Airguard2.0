@@ -2382,8 +2382,15 @@
     }
     const values = normalizeSeriesValues(payload.data);
     const points = values
-      .map((row) => ({ x: row[0] * 1000, y: Number(row[1]) }))
-      .filter((point) => Number.isFinite(point.y));
+      .map((row) => {
+        const ts = Number(row[0]);
+        const val = Number(row[1]);
+        if (!Number.isFinite(ts) || !Number.isFinite(val)) {
+          return null;
+        }
+        return { x: ts * 1000, y: val };
+      })
+      .filter(Boolean);
     return limitPoints(points);
   }
 
@@ -3054,14 +3061,14 @@
       .map((entry) => {
         if (!entry) return null;
         if (Array.isArray(entry) && entry.length >= 2) {
-          return [Number(entry[0]), Number(entry[1])];
+          const ts = coerceTimestamp(entry[0]);
+          const val = coerceNumeric(entry[1]);
+          return Number.isFinite(ts) && Number.isFinite(val) ? [ts, val] : null;
         }
         if (typeof entry === 'object') {
-          const ts = 'x' in entry ? Number(entry.x) : Number(entry.ts);
-          const val = 'y' in entry ? Number(entry.y) : Number(entry.value);
-          if (Number.isFinite(ts) && Number.isFinite(val)) {
-            return [ts, val];
-          }
+          const ts = coerceTimestamp('x' in entry ? entry.x : entry.ts);
+          const val = coerceNumeric('y' in entry ? entry.y : entry.value);
+          return Number.isFinite(ts) && Number.isFinite(val) ? [ts, val] : null;
         }
         return null;
       })
@@ -3070,6 +3077,43 @@
     return containsMilliseconds
       ? normalized.map(([ts, val]) => [ts / 1000, val])
       : normalized;
+  }
+
+  function coerceTimestamp(value) {
+    if (value == null) return NaN;
+    if (value instanceof Date) {
+      const time = value.getTime();
+      return Number.isFinite(time) ? time / 1000 : NaN;
+    }
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : NaN;
+    }
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      const numeric = Number(trimmed);
+      if (Number.isFinite(numeric)) {
+        return numeric;
+      }
+      const parsed = Date.parse(trimmed);
+      if (Number.isFinite(parsed)) {
+        return parsed / 1000;
+      }
+    }
+    return NaN;
+  }
+
+  function coerceNumeric(value) {
+    if (value == null) return NaN;
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : NaN;
+    }
+    if (typeof value === 'string') {
+      const cleaned = value.replace(/\u202f/g, '').replace(/\s+/g, '');
+      const normalized = cleaned.replace(/,/g, '.');
+      const numeric = Number(normalized);
+      return Number.isFinite(numeric) ? numeric : NaN;
+    }
+    return NaN;
   }
 
   function smoothSeries(series) {
