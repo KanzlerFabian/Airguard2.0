@@ -3609,7 +3609,9 @@
     } else {
       resetTooltipState(state.modalChart);
       state.modalChart.data.datasets = datasets;
-      state.modalChart.options.plugins.targetGuides = { guides };
+      const targetGuideOptions = state.modalChart.options.plugins.targetGuides
+        || (state.modalChart.options.plugins.targetGuides = {});
+      targetGuideOptions.guides = guides;
       state.modalChart.options.plugins.tooltip = state.modalChart.options.plugins.tooltip || {};
       state.modalChart.options.plugins.tooltip.callbacks =
         state.modalChart.options.plugins.tooltip.callbacks || {};
