@@ -4,6 +4,7 @@ const path = require('path');
 const express = require('express');
 const compression = require('compression');
 const helmet = require('helmet');
+const DataStore = require('./data-store');
 
 if (typeof fetch !== 'function') {
   throw new Error('Global fetch API not available. Please run with Node.js v18 or newer.');
@@ -162,6 +163,11 @@ if (!isProduction) {
 }
 
 
+const dataStore = new DataStore(path.join(__dirname, '.cache', 'metrics.json'));
+dataStore.ready.catch((error) => {
+  console.warn('[airguard-web] Failed to initialise cache store:', error);
+});
+
 const app = express();
 app.set('trust proxy', true);
 app.disable('x-powered-by');
@@ -248,6 +254,7 @@ app.post('/push/test', (req, res) => {
 
 app.get('/api/now', async (req, res, next) => {
   try {
+    await dataStore.ready;
     const payload = await fetchPrometheus('query', { query: 'esphome_sensor_value' });
     const results = Array.isArray(payload?.data?.result) ? payload.data.result : [];
     const data = {};
@@ -287,21 +294,47 @@ app.get('/api/now', async (req, res, next) => {
       };
     }
 
-    sendJSON(res, {
+    const responsePayload = {
       ok: true,
       ts: Date.now(),
       data,
       meta: { metrics: METRICS }
-    });
+    };
+
+    dataStore
+      .recordSnapshot({
+        ts: responsePayload.ts,
+        data: responsePayload.data,
+        meta: responsePayload.meta
+      })
+      .catch((error) => {
+        console.warn('[airguard-web] Failed to cache snapshot:', error);
+      });
+
+    sendJSON(res, responsePayload);
   } catch (error) {
+    try {
+      const cached = dataStore.latestSnapshot();
+      if (cached) {
+        sendJSON(res, { ok: true, cached: true, ts: cached.ts, data: cached.data, meta: cached.meta });
+        return;
+      }
+    } catch (cacheError) {
+      console.warn('[airguard-web] Failed to serve cached snapshot:', cacheError);
+    }
     next(error);
   }
 });
 
 app.get('/api/series', async (req, res, next) => {
+  let metric;
+  let rangeLiteral;
+  let stepLiteral;
+  let windowLiteral;
   try {
+    await dataStore.ready;
     const nameLiteral = String(req.query.name || '');
-    const metric = QUERY_LOOKUP.get(normalizeQueryName(nameLiteral));
+    metric = QUERY_LOOKUP.get(normalizeQueryName(nameLiteral));
 
     if (!metric) {
       return sendJSON(
@@ -311,9 +344,9 @@ app.get('/api/series', async (req, res, next) => {
       );
     }
 
-    const rangeLiteral = req.query.range ? String(req.query.range) : '24h';
-    const stepLiteral = req.query.step ? String(req.query.step) : '120s';
-    const windowLiteral = req.query.win ? String(req.query.win) : '10m';
+    rangeLiteral = req.query.range ? String(req.query.range) : '24h';
+    stepLiteral = req.query.step ? String(req.query.step) : '120s';
+    windowLiteral = req.query.win ? String(req.query.win) : '10m';
 
     const rangeSeconds = parseDuration(rangeLiteral);
     const stepSeconds = parseDuration(stepLiteral);
@@ -375,7 +408,7 @@ app.get('/api/series', async (req, res, next) => {
       })
       .filter(Boolean);
 
-    sendJSON(res, {
+    const responsePayload = {
       ok: true,
       ts: Date.now(),
       data,
@@ -385,8 +418,42 @@ app.get('/api/series', async (req, res, next) => {
         step: stepLiteral,
         win: windowLiteral
       }
-    });
+    };
+
+    dataStore
+      .recordSeries(metric.slug || metric.key, { range: rangeLiteral, step: stepLiteral, win: windowLiteral }, responsePayload)
+      .catch((error) => {
+        console.warn('[airguard-web] Failed to cache series:', error);
+      });
+
+    sendJSON(res, responsePayload);
   } catch (error) {
+    if (metric && rangeLiteral && stepLiteral && windowLiteral) {
+      try {
+        const cached = dataStore.findSeries(metric.slug || metric.key, {
+          range: rangeLiteral,
+          step: stepLiteral,
+          win: windowLiteral
+        });
+        if (cached) {
+          sendJSON(res, {
+            ok: true,
+            cached: true,
+            ts: cached.ts || Date.now(),
+            data: Array.isArray(cached.data) ? cached.data : [],
+            meta: cached.meta || {
+              name: metric.key,
+              range: rangeLiteral,
+              step: stepLiteral,
+              win: windowLiteral
+            }
+          });
+          return;
+        }
+      } catch (cacheError) {
+        console.warn('[airguard-web] Failed to serve cached series:', cacheError);
+      }
+    }
     next(error);
   }
 });
