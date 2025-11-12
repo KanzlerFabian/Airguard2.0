@@ -475,20 +475,54 @@ app.use((err, req, res, next) => {
   }
 });
 
-const server = app.listen(PORT, () => {
-  console.log(`[airguard-web] Listening on http://127.0.0.1:${PORT} (Prometheus: ${PROM_URL})`);
-});
+let server = null;
+
+function startServer(targetPort, allowRetry = true) {
+  const instance = app
+    .listen(targetPort, () => {
+      const address = instance.address();
+      const actualPort = typeof address === 'object' && address ? address.port : targetPort;
+      console.log(
+        `[airguard-web] Listening on http://127.0.0.1:${actualPort} (Prometheus: ${PROM_URL})`
+      );
+    })
+    .on('error', (error) => {
+      if (error?.code === 'EADDRINUSE' && allowRetry) {
+        try {
+          instance.close();
+        } catch (closeError) {
+          console.warn('[airguard-web] Failed to close server after EADDRINUSE:', closeError);
+        }
+        console.warn(
+          `[airguard-web] Port ${targetPort} already in use, retrying on a random free port...`
+        );
+        startServer(0, false);
+        return;
+      }
+      console.error('[airguard-web] Failed to start server:', error);
+      process.exitCode = 1;
+    });
+
+  server = instance;
+  return instance;
+}
+
+startServer(PORT);
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 function gracefulShutdown(signal) {
   console.log(`[airguard-web] Received ${signal}, shutting down...`);
-  server.close(() => {
-    console.log('[airguard-web] Shutdown complete');
+  if (server && typeof server.close === 'function') {
+    server.close(() => {
+      console.log('[airguard-web] Shutdown complete');
+      process.exit(0);
+    });
+    setTimeout(() => process.exit(1), 10000).unref();
+  } else {
     process.exit(0);
-  });
-  setTimeout(() => process.exit(1), 10000).unref();
+  }
 }
 
 async function fetchPrometheus(endpoint, params) {
