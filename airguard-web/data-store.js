@@ -5,18 +5,20 @@ const fsp = require('fs/promises');
 
 class DataStore {
   constructor(filePath, options = {}) {
-    this.filePath = filePath;
+    this.filePath = typeof filePath === 'string' && filePath.length ? path.resolve(filePath) : null;
     this.options = {
       snapshotLimit: options.snapshotLimit || 288,
       seriesLimit: options.seriesLimit || 150,
       flushDelayMs: options.flushDelayMs || 50
     };
+    this._persistenceEnabled = Boolean(this.filePath);
+    this._persistenceFailed = false;
     this.state = {
       snapshots: [],
       series: {}
     };
     this._flushTimer = null;
-    this._ready = this._load();
+    this._ready = this._persistenceEnabled ? this._load() : Promise.resolve();
   }
 
   get ready() {
@@ -24,6 +26,9 @@ class DataStore {
   }
 
   async _load() {
+    if (!this._persistenceEnabled) {
+      return;
+    }
     try {
       const existing = await fsp.readFile(this.filePath, 'utf8');
       const parsed = JSON.parse(existing);
@@ -55,6 +60,10 @@ class DataStore {
         }
       }
     } catch (error) {
+      if (error?.code === 'EACCES') {
+        this._disablePersistence(error, 'No write access for cache directory');
+        return;
+      }
       if (error.code !== 'ENOENT') {
         console.warn('[DataStore] Failed to load cache:', error);
       }
@@ -134,16 +143,26 @@ class DataStore {
   }
 
   _scheduleFlush() {
+    if (!this._persistenceEnabled || this._persistenceFailed) {
+      return;
+    }
     if (this._flushTimer) return;
     this._flushTimer = setTimeout(() => {
       this._flushTimer = null;
       this._flush().catch((error) => {
+        if (error?.code === 'EACCES') {
+          this._disablePersistence(error, 'Cache disabled after write failure');
+          return;
+        }
         console.warn('[DataStore] Failed to flush cache:', error);
       });
     }, this.options.flushDelayMs).unref();
   }
 
   async _flush() {
+    if (!this._persistenceEnabled || this._persistenceFailed) {
+      return;
+    }
     await this.ready;
     const payload = JSON.stringify(this.state, null, 2);
     await this._ensureDir();
@@ -151,6 +170,9 @@ class DataStore {
   }
 
   async _ensureDir() {
+    if (!this._persistenceEnabled || this._persistenceFailed) {
+      return;
+    }
     const dir = path.dirname(this.filePath);
     await fsp.mkdir(dir, { recursive: true });
   }
@@ -206,6 +228,21 @@ class DataStore {
       delete cloned.snapshots;
     }
     return cloned;
+  }
+
+  _disablePersistence(error, reason) {
+    if (this._persistenceFailed) {
+      return;
+    }
+    this._persistenceFailed = true;
+    this._persistenceEnabled = false;
+    this.filePath = null;
+    if (this._flushTimer) {
+      clearTimeout(this._flushTimer);
+      this._flushTimer = null;
+    }
+    const message = reason || 'Cache disabled due to persistence failure';
+    console.warn(`[DataStore] ${message}. Continuing without disk cache.`, error);
   }
 }
 
