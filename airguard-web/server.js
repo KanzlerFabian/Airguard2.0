@@ -722,7 +722,7 @@ function normalizeSeriesParams(rangeLiteral, stepLiteral, windowLiteral) {
 
   return {
     rangeKey,
-    rangeLiteral: preset.literal,
+    rangeLiteral: durationLiteralFromSeconds(rangeSeconds),
     rangeSeconds,
     stepSeconds,
     stepLiteral: durationLiteralFromSeconds(stepSeconds),
