@@ -27,6 +27,23 @@
     });
   }
 
+  function debounce(fn, wait = 120) {
+    let timer = null;
+    return (...args) => {
+      if (timer) {
+        window.clearTimeout(timer);
+      }
+      timer = window.setTimeout(() => {
+        timer = null;
+        try {
+          fn.apply(null, args);
+        } catch (error) {
+          console.warn('Debounced Funktion fehlgeschlagen', error);
+        }
+      }, wait);
+    };
+  }
+
   const targetGuidePlugin = {
     id: 'targetGuides',
     defaults: {
@@ -77,9 +94,9 @@
     }
   };
 
-  const safeInteractionPlugin = {
-    id: 'safeInteraction',
-    afterInit(chart) {
+  const tooltipGuardPlugin = {
+    id: 'tooltipGuard',
+    beforeInit(chart) {
       const hasData = chartHasUsableData(chart);
       syncTooltipState(chart, hasData);
       if (!hasData) {
@@ -93,20 +110,14 @@
         clearActiveElements(chart);
       }
     },
-    beforeEvent(chart, args) {
+    beforeEvent(chart) {
       const hasData = chartHasUsableData(chart);
       if (!hasData) {
-        syncTooltipState(chart, false);
         clearActiveElements(chart);
-        if (args && typeof args === 'object') {
-          args.cancel = true;
-        }
+        syncTooltipState(chart, false);
         return false;
       }
-      const active = typeof chart?.getActiveElements === 'function' ? chart.getActiveElements() : [];
-      if (!Array.isArray(active) || active.length === 0) {
-        resetTooltipState(chart);
-      }
+      return true;
     }
   };
 
@@ -177,19 +188,18 @@
   }
 
   function clearActiveElements(chart) {
-    if (!chart) return;
-    const eventPosition = resolveEventPosition(chart);
-    if (typeof chart.setActiveElements === 'function') {
-      try {
-        chart.setActiveElements([], eventPosition);
-      } catch (error) {
-        console.debug('Aktive Elemente konnten nicht zurückgesetzt werden', error);
-      }
+    if (!chart?.tooltip || typeof chart.tooltip.setActiveElements !== 'function') {
+      return;
     }
-    resetTooltipState(chart, eventPosition);
+    const eventPosition = { x: 0, y: 0 };
+    try {
+      chart.tooltip.setActiveElements([], eventPosition);
+    } catch (error) {
+      console.debug('Tooltip konnte nicht zurückgesetzt werden', error);
+    }
   }
 
-  function resetTooltipState(chart, eventPosition = resolveEventPosition(chart)) {
+  function resetTooltipState(chart, eventPosition = { x: 0, y: 0 }) {
     if (!chart?.tooltip || typeof chart.tooltip.setActiveElements !== 'function') {
       return;
     }
@@ -200,22 +210,6 @@
     }
   }
 
-  function resolveEventPosition(chart) {
-    if (!chart) {
-      return { x: 0, y: 0 };
-    }
-    const area = chart.chartArea;
-    if (area && Number.isFinite(area.left) && Number.isFinite(area.right) && Number.isFinite(area.top) && Number.isFinite(area.bottom)) {
-      return {
-        x: (area.left + area.right) / 2,
-        y: (area.top + area.bottom) / 2
-      };
-    }
-    const width = Number.isFinite(chart.width) ? chart.width : 0;
-    const height = Number.isFinite(chart.height) ? chart.height : 0;
-    return { x: width / 2, y: height / 2 };
-  }
-
   function recordTooltipPreference(chart, enabled) {
     if (!chart) return;
     ensureInteractionBackups(chart);
@@ -224,7 +218,7 @@
     }
   }
 
-  Chart.register(targetGuidePlugin, safeInteractionPlugin);
+  Chart.register(targetGuidePlugin, tooltipGuardPlugin);
   Chart.defaults.font.family = "'Inter','Segoe UI',system-ui,sans-serif";
   Chart.defaults.color = '#6b7280';
   Chart.defaults.plugins.legend.labels.usePointStyle = true;
@@ -268,6 +262,9 @@
     queueMicrotask(() => {
       scheduledChartUpdates.delete(chart);
       try {
+        if (chart?.tooltip && typeof chart.tooltip.setActiveElements === 'function') {
+          chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+        }
         chart.update(entry.mode);
       } catch (error) {
         console.warn('Chart-Update fehlgeschlagen', error);
@@ -319,11 +316,11 @@
         return state;
       }
       state = next;
-      scheduleNotify();
+      notifyOnce();
       return state;
     }
 
-    function scheduleNotify() {
+    function notifyOnce() {
       if (notifyScheduled) return;
       notifyScheduled = true;
       queueMicrotask(() => {
@@ -372,10 +369,9 @@
       }
       if (emitDepth > 0) {
         const message = 'Konfigurations-Listener dürfen createConfigStore.set nicht aufrufen.';
-        if (DEV_ASSERTS) {
-          throw new Error(message);
-        }
         console.warn(message);
+        pendingPatch = { ...(pendingPatch || {}), ...patch };
+        schedulePendingFlush();
         return state;
       }
       if (updating) {
@@ -490,7 +486,7 @@
   };
 
   const SPARKLINE_RANGE_KEY = '24h';
-  const FETCH_RETRY_DELAYS = [500, 1000, 2000];
+  const FETCH_RETRY_DELAYS = [500, 1000];
   const EMPTY_SERIES_RETRY_DELAYS = [500, 1000];
   const RANGE_RULES = {
     '24h': { stepMin: 120, stepMax: 300, windowMin: 240 },
@@ -538,16 +534,16 @@
   });
 
   const METRIC_CONFIG = {
-    CO2: { unit: 'ppm', decimals: 0, label: 'CO₂' },
-    'PM1.0': { unit: 'µg/m³', decimals: 1, label: 'PM1' },
-    'PM2.5': { unit: 'µg/m³', decimals: 1, label: 'PM2.5' },
-    PM10: { unit: 'µg/m³', decimals: 1, label: 'PM10' },
-    TVOC: { unit: 'ppb', decimals: 0, label: 'TVOC' },
-    Temperatur: { unit: '°C', decimals: 1, label: 'Temperatur' },
-    'rel. Feuchte': { unit: '%', decimals: 0, label: 'rel. Feuchte' },
-    Lux: { unit: 'lx', decimals: 0, label: 'Lux' },
-    Luftdruck: { unit: 'hPa', decimals: 1, label: 'Luftdruck' },
-    Farbtemperatur: { unit: 'K', decimals: 0, label: 'CCT' }
+    CO2: { unit: 'ppm', decimals: 0, label: 'CO₂', apiName: 'co2' },
+    'PM1.0': { unit: 'µg/m³', decimals: 1, label: 'PM1', apiName: 'pm1' },
+    'PM2.5': { unit: 'µg/m³', decimals: 1, label: 'PM2.5', apiName: 'pm25' },
+    PM10: { unit: 'µg/m³', decimals: 1, label: 'PM10', apiName: 'pm10' },
+    TVOC: { unit: 'ppb', decimals: 0, label: 'TVOC', apiName: 'tvoc' },
+    Temperatur: { unit: '°C', decimals: 1, label: 'Temperatur', apiName: 'temp_final' },
+    'rel. Feuchte': { unit: '%', decimals: 0, label: 'rel. Feuchte', apiName: 'humidity' },
+    Lux: { unit: 'lx', decimals: 0, label: 'Lux', apiName: 'lux' },
+    Luftdruck: { unit: 'hPa', decimals: 1, label: 'Luftdruck', apiName: 'pressure_hpa' },
+    Farbtemperatur: { unit: 'K', decimals: 0, label: 'CCT', apiName: 'cct_k' }
   };
 
   const NOW_KEY_ALIASES = new Map([
@@ -1112,13 +1108,17 @@
     setupInstallPrompt();
     setupNotifications();
     updateOfflineState();
-    window.addEventListener('online', updateOfflineState);
-    window.addEventListener('offline', updateOfflineState);
+    const debouncedOfflineUpdate = debounce(updateOfflineState, 150);
+    window.addEventListener('online', debouncedOfflineUpdate);
+    window.addEventListener('offline', debouncedOfflineUpdate);
     refreshAll(true).catch(handleError);
     setupTimers();
+    const scheduleVisibilityRefresh = debounce(() => {
+      refreshAll(false).catch(handleError);
+    }, 160);
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) {
-        refreshAll(false).catch(handleError);
+        scheduleVisibilityRefresh();
       }
     });
     document.addEventListener('keydown', handleGlobalKeydown);
@@ -1579,10 +1579,26 @@
   async function refreshNow() {
     const response = await fetch('/api/now', { headers: { 'Accept': 'application/json' } });
     if (!response.ok) {
-      throw new Error('Fehler beim Laden der Live-Daten');
+      let payload = null;
+      try {
+        payload = await response.clone().json();
+      } catch (error) {
+        payload = null;
+      }
+      if (payload?.error === 'backend_unreachable') {
+        const err = new Error('Backend nicht erreichbar. Bitte erneut laden.');
+        err.code = 'backend_unreachable';
+        throw err;
+      }
+      throw new Error(payload?.error || 'Fehler beim Laden der Live-Daten');
     }
     const payload = await response.json();
     if (!payload || !payload.ok) {
+      if (payload?.error === 'backend_unreachable') {
+        const err = new Error('Backend nicht erreichbar. Bitte erneut laden.');
+        err.code = 'backend_unreachable';
+        throw err;
+      }
       throw new Error(payload?.error || 'API Antwort fehlerhaft');
     }
 
@@ -2859,10 +2875,22 @@
 
   function resolveSeriesNames(metric) {
     const list = SERIES_NAME_ALIASES.get(metric);
-    if (!Array.isArray(list) || !list.length) {
-      return [metric];
+    const names = new Set();
+    const apiName = METRIC_CONFIG[metric]?.apiName;
+    if (apiName) {
+      names.add(apiName);
     }
-    return Array.from(new Set([metric, ...list]));
+    if (metric) {
+      names.add(metric);
+    }
+    if (Array.isArray(list) && list.length) {
+      list.forEach((entry) => {
+        if (entry) {
+          names.add(entry);
+        }
+      });
+    }
+    return Array.from(names);
   }
 
   async function requestSeries(metric, queryName, range, options = {}) {
@@ -2897,14 +2925,13 @@
       } catch (error) {
         payload = null;
       }
-      if (!response.ok) {
-        const err = buildSeriesError(metric, range, payload);
-        if (payload?.error === 'unknown_metric') {
-          err.code = 'unknown_metric';
+      const backendUnreachable = payload?.error === 'backend_unreachable';
+      if (!response.ok || !payload || !payload.ok) {
+        if (backendUnreachable) {
+          const err = new Error('Backend nicht erreichbar. Bitte erneut laden.');
+          err.code = 'backend_unreachable';
+          throw err;
         }
-        throw err;
-      }
-      if (!payload || !payload.ok) {
         const err = buildSeriesError(metric, range, payload);
         if (payload?.error === 'unknown_metric') {
           err.code = 'unknown_metric';
@@ -3700,7 +3727,14 @@
 
   function handleModalError(error) {
     console.warn('Modal-Chart konnte nicht geladen werden', error);
-    const message = typeof error === 'string' ? error : error?.message || 'Diagramm konnte nicht geladen werden.';
+    const code = error?.code;
+    let message = typeof error === 'string' ? error : error?.message || 'Diagramm konnte nicht geladen werden.';
+    if (code === 'backend_unreachable') {
+      message = 'Backend nicht erreichbar. Bitte erneut laden.';
+      teardownModalChart();
+      modalConfig.set({ loading: false, error: message, empty: false });
+      return;
+    }
     modalConfig.set({ loading: false, error: message, empty: false });
     showToast(message);
   }
@@ -4122,8 +4156,14 @@
 
   async function subscribeForPush() {
     if (!('serviceWorker' in navigator)) return;
-    const registration = await navigator.serviceWorker.ready;
-    if (!('pushManager' in registration)) return;
+    let registration;
+    try {
+      registration = await navigator.serviceWorker.ready;
+    } catch (error) {
+      console.info('Push-Registrierung übersprungen (Service Worker nicht aktiv).');
+      return;
+    }
+    if (!registration || !('pushManager' in registration)) return;
     try {
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true
@@ -4140,6 +4180,12 @@
   }
 
   function handleError(error) {
+    const code = error?.code;
+    if (code === 'backend_unreachable') {
+      console.info('Backend nicht erreichbar, erneuter Versuch empfohlen.');
+      showToast('Backend nicht erreichbar. Bitte erneut versuchen.');
+      return;
+    }
     console.error(error);
     showToast(typeof error === 'string' ? error : error?.message || 'Unbekannter Fehler');
   }
