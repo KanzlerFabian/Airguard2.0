@@ -178,25 +178,42 @@
 
   function clearActiveElements(chart) {
     if (!chart) return;
+    const eventPosition = resolveEventPosition(chart);
     if (typeof chart.setActiveElements === 'function') {
       try {
-        chart.setActiveElements([]);
+        chart.setActiveElements([], eventPosition);
       } catch (error) {
         console.debug('Aktive Elemente konnten nicht zurückgesetzt werden', error);
       }
     }
-    resetTooltipState(chart);
+    resetTooltipState(chart, eventPosition);
   }
 
-  function resetTooltipState(chart) {
+  function resetTooltipState(chart, eventPosition = resolveEventPosition(chart)) {
     if (!chart?.tooltip || typeof chart.tooltip.setActiveElements !== 'function') {
       return;
     }
     try {
-      chart.tooltip.setActiveElements([]);
+      chart.tooltip.setActiveElements([], eventPosition);
     } catch (error) {
       console.debug('Tooltip konnte nicht zurückgesetzt werden', error);
     }
+  }
+
+  function resolveEventPosition(chart) {
+    if (!chart) {
+      return { x: 0, y: 0 };
+    }
+    const area = chart.chartArea;
+    if (area && Number.isFinite(area.left) && Number.isFinite(area.right) && Number.isFinite(area.top) && Number.isFinite(area.bottom)) {
+      return {
+        x: (area.left + area.right) / 2,
+        y: (area.top + area.bottom) / 2
+      };
+    }
+    const width = Number.isFinite(chart.width) ? chart.width : 0;
+    const height = Number.isFinite(chart.height) ? chart.height : 0;
+    return { x: width / 2, y: height / 2 };
   }
 
   function recordTooltipPreference(chart, enabled) {
@@ -3539,7 +3556,7 @@
         return;
       }
       const hasData = definition.metrics.some(
-        (metricKey) => Array.isArray(data[metricKey]) && data[metricKey].length > 1
+        (metricKey) => Array.isArray(data[metricKey]) && data[metricKey].length > 0
       );
       applyModalHeading(definition, range, activeMetric);
       if (!hasData) {
@@ -3596,10 +3613,11 @@
         spanGaps: true
       };
     });
+    const hasSamples = datasets.some((dataset) => Array.isArray(dataset.data) && dataset.data.length > 0);
     const tooltipEnabled = datasets.some((dataset) => Array.isArray(dataset.data) && dataset.data.length > 1);
     const container = ui.modalCanvas.closest('.chart-modal__canvas');
     if (container) {
-      container.classList.toggle('is-empty', !tooltipEnabled);
+      container.classList.toggle('is-empty', !hasSamples);
     }
 
     const timeUnit = range.range === '24h' ? 'hour' : range.range === '7d' ? 'day' : 'week';
@@ -3674,7 +3692,7 @@
       state.modalChart.options.scales.y.suggestedMax = definition.yBounds?.max;
       recordTooltipPreference(state.modalChart, tooltipEnabled);
     }
-    syncTooltipState(state.modalChart, tooltipEnabled);
+    syncTooltipState(state.modalChart, hasSamples);
     scheduleChartUpdate(state.modalChart, 'none');
     scheduleModalResize();
     queueModalLayoutSync();
@@ -4027,13 +4045,15 @@
   function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     const host = typeof window.location.hostname === 'string' ? window.location.hostname.toLowerCase() : '';
+    const protocol = typeof window.location.protocol === 'string' ? window.location.protocol.toLowerCase() : '';
     const allowedHosts = new Set(['localhost', 'airguardpi.local']);
     const secureContext = Boolean(window.isSecureContext);
     const isAllowedHost = allowedHosts.has(host);
-    if (!secureContext && !isAllowedHost) {
-      console.info('SW skipped (insecure)');
+    const allowInsecureHost = protocol === 'http:' && isAllowedHost;
+    if (!secureContext && !allowInsecureHost) {
+      console.info('Service Worker übersprungen (unsicherer Kontext)');
       if (ui.pwaStatusBadge) {
-        ui.pwaStatusBadge.textContent = 'Offline-Cache deaktiviert (kein gültiges Zertifikat)';
+        ui.pwaStatusBadge.textContent = 'Offline-Cache deaktiviert (unsicherer Kontext)';
         ui.pwaStatusBadge.hidden = false;
       }
       return;
