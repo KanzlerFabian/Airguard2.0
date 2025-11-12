@@ -29,16 +29,29 @@ class DataStore {
       const parsed = JSON.parse(existing);
       if (parsed && typeof parsed === 'object') {
         if (Array.isArray(parsed.snapshots)) {
-          this.state.snapshots = parsed.snapshots.filter((entry) =>
-            entry && typeof entry === 'object' && Number.isFinite(entry.ts)
-          );
+          this.state.snapshots = parsed.snapshots
+            .filter((entry) => entry && typeof entry === 'object')
+            .map((entry) => this._cloneSnapshot(entry))
+            .filter(Boolean);
         }
         if (parsed.series && typeof parsed.series === 'object') {
-          this.state.series = Object.fromEntries(
-            Object.entries(parsed.series).filter(([key, value]) =>
-              key && value && typeof value === 'object'
-            )
-          );
+          const series = {};
+          for (const [key, value] of Object.entries(parsed.series)) {
+            if (!key || !value || typeof value !== 'object') {
+              continue;
+            }
+            const sanitized = this._sanitizeSeriesData(value.data);
+            if (!sanitized.length) {
+              continue;
+            }
+            const ts = Number(value.ts);
+            series[key] = {
+              ts: Number.isFinite(ts) ? ts : Date.now(),
+              data: sanitized,
+              meta: this._cloneMeta(value.meta)
+            };
+          }
+          this.state.series = series;
         }
       }
     } catch (error) {
@@ -54,7 +67,7 @@ class DataStore {
     if (!payload || typeof payload !== 'object' || !Number.isFinite(payload.ts)) {
       return;
     }
-    this.state.snapshots.push(payload);
+    this.state.snapshots.push(this._cloneSnapshot(payload));
     if (this.state.snapshots.length > this.options.snapshotLimit) {
       this.state.snapshots.splice(0, this.state.snapshots.length - this.options.snapshotLimit);
     }
@@ -65,17 +78,22 @@ class DataStore {
     if (!Array.isArray(this.state.snapshots) || this.state.snapshots.length === 0) {
       return null;
     }
-    return this.state.snapshots[this.state.snapshots.length - 1] || null;
+    const snapshot = this.state.snapshots[this.state.snapshots.length - 1];
+    return snapshot ? this._cloneSnapshot(snapshot) : null;
   }
 
   async recordSeries(key, params, payload) {
     await this.ready;
     const normalizedKey = this._seriesKey(key, params);
     if (!normalizedKey) return;
+    const sanitizedData = this._sanitizeSeriesData(payload?.data);
+    if (!sanitizedData.length) {
+      return;
+    }
     this.state.series[normalizedKey] = {
       ts: Date.now(),
-      data: Array.isArray(payload?.data) ? payload.data : [],
-      meta: payload?.meta || null
+      data: sanitizedData,
+      meta: this._cloneMeta(payload?.meta)
     };
     const keys = Object.keys(this.state.series);
     if (keys.length > this.options.seriesLimit) {
@@ -95,7 +113,15 @@ class DataStore {
   findSeries(key, params) {
     const normalizedKey = this._seriesKey(key, params);
     if (!normalizedKey) return null;
-    return this.state.series[normalizedKey] || null;
+    const entry = this.state.series[normalizedKey];
+    if (!entry) {
+      return null;
+    }
+    return {
+      ts: entry.ts,
+      data: entry.data.map((point) => ({ x: point.x, y: point.y })),
+      meta: this._cloneMeta(entry.meta)
+    };
   }
 
   _seriesKey(key, params) {
@@ -127,6 +153,59 @@ class DataStore {
   async _ensureDir() {
     const dir = path.dirname(this.filePath);
     await fsp.mkdir(dir, { recursive: true });
+  }
+
+  _sanitizeSeriesData(raw) {
+    if (!raw) {
+      return [];
+    }
+    const values = Array.isArray(raw) ? raw : Array.isArray(raw?.values) ? raw.values : [];
+    if (!Array.isArray(values) || values.length === 0) {
+      return [];
+    }
+    const sanitized = [];
+    for (const entry of values) {
+      if (!entry) continue;
+      let x;
+      let y;
+      if (Array.isArray(entry) && entry.length >= 2) {
+        x = Number(entry[0]);
+        y = Number(entry[1]);
+      } else if (typeof entry === 'object') {
+        x = Number('x' in entry ? entry.x : entry.ts);
+        y = Number('y' in entry ? entry.y : entry.value);
+      }
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        continue;
+      }
+      sanitized.push({ x, y });
+    }
+    return sanitized;
+  }
+
+  _cloneMeta(meta) {
+    if (!meta || typeof meta !== 'object') {
+      return null;
+    }
+    try {
+      return JSON.parse(JSON.stringify(meta));
+    } catch (error) {
+      return { ...meta };
+    }
+  }
+
+  _cloneSnapshot(snapshot) {
+    if (!snapshot || typeof snapshot !== 'object') {
+      return null;
+    }
+    const cloned = this._cloneMeta(snapshot);
+    if (!cloned || !Number.isFinite(cloned.ts)) {
+      return null;
+    }
+    if (Array.isArray(cloned.snapshots)) {
+      delete cloned.snapshots;
+    }
+    return cloned;
   }
 }
 

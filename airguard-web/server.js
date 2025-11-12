@@ -112,6 +112,7 @@ const METRICS = [
 
 const QUERY_LOOKUP = new Map();
 const KNOWN_QUERY_KEYS = new Set();
+const SERIES_PROM_NAME_CACHE = new Map();
 
 for (const metric of METRICS) {
   const promList = Array.isArray(metric.promNames) && metric.promNames.length > 0 ? metric.promNames : [metric.key];
@@ -331,6 +332,8 @@ app.get('/api/series', async (req, res, next) => {
   let rangeLiteral;
   let stepLiteral;
   let windowLiteral;
+  let metricKey;
+  let usedPromName;
   try {
     await dataStore.ready;
     const nameLiteral = String(req.query.name || '');
@@ -344,6 +347,7 @@ app.get('/api/series', async (req, res, next) => {
       );
     }
 
+    metricKey = metric.slug || metric.key;
     rangeLiteral = req.query.range ? String(req.query.range) : '24h';
     stepLiteral = req.query.step ? String(req.query.step) : '120s';
     windowLiteral = req.query.win ? String(req.query.win) : '10m';
@@ -381,32 +385,54 @@ app.get('/api/series', async (req, res, next) => {
 
     const endSeconds = Math.floor(Date.now() / 1000);
     const startSeconds = Math.max(0, endSeconds - rangeSeconds);
-    const promNameEscaped = escapePromString(metric.promQueryName || metric.key);
-    const baseQuery = `esphome_sensor_value{name="${promNameEscaped}"}`;
-    const seriesQuery = `avg_over_time(${baseQuery}[${windowLiteral}])`;
+    const candidates = buildPromNameCandidates(metric, nameLiteral, metricKey);
+    const attempts = candidates.length > 0 ? candidates : [metric.promQueryName || metric.key];
+    let data = [];
+    let firstCandidate = attempts[0];
+    for (const candidate of attempts) {
+      const result = await queryPrometheusSeries(candidate, windowLiteral, stepLiteral, startSeconds, endSeconds);
+      if (!usedPromName) {
+        usedPromName = candidate;
+        data = result;
+      }
+      if (Array.isArray(result) && result.length > 0) {
+        usedPromName = candidate;
+        data = result;
+        break;
+      }
+    }
 
-    const payload = await fetchPrometheus('query_range', {
-      query: seriesQuery,
-      start: String(startSeconds),
-      end: String(endSeconds),
-      step: stepLiteral
-    });
+    if (!usedPromName) {
+      usedPromName = firstCandidate || metric.promQueryName || metric.key;
+    }
 
-    const series = Array.isArray(payload?.data?.result) ? payload.data.result : [];
-    const primarySeries = series[0];
-    const values = Array.isArray(primarySeries?.values) ? primarySeries.values : [];
+    if (!Array.isArray(data)) {
+      data = [];
+    }
 
-    const data = values
-      .map((entry) => {
-        const [ts, rawValue] = entry;
-        const x = Number(ts) * 1000;
-        const y = Number.parseFloat(rawValue);
-        if (!Number.isFinite(x) || !Number.isFinite(y)) {
-          return null;
-        }
-        return { x, y };
-      })
-      .filter(Boolean);
+    if (data.length === 0 && metricKey) {
+      const cached = dataStore.findSeries(metricKey, {
+        range: rangeLiteral,
+        step: stepLiteral,
+        win: windowLiteral
+      });
+      if (cached && Array.isArray(cached.data) && cached.data.length > 0) {
+        sendJSON(res, {
+          ok: true,
+          cached: true,
+          ts: cached.ts || Date.now(),
+          data: cached.data,
+          meta: {
+            name: metric.key,
+            range: rangeLiteral,
+            step: stepLiteral,
+            win: windowLiteral,
+            promName: cached.meta?.promName || usedPromName
+          }
+        });
+        return;
+      }
+    }
 
     const responsePayload = {
       ok: true,
@@ -416,15 +442,19 @@ app.get('/api/series', async (req, res, next) => {
         name: metric.key,
         range: rangeLiteral,
         step: stepLiteral,
-        win: windowLiteral
+        win: windowLiteral,
+        promName: usedPromName
       }
     };
 
-    dataStore
-      .recordSeries(metric.slug || metric.key, { range: rangeLiteral, step: stepLiteral, win: windowLiteral }, responsePayload)
-      .catch((error) => {
-        console.warn('[airguard-web] Failed to cache series:', error);
-      });
+    if (Array.isArray(data) && data.length > 0 && metricKey) {
+      SERIES_PROM_NAME_CACHE.set(metricKey, usedPromName);
+      dataStore
+        .recordSeries(metricKey, { range: rangeLiteral, step: stepLiteral, win: windowLiteral }, responsePayload)
+        .catch((error) => {
+          console.warn('[airguard-web] Failed to cache series:', error);
+        });
+    }
 
     sendJSON(res, responsePayload);
   } catch (error) {
@@ -441,12 +471,16 @@ app.get('/api/series', async (req, res, next) => {
             cached: true,
             ts: cached.ts || Date.now(),
             data: Array.isArray(cached.data) ? cached.data : [],
-            meta: cached.meta || {
-              name: metric.key,
-              range: rangeLiteral,
-              step: stepLiteral,
-              win: windowLiteral
-            }
+            meta:
+              cached.meta && typeof cached.meta === 'object'
+                ? { ...cached.meta }
+                : {
+                    name: metric.key,
+                    range: rangeLiteral,
+                    step: stepLiteral,
+                    win: windowLiteral,
+                    promName: usedPromName
+                  }
           });
           return;
         }
@@ -638,4 +672,72 @@ function normalizeQueryName(value) {
     return '';
   }
   return normalized;
+}
+
+function buildPromNameCandidates(metric, requestedName, metricKey) {
+  const queue = [];
+  const seen = new Set();
+  const push = (value) => {
+    if (!value || typeof value !== 'string') {
+      return;
+    }
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return;
+    }
+    const normalized = normalizeQueryName(trimmed) || trimmed.toLowerCase();
+    if (seen.has(normalized)) {
+      return;
+    }
+    seen.add(normalized);
+    queue.push(trimmed);
+  };
+
+  if (metricKey && SERIES_PROM_NAME_CACHE.has(metricKey)) {
+    push(SERIES_PROM_NAME_CACHE.get(metricKey));
+  }
+  push(requestedName);
+  if (Array.isArray(metric.promNames)) {
+    metric.promNames.forEach(push);
+  }
+  if (Array.isArray(metric.queryNames)) {
+    metric.queryNames.forEach(push);
+  }
+  push(metric.promQueryName);
+  push(metric.key);
+  push(metric.label);
+  push(metric.slug);
+
+  return queue;
+}
+
+async function queryPrometheusSeries(name, windowLiteral, stepLiteral, startSeconds, endSeconds) {
+  const promName = typeof name === 'string' && name.trim().length ? name.trim() : name;
+  const targetName = promName || '';
+  const promNameEscaped = escapePromString(targetName || '');
+  const baseQuery = `esphome_sensor_value{name="${promNameEscaped}"}`;
+  const seriesQuery = `avg_over_time(${baseQuery}[${windowLiteral}])`;
+
+  const payload = await fetchPrometheus('query_range', {
+    query: seriesQuery,
+    start: String(startSeconds),
+    end: String(endSeconds),
+    step: stepLiteral
+  });
+
+  const series = Array.isArray(payload?.data?.result) ? payload.data.result : [];
+  const primarySeries = series[0];
+  const values = Array.isArray(primarySeries?.values) ? primarySeries.values : [];
+
+  return values
+    .map((entry) => {
+      const [ts, rawValue] = entry;
+      const x = Number(ts) * 1000;
+      const y = Number.parseFloat(rawValue);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        return null;
+      }
+      return { x, y };
+    })
+    .filter(Boolean);
 }
