@@ -1,4 +1,4 @@
-const SHELL_CACHE = 'airguard-shell-v3';
+const SHELL_CACHE = 'airguard-shell-v4';
 const DATA_CACHE = 'airguard-data-v1';
 
 const SHELL_ASSETS = [
