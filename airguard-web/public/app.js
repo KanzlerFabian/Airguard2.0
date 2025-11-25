@@ -187,16 +187,23 @@
     }
   }
 
-  function clearActiveElements(chart) {
+  function safeClearTooltip(chart, fallback = { x: 0, y: 0 }) {
     if (!chart?.tooltip || typeof chart.tooltip.setActiveElements !== 'function') {
       return;
     }
-    const eventPosition = getSafeEventPosition(chart);
+    const tooltip = chart.tooltip;
+    const hasActive = Array.isArray(tooltip._active) && tooltip._active.length > 0;
+    if (!hasActive) return;
+    const eventPosition = getSafeEventPosition(chart, fallback);
     try {
-      chart.tooltip.setActiveElements([], eventPosition);
+      tooltip.setActiveElements([], eventPosition);
     } catch (error) {
-      console.debug('Tooltip konnte nicht zurückgesetzt werden', error);
+      console.warn('Tooltip konnte nicht zurückgesetzt werden', error);
     }
+  }
+
+  function clearActiveElements(chart) {
+    safeClearTooltip(chart);
   }
 
   function resetTooltipState(chart, eventPosition = { x: 0, y: 0 }) {
@@ -207,7 +214,7 @@
     try {
       chart.tooltip.setActiveElements([], safePosition);
     } catch (error) {
-      console.debug('Tooltip konnte nicht zurückgesetzt werden', error);
+      console.warn('Tooltip konnte nicht zurückgesetzt werden', error);
     }
   }
 
@@ -279,9 +286,7 @@
     queueMicrotask(() => {
       scheduledChartUpdates.delete(chart);
       try {
-        if (chart?.tooltip && typeof chart.tooltip.setActiveElements === 'function') {
-          chart.tooltip.setActiveElements([], getSafeEventPosition(chart));
-        }
+        safeClearTooltip(chart);
         chart.update(entry.mode);
       } catch (error) {
         console.warn('Chart-Update fehlgeschlagen', error);
