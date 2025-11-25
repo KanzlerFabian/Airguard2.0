@@ -1594,49 +1594,54 @@
   }
 
   async function refreshNow() {
-    const response = await fetch('/api/now', { headers: { 'Accept': 'application/json' } });
-    if (!response.ok) {
-      let payload = null;
-      try {
-        payload = await response.clone().json();
-      } catch (error) {
-        payload = null;
+    try {
+      const response = await fetch('/api/now', { headers: { 'Accept': 'application/json' } });
+      if (!response.ok) {
+        let payload = null;
+        try {
+          payload = await response.clone().json();
+        } catch (error) {
+          payload = null;
+        }
+        if (payload?.error === 'backend_unreachable') {
+          const err = new Error('Backend nicht erreichbar. Bitte erneut laden.');
+          err.code = 'backend_unreachable';
+          throw err;
+        }
+        throw new Error(payload?.error || 'Fehler beim Laden der Live-Daten');
       }
-      if (payload?.error === 'backend_unreachable') {
-        const err = new Error('Backend nicht erreichbar. Bitte erneut laden.');
-        err.code = 'backend_unreachable';
-        throw err;
+      const payload = await response.json();
+      if (!payload || !payload.ok) {
+        if (payload?.error === 'backend_unreachable') {
+          const err = new Error('Backend nicht erreichbar. Bitte erneut laden.');
+          err.code = 'backend_unreachable';
+          throw err;
+        }
+        throw new Error(payload?.error || 'API Antwort fehlerhaft');
       }
-      throw new Error(payload?.error || 'Fehler beim Laden der Live-Daten');
-    }
-    const payload = await response.json();
-    if (!payload || !payload.ok) {
-      if (payload?.error === 'backend_unreachable') {
-        const err = new Error('Backend nicht erreichbar. Bitte erneut laden.');
-        err.code = 'backend_unreachable';
-        throw err;
-      }
-      throw new Error(payload?.error || 'API Antwort fehlerhaft');
-    }
 
-    const data = normalizeNowData(payload.data || {});
-    const merged = { ...(state.now || {}) };
-    for (const [metric, sample] of Object.entries(data)) {
-      merged[metric] = sample;
-    }
-    state.now = merged;
-    const displayData = state.now;
-    updateTimestamp(payload.ts || Date.now());
-    updateHero(displayData);
-    updateStatusCards(displayData);
-    updateCircadian(displayData);
-    checkAlerts(displayData);
-    const activeModalMetric = modalConfig.get().metric;
-    if (activeModalMetric) {
-      refreshModalDetails(activeModalMetric);
-    }
-    if (displayData['Luftdruck']) {
-      refreshPressureTrend().catch((error) => console.warn('Drucktrend Fehler', error));
+      const data = normalizeNowData(payload.data || {});
+      const merged = { ...(state.now || {}) };
+      for (const [metric, sample] of Object.entries(data)) {
+        merged[metric] = sample;
+      }
+      state.now = merged;
+      const displayData = state.now;
+      updateTimestamp(payload.ts || Date.now());
+      updateHero(displayData);
+      updateStatusCards(displayData);
+      updateCircadian(displayData);
+      checkAlerts(displayData);
+      const activeModalMetric = modalConfig.get().metric;
+      if (activeModalMetric) {
+        refreshModalDetails(activeModalMetric);
+      }
+      if (displayData['Luftdruck']) {
+        refreshPressureTrend().catch((error) => console.warn('Drucktrend Fehler', error));
+      }
+    } catch (error) {
+      console.error('Live-Daten konnten nicht geladen werden', error);
+      throw error;
     }
   }
 
@@ -2911,78 +2916,87 @@
   }
 
   async function requestSeries(metric, queryName, range, options = {}) {
-    const params = new URLSearchParams({
-      name: queryName,
-      range: range.range,
-      step: range.step,
-      win: range.win
-    });
-    const maxAttempts = EMPTY_SERIES_RETRY_DELAYS.length + 1;
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      if (options.signal?.aborted) {
-        throw new DOMException('Aborted', 'AbortError');
-      }
-      let response;
-      try {
-        response = await fetchWithRetry(`/api/series?${params.toString()}`, {
-          headers: { Accept: 'application/json' }
-        }, { signal: options.signal, label: `${metric}:${queryName}:${range.range}#${attempt + 1}` });
-      } catch (error) {
-        if (error?.name === 'AbortError') {
-          throw error;
+    try {
+      const params = new URLSearchParams({
+        name: queryName,
+        range: range.range,
+        step: range.step,
+        win: range.win
+      });
+      const maxAttempts = EMPTY_SERIES_RETRY_DELAYS.length + 1;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        if (options.signal?.aborted) {
+          throw new DOMException('Aborted', 'AbortError');
         }
-        const err = buildNetworkError(metric, range, error);
-        err.code = 'network_error';
-        err.cause = error;
-        throw err;
-      }
-      let payload = null;
-      try {
-        payload = await response.clone().json();
-      } catch (error) {
-        payload = null;
-      }
-      const backendUnreachable = payload?.error === 'backend_unreachable';
-      if (!response.ok || !payload || !payload.ok) {
-        if (backendUnreachable) {
-          const err = new Error('Backend nicht erreichbar. Bitte erneut laden.');
-          err.code = 'backend_unreachable';
-          throw err;
-        }
-        const err = buildSeriesError(metric, range, payload);
-        if (payload?.error === 'unknown_metric') {
-          err.code = 'unknown_metric';
-        }
-        throw err;
-      }
-      const values = normalizeSeriesValues(payload.data);
-      const rawPoints = values
-        .map((row) => {
-          const ts = Number(row[0]);
-          const val = Number(row[1]);
-          if (!Number.isFinite(ts) || !Number.isFinite(val)) {
-            return null;
-          }
-          return { x: ts * 1000, y: val };
-        })
-        .filter(Boolean);
-      const cleaned = dedupePoints(rawPoints);
-      const limited = limitPoints(cleaned);
-      if (limited.length === 0 && attempt < EMPTY_SERIES_RETRY_DELAYS.length) {
-        const delayMs = EMPTY_SERIES_RETRY_DELAYS[attempt];
+        let response;
         try {
-          await delay(delayMs, options.signal);
+          response = await fetchWithRetry(
+            `/api/series?${params.toString()}`,
+            {
+              headers: { Accept: 'application/json' }
+            },
+            { signal: options.signal, label: `${metric}:${queryName}:${range.range}#${attempt + 1}` }
+          );
         } catch (error) {
           if (error?.name === 'AbortError') {
             throw error;
           }
-          throw error;
+          const err = buildNetworkError(metric, range, error);
+          err.code = 'network_error';
+          err.cause = error;
+          throw err;
         }
-        continue;
+        let payload = null;
+        try {
+          payload = await response.clone().json();
+        } catch (error) {
+          payload = null;
+        }
+        const backendUnreachable = payload?.error === 'backend_unreachable';
+        if (!response.ok || !payload || !payload.ok) {
+          if (backendUnreachable) {
+            const err = new Error('Backend nicht erreichbar. Bitte erneut laden.');
+            err.code = 'backend_unreachable';
+            throw err;
+          }
+          const err = buildSeriesError(metric, range, payload);
+          if (payload?.error === 'unknown_metric') {
+            err.code = 'unknown_metric';
+          }
+          throw err;
+        }
+        const values = normalizeSeriesValues(payload.data);
+        const rawPoints = values
+          .map((row) => {
+            const ts = Number(row[0]);
+            const val = Number(row[1]);
+            if (!Number.isFinite(ts) || !Number.isFinite(val)) {
+              return null;
+            }
+            return { x: ts * 1000, y: val };
+          })
+          .filter(Boolean);
+        const cleaned = dedupePoints(rawPoints);
+        const limited = limitPoints(cleaned);
+        if (limited.length === 0 && attempt < EMPTY_SERIES_RETRY_DELAYS.length) {
+          const delayMs = EMPTY_SERIES_RETRY_DELAYS[attempt];
+          try {
+            await delay(delayMs, options.signal);
+          } catch (error) {
+            if (error?.name === 'AbortError') {
+              throw error;
+            }
+            throw error;
+          }
+          continue;
+        }
+        return limited;
       }
-      return limited;
+      return [];
+    } catch (error) {
+      console.error('Zeitreihendaten konnten nicht geladen werden', error);
+      throw error;
     }
-    return [];
   }
 
   function buildSeriesError(metric, range, payload) {
@@ -3009,12 +3023,12 @@
         : '24 h';
     const message = `Netzwerkfehler: ${label} (${rangeLabel}) konnte nicht geladen werden. Bitte Verbindung prüfen und erneut versuchen.`;
     if (originalError) {
-      console.warn('Netzwerkfehler beim Laden der Serien', originalError);
+        console.warn('Netzwerkfehler beim Laden der Serien', originalError);
+      }
+      return new Error(message);
     }
-    return new Error(message);
-  }
 
-  function updateSparklines() {
+    function updateSparklines() {
     HERO_METRICS.forEach((metric) => {
       const sparkline = state.sparklines.get(metric);
       if (!sparkline) return;
@@ -3216,8 +3230,16 @@
         caption = `${phase.title}: Ziel ${formattedRange}`;
       }
     }
-    renderScaleGraphic(ui.modalScaleSvg, normalized, value, {
-      unit: normalized.unit,
+    const scaleConfig = {
+      ...normalized,
+      segments: Array.isArray(normalized.segments)
+        ? normalized.segments.map((segment) => ({ ...segment }))
+        : [],
+      ticks: Array.isArray(normalized.ticks) ? normalized.ticks.map((tick) => ({ ...tick })) : []
+    };
+
+    renderScaleGraphic(ui.modalScaleSvg, scaleConfig, value, {
+      unit: scaleConfig.unit,
       decimals,
       highlight
     });
