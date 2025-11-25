@@ -191,7 +191,7 @@
     if (!chart?.tooltip || typeof chart.tooltip.setActiveElements !== 'function') {
       return;
     }
-    const eventPosition = { x: 0, y: 0 };
+    const eventPosition = getSafeEventPosition(chart);
     try {
       chart.tooltip.setActiveElements([], eventPosition);
     } catch (error) {
@@ -203,8 +203,9 @@
     if (!chart?.tooltip || typeof chart.tooltip.setActiveElements !== 'function') {
       return;
     }
+    const safePosition = getSafeEventPosition(chart, eventPosition);
     try {
-      chart.tooltip.setActiveElements([], eventPosition);
+      chart.tooltip.setActiveElements([], safePosition);
     } catch (error) {
       console.debug('Tooltip konnte nicht zurückgesetzt werden', error);
     }
@@ -216,6 +217,22 @@
     if (chart.$_safeInteraction) {
       chart.$_safeInteraction.preferredTooltip = enabled;
     }
+  }
+
+  function getSafeEventPosition(chart, fallback = { x: 0, y: 0 }) {
+    const stored = chart?.tooltip?._eventPosition;
+    if (stored && Number.isFinite(stored.x) && Number.isFinite(stored.y)) {
+      return stored;
+    }
+    const area = chart?.chartArea;
+    if (area) {
+      const x = Number(area.left) + Number(area.right);
+      const y = Number(area.top) + Number(area.bottom);
+      if (Number.isFinite(x) && Number.isFinite(y)) {
+        return { x: x / 2, y: y / 2 };
+      }
+    }
+    return { ...fallback };
   }
 
   Chart.register(targetGuidePlugin, tooltipGuardPlugin);
@@ -263,7 +280,7 @@
       scheduledChartUpdates.delete(chart);
       try {
         if (chart?.tooltip && typeof chart.tooltip.setActiveElements === 'function') {
-          chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+          chart.tooltip.setActiveElements([], getSafeEventPosition(chart));
         }
         chart.update(entry.mode);
       } catch (error) {
