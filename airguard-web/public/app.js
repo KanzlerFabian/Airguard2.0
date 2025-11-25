@@ -187,16 +187,19 @@
     }
   }
 
-  function safeClearTooltip(chart, fallback = { x: 0, y: 0 }) {
-    if (!chart?.tooltip || typeof chart.tooltip.setActiveElements !== 'function') {
+  function safeClearTooltip(chart) {
+    if (!chart || typeof chart.setActiveElements !== 'function' || !chart.tooltip) {
       return;
     }
-    const tooltip = chart.tooltip;
-    const hasActive = Array.isArray(tooltip._active) && tooltip._active.length > 0;
-    if (!hasActive) return;
-    const eventPosition = getSafeEventPosition(chart, fallback);
+    const activeElements = typeof chart.getActiveElements === 'function'
+      ? chart.getActiveElements()
+      : [];
+    if (!activeElements || activeElements.length === 0) return;
     try {
-      tooltip.setActiveElements([], eventPosition);
+      chart.setActiveElements([]);
+      if (typeof chart.tooltip.update === 'function') {
+        chart.tooltip.update();
+      }
     } catch (error) {
       console.warn('Tooltip konnte nicht zurückgesetzt werden', error);
     }
@@ -206,40 +209,12 @@
     safeClearTooltip(chart);
   }
 
-  function resetTooltipState(chart, eventPosition = { x: 0, y: 0 }) {
-    if (!chart?.tooltip || typeof chart.tooltip.setActiveElements !== 'function') {
-      return;
-    }
-    const safePosition = getSafeEventPosition(chart, eventPosition);
-    try {
-      chart.tooltip.setActiveElements([], safePosition);
-    } catch (error) {
-      console.warn('Tooltip konnte nicht zurückgesetzt werden', error);
-    }
-  }
-
   function recordTooltipPreference(chart, enabled) {
     if (!chart) return;
     ensureInteractionBackups(chart);
     if (chart.$_safeInteraction) {
       chart.$_safeInteraction.preferredTooltip = enabled;
     }
-  }
-
-  function getSafeEventPosition(chart, fallback = { x: 0, y: 0 }) {
-    const stored = chart?.tooltip?._eventPosition;
-    if (stored && Number.isFinite(stored.x) && Number.isFinite(stored.y)) {
-      return stored;
-    }
-    const area = chart?.chartArea;
-    if (area) {
-      const x = Number(area.left) + Number(area.right);
-      const y = Number(area.top) + Number(area.bottom);
-      if (Number.isFinite(x) && Number.isFinite(y)) {
-        return { x: x / 2, y: y / 2 };
-      }
-    }
-    return { ...fallback };
   }
 
   Chart.register(targetGuidePlugin, tooltipGuardPlugin);
@@ -3702,71 +3677,69 @@
       return `${context.dataset.label}: ${valueLabel}${suffix}`;
     };
 
-    if (!state.modalChart) {
-      state.modalChart = new Chart(ctx, {
-        type: 'line',
-        data: { datasets },
-        plugins: [targetGuidePlugin],
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          interaction: { mode: 'index', intersect: false },
-          layout: { padding: { top: 8, right: 12, bottom: 8, left: 6 } },
-          plugins: {
-            legend: { labels: { color: '#475569', boxWidth: 12, boxHeight: 12, padding: 12 } },
-            tooltip: {
-              enabled: tooltipEnabled,
-              callbacks: { label: tooltipLabel }
-            },
-            targetGuides: { guides }
-          },
-          scales: {
-            x: {
-              type: 'time',
-              time: { unit: timeUnit, tooltipFormat: 'dd.MM.yyyy HH:mm' },
-              ticks: { maxRotation: 0, maxTicksLimit: 6, color: '#94a3b8' },
-              grid: { display: false, drawBorder: false },
-              border: { display: false }
-            },
-            y: {
-              title: { display: true, text: definition.yTitle, color: '#9ca3af' },
-              ticks: {
-                color: '#94a3b8',
-                maxTicksLimit: 6,
-                callback(value) {
-                  return formatScaleTick(value, definition.yTitle);
-                }
-              },
-              grid: { color: 'rgba(148, 163, 184, 0.12)', lineWidth: 1, drawBorder: false },
-              border: { display: false },
-              suggestedMin: definition.yBounds?.min,
-              suggestedMax: definition.yBounds?.max
-            }
-          }
-        }
-      });
-      recordTooltipPreference(state.modalChart, tooltipEnabled);
-    } else {
-      clearActiveElements(state.modalChart);
-      state.modalChart.data.datasets = datasets;
-      const targetGuideOptions = state.modalChart.options.plugins.targetGuides
-        || (state.modalChart.options.plugins.targetGuides = {});
-      assignGuides(targetGuideOptions, guides);
-      state.modalChart.options.plugins.tooltip = state.modalChart.options.plugins.tooltip || {};
-      state.modalChart.options.plugins.tooltip.callbacks =
-        state.modalChart.options.plugins.tooltip.callbacks || {};
-      state.modalChart.options.plugins.tooltip.callbacks.label = tooltipLabel;
-      state.modalChart.options.plugins.tooltip.enabled = tooltipEnabled;
-      state.modalChart.options.scales.x.time.unit = timeUnit;
-      state.modalChart.options.scales.y.title.text = definition.yTitle;
-      state.modalChart.options.scales.y.suggestedMin = definition.yBounds?.min;
-      state.modalChart.options.scales.y.suggestedMax = definition.yBounds?.max;
-      recordTooltipPreference(state.modalChart, tooltipEnabled);
+    const options = buildModalChartOptions(definition, timeUnit, guides, tooltipEnabled, tooltipLabel);
+    const config = {
+      type: 'line',
+      data: { datasets },
+      plugins: [targetGuidePlugin],
+      options
+    };
+
+    if (state.modalChart) {
+      try {
+        state.modalChart.destroy();
+      } catch (error) {
+        console.warn('Diagramm konnte nicht bereinigt werden', error);
+      }
+      state.modalChart = null;
     }
+
+    state.modalChart = new Chart(ctx, config);
+    recordTooltipPreference(state.modalChart, tooltipEnabled);
     syncTooltipState(state.modalChart, hasSamples);
-    scheduleChartUpdate(state.modalChart, 'none');
     scheduleModalResize();
     queueModalLayoutSync();
+  }
+
+  function buildModalChartOptions(definition, timeUnit, guides, tooltipEnabled, tooltipLabel) {
+    const safeGuides = Array.isArray(guides) ? guides.map((guide) => ({ ...guide })) : [];
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      layout: { padding: { top: 8, right: 12, bottom: 8, left: 6 } },
+      plugins: {
+        legend: { labels: { color: '#475569', boxWidth: 12, boxHeight: 12, padding: 12 } },
+        tooltip: {
+          enabled: tooltipEnabled,
+          callbacks: { label: tooltipLabel }
+        },
+        targetGuides: { guides: safeGuides }
+      },
+      scales: {
+        x: {
+          type: 'time',
+          time: { unit: timeUnit, tooltipFormat: 'dd.MM.yyyy HH:mm' },
+          ticks: { maxRotation: 0, maxTicksLimit: 6, color: '#94a3b8' },
+          grid: { display: false, drawBorder: false },
+          border: { display: false }
+        },
+        y: {
+          title: { display: true, text: definition.yTitle, color: '#9ca3af' },
+          ticks: {
+            color: '#94a3b8',
+            maxTicksLimit: 6,
+            callback(value) {
+              return formatScaleTick(value, definition.yTitle);
+            }
+          },
+          grid: { color: 'rgba(148, 163, 184, 0.12)', lineWidth: 1, drawBorder: false },
+          border: { display: false },
+          suggestedMin: definition.yBounds?.min,
+          suggestedMax: definition.yBounds?.max
+        }
+      }
+    };
   }
 
   function handleModalError(error) {
@@ -4122,13 +4095,7 @@
 
   function registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
-    const host = typeof window.location.hostname === 'string' ? window.location.hostname.toLowerCase() : '';
-    const protocol = typeof window.location.protocol === 'string' ? window.location.protocol.toLowerCase() : '';
-    const allowedHosts = new Set(['localhost', 'airguardpi.local']);
-    const secureContext = Boolean(window.isSecureContext);
-    const isAllowedHost = allowedHosts.has(host);
-    const allowInsecureHost = protocol === 'http:' && isAllowedHost;
-    if (!secureContext && !allowInsecureHost) {
+    if (!window.isSecureContext) {
       console.info('Service Worker übersprungen (unsicherer Kontext)');
       if (ui.pwaStatusBadge) {
         ui.pwaStatusBadge.textContent = 'Offline-Cache deaktiviert (unsicherer Kontext)';
