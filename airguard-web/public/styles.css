@@ -324,6 +324,7 @@ a {
 }
 
 .mini-chart {
+  position: relative;
   grid-column: 1 / -1;
   width: 100%;
   height: 54px;
@@ -336,6 +337,37 @@ a {
 .mini-chart canvas {
   width: 100% !important;
   height: 100% !important;
+}
+
+.mini-card:not(.ready) .mini-chart canvas {
+  opacity: 0;
+}
+
+.mini-card:not(.ready) .mini-chart::after {
+  content: '';
+  position: absolute;
+  inset: 12px 10px;
+  border-radius: 999px;
+  background: linear-gradient(120deg, rgba(226, 232, 240, 0.48) 20%, rgba(248, 250, 252, 0.8) 50%, rgba(226, 232, 240, 0.48) 80%);
+  animation: shimmer 1.4s ease infinite;
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.mini-card.ready .mini-chart.is-empty::after {
+  content: 'Keine Daten';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 0.85rem;
+  color: var(--text-soft);
+  background: linear-gradient(180deg, rgba(226, 232, 240, 0.35), rgba(226, 232, 240, 0.2));
+  pointer-events: none;
+}
+
+.mini-card.ready .mini-chart.is-empty canvas {
+  opacity: 0;
 }
 
 .hero-update {
@@ -650,7 +682,7 @@ a {
 .cycle-marker {
   position: absolute;
   top: 50%;
-  left: var(--cycle-pos, 50%);
+  left: var(--pos, var(--cycle-pos, 50%));
   transform: translate(-50%, -50%);
   width: 28px;
   height: 28px;
@@ -978,6 +1010,66 @@ a {
 .chart-modal__canvas canvas {
   width: 100% !important;
   height: 100% !important;
+  transition: opacity var(--transition-base);
+}
+
+.chart-modal__canvas.is-loading canvas {
+  opacity: 0.4;
+  transition: opacity var(--transition-base);
+}
+
+.chart-modal__canvas.is-empty canvas {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.chart-modal__state {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  gap: 0.75rem;
+  padding: 1.4rem;
+  text-align: center;
+  background: rgba(241, 245, 249, 0.72);
+  backdrop-filter: blur(3px);
+  border-radius: inherit;
+  color: var(--text-muted);
+  z-index: 2;
+  transition: opacity var(--transition-base);
+}
+
+.chart-modal__state[hidden] {
+  display: none;
+}
+
+.chart-modal__state.is-error {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+}
+
+.chart-modal__state.is-empty {
+  background: rgba(148, 163, 184, 0.18);
+}
+
+.chart-modal__state.is-loading::before {
+  content: '';
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 3px solid rgba(148, 163, 184, 0.35);
+  border-top-color: var(--tone-teal);
+  animation: spin 0.9s linear infinite;
+}
+
+.chart-modal__state p {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.chart-modal__retry {
+  justify-self: center;
 }
 
 .chart-modal__info {
@@ -1038,123 +1130,117 @@ a {
   gap: var(--space-2);
 }
 
-.chart-modal__scale-labels,
-.chart-modal__scale-values {
-  display: grid;
-  gap: 0.35rem;
-  font-size: 0.85rem;
-  color: var(--text-muted);
+.chart-scale {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
-.chart-modal__scale-labels {
-  grid-template-columns: var(
-    --scale-columns-template,
-    repeat(var(--scale-columns, 4), minmax(0, 1fr))
-  );
+.chart-scale__track {
+  fill: rgba(148, 163, 184, 0.32);
 }
 
-.chart-modal__scale-values {
-  grid-template-columns: var(
-    --scale-values-template,
-    repeat(var(--scale-ticks, 5), minmax(0, 1fr))
-  );
+.chart-scale__segment {
+  opacity: 0.9;
 }
 
-.chart-modal__scale-labels span {
-  text-align: center;
+.chart-scale__segment--excellent,
+.chart-scale__segment--optimal {
+  fill: rgba(22, 163, 74, 0.26);
+}
+
+.chart-scale__segment--good {
+  fill: rgba(14, 165, 233, 0.24);
+}
+
+.chart-scale__segment--elevated,
+.chart-scale__segment--warning {
+  fill: rgba(250, 204, 21, 0.32);
+}
+
+.chart-scale__segment--poor,
+.chart-scale__segment--critical {
+  fill: rgba(239, 68, 68, 0.3);
+}
+
+.chart-scale__segment-label {
+  font-size: 3.8px;
   font-weight: 600;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.15rem;
+  fill: #475569;
+  text-anchor: middle;
 }
 
-.chart-modal__scale-labels span small {
+.chart-scale__segment-sub {
+  font-size: 3.2px;
   font-weight: 500;
-  color: var(--text-soft);
-  font-size: 0.75rem;
+  fill: #94a3b8;
 }
 
-.chart-modal__scale-values span {
-  text-align: center;
+.chart-scale__tick {
+  stroke: rgba(148, 163, 184, 0.6);
+  stroke-width: 0.8;
 }
 
-.chart-modal__scale-track {
-  position: relative;
-  height: 12px;
-  border-radius: 999px;
-  overflow: visible;
-  background: rgba(148, 163, 184, 0.3);
+.chart-scale__tick-label {
+  font-size: 3.2px;
+  fill: #94a3b8;
+  text-anchor: middle;
 }
 
-.chart-modal__scale-track::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: var(--target-start, 0%);
-  width: calc(var(--target-end, 0%) - var(--target-start, 0%));
-  height: 100%;
-  border-radius: inherit;
-  background: rgba(14, 165, 233, 0.18);
-  opacity: var(--target-visible, 0);
+.chart-scale__highlight {
+  fill: rgba(14, 165, 233, 0.18);
+}
+
+.chart-scale__marker {
+  color: rgba(14, 165, 233, 0.6);
+}
+
+.chart-scale__marker--excellent,
+.chart-scale__marker--optimal {
+  color: #16a34a;
+}
+
+.chart-scale__marker--good {
+  color: #0ea5e9;
+}
+
+.chart-scale__marker--elevated,
+.chart-scale__marker--warning {
+  color: #facc15;
+}
+
+.chart-scale__marker--poor,
+.chart-scale__marker--critical {
+  color: #ef4444;
+}
+
+.chart-scale__marker-line {
+  stroke: currentColor;
+  stroke-width: 0.9;
+}
+
+.chart-scale__marker-dot {
+  fill: currentColor;
+  stroke: #fff;
+  stroke-width: 1.2;
+}
+
+.chart-scale__marker-label {
   pointer-events: none;
 }
 
-.chart-modal__scale-gradient {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(90deg, rgba(148, 163, 184, 0.4), rgba(148, 163, 184, 0.6));
+.chart-scale__marker-label-bg {
+  fill: rgba(15, 23, 42, 0.88);
+  rx: 4;
+  ry: 4;
 }
 
-.chart-modal__scale-marker {
-  position: absolute;
-  top: 50%;
-  transform: translate(calc(-50% + var(--marker-offset, 0px)), -50%);
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.35rem;
-  min-width: 60px;
-}
-
-.chart-modal__scale-marker-dot {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 3px solid #fff;
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.25);
-  background: #0f172a;
-}
-
-.chart-modal__scale-marker[data-tone="excellent"] .chart-modal__scale-marker-dot,
-.chart-modal__scale-marker[data-tone="optimal"] .chart-modal__scale-marker-dot {
-  background: #16a34a;
-}
-
-.chart-modal__scale-marker[data-tone="good"] .chart-modal__scale-marker-dot {
-  background: #0ea5e9;
-}
-
-.chart-modal__scale-marker[data-tone="elevated"] .chart-modal__scale-marker-dot,
-.chart-modal__scale-marker[data-tone="warning"] .chart-modal__scale-marker-dot {
-  background: #facc15;
-}
-
-.chart-modal__scale-marker[data-tone="poor"] .chart-modal__scale-marker-dot,
-.chart-modal__scale-marker[data-tone="critical"] .chart-modal__scale-marker-dot {
-  background: #ef4444;
-}
-
-.chart-modal__scale-marker-value {
-  background: rgba(15, 23, 42, 0.85);
-  color: #fff;
-  border-radius: 999px;
-  padding: 0.25rem 0.8rem;
-  font-size: 0.82rem;
+.chart-scale__marker-value {
+  fill: #fff;
+  font-size: 3.2px;
   font-weight: 600;
-  white-space: nowrap;
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.28);
+  text-anchor: middle;
+  dominant-baseline: middle;
 }
 
 .chart-modal__scale-caption {
@@ -1367,14 +1453,15 @@ a {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: calc(var(--start, 0) * 1%);
-  width: calc((var(--end, 100) - var(--start, 0)) * 1%);
+  left: var(--start, 0%);
+  width: calc(var(--end, 100%) - var(--start, 0%));
   background: var(--segment-color, rgba(14, 165, 233, 0.18));
 }
 
 .circadian-scale__marker {
   position: absolute;
   top: 50%;
+  left: var(--pos, 50%);
   transform: translate(calc(-50% + var(--offset, 0px)), -50%);
   display: inline-flex;
   flex-direction: column;
@@ -1635,6 +1722,15 @@ a {
   }
   100% {
     transform: translateX(100%);
+  }
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
   }
 }
 

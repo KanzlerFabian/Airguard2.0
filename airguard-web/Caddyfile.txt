@@ -9,6 +9,7 @@ airguardpi.local {
             Referrer-Policy "no-referrer"
             Permissions-Policy "geolocation=(), camera=(), microphone=()"
             X-Frame-Options "DENY"
+            Cache-Control "no-cache"
         }
         reverse_proxy 127.0.0.1:8088
     }
