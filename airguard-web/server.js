@@ -12,53 +12,46 @@ if (typeof fetch !== 'function') {
 const METRICS = [
   {
     key: 'CO2',
-    label: 'CO\u2082',
+    label: 'CO₂',
     unit: 'ppm',
     decimals: 0,
-    promNames: ['co2_ppm', 'CO2', 'co2'],
-    queryNames: ['CO\u2082', 'CO2', 'co2', 'co2_ppm'],
+    promNames: ['CO2', 'CO₂', 'co2_ppm', 'co2'],
+    queryNames: ['CO₂', 'CO2', 'co2', 'co2_ppm'],
     slug: 'co2'
   },
   {
     key: 'PM1.0',
     label: 'PM1',
-    unit: '\u00b5g/m\u00b3',
+    unit: 'µg/m³',
     decimals: 1,
-    promNames: ['pm1', 'PM1.0', 'pm1.0'],
+    promNames: ['PM1.0', 'PM1', 'pm1', 'pm1.0'],
     queryNames: ['PM1', 'PM1.0', 'pm1'],
     slug: 'pm1'
   },
   {
     key: 'PM2.5',
     label: 'PM2.5',
-    unit: '\u00b5g/m\u00b3',
+    unit: 'µg/m³',
     decimals: 1,
-    promNames: ['pm25', 'PM2.5', 'pm2_5', 'pm2.5'],
+    promNames: ['PM2.5', 'pm25', 'pm2_5', 'pm2.5'],
     queryNames: ['PM2.5', 'pm2.5', 'pm25'],
     slug: 'pm25'
   },
   {
     key: 'PM10',
     label: 'PM10',
-    unit: '\u00b5g/m\u00b3',
+    unit: 'µg/m³',
     decimals: 1,
-    promNames: ['pm10', 'PM10'],
+    promNames: ['PM10', 'pm10'],
     queryNames: ['PM10', 'pm10'],
     slug: 'pm10'
   },
   {
     key: 'Temperatur',
     label: 'Temperatur',
-    unit: '\u00b0C',
+    unit: '°C',
     decimals: 1,
-    promNames: [
-      'temp_final',
-      'temperatur',
-      'temperatur_kalibriert',
-      'temperatur__bme_kalibriert_',
-      'temperature',
-      'temp'
-    ],
+    promNames: ['Temperatur', 'temp_final', 'temperatur', 'temperatur_kalibriert', 'temperatur__bme_kalibriert_', 'temperature', 'temp'],
     queryNames: ['Temperatur', 'temperatur', 'temperature', 'temp', 'temp_final', 'temperature_final'],
     slug: 'temp_final'
   },
@@ -67,7 +60,7 @@ const METRICS = [
     label: 'rel. Feuchte',
     unit: '%',
     decimals: 1,
-    promNames: ['humidity', 'rel. Feuchte', 'rel_feuchte'],
+    promNames: ['rel. Feuchte', 'humidity', 'rel_feuchte'],
     queryNames: ['rel. Feuchte', 'relfeuchte', 'luftfeuchte', 'humidity'],
     slug: 'humidity'
   },
@@ -76,7 +69,7 @@ const METRICS = [
     label: 'Lux',
     unit: 'lx',
     decimals: 0,
-    promNames: ['lux', 'Lux', 'beleuchtungsstaerke'],
+    promNames: ['Lux', 'lux', 'beleuchtungsstaerke'],
     queryNames: ['Lux', 'lux'],
     slug: 'lux'
   },
@@ -85,7 +78,7 @@ const METRICS = [
     label: 'CCT',
     unit: 'K',
     decimals: 0,
-    promNames: ['cct_k', 'Farbtemperatur', 'cct', 'farbtemperatur'],
+    promNames: ['Farbtemperatur', 'CCT', 'cct_k', 'cct', 'farbtemperatur'],
     queryNames: ['CCT', 'Farbtemperatur', 'cct', 'cct_k'],
     slug: 'cct_k'
   },
@@ -94,7 +87,7 @@ const METRICS = [
     label: 'Luftdruck',
     unit: 'hPa',
     decimals: 1,
-    promNames: ['pressure_hpa', 'Luftdruck', 'pressure', 'luftdruck'],
+    promNames: ['Luftdruck', 'pressure_hpa', 'pressure', 'luftdruck'],
     queryNames: ['Luftdruck', 'druck', 'pressure_hpa'],
     slug: 'pressure_hpa'
   },
@@ -103,11 +96,12 @@ const METRICS = [
     label: 'TVOC',
     unit: 'ppb',
     decimals: 0,
-    promNames: ['tvoc', 'TVOC'],
+    promNames: ['TVOC', 'tvoc'],
     queryNames: ['TVOC', 'voc', 'tvoc'],
     slug: 'tvoc'
   }
 ];
+
 
 const QUERY_LOOKUP = new Map();
 const KNOWN_QUERY_KEYS = new Set();
