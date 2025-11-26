@@ -59,6 +59,16 @@ const METRICS = [
     queryNames: ['Temperatur', 'temperatur', 'temperature', 'temp', 'temp_final', 'temperature_final'],
     slug: 'temp_final'
   },
+    {
+    key: 'rel. Feuchte',
+    label: 'rel. Feuchte',
+    unit: '%',
+    decimals: 1,
+    // Prometheus-Label name: "rel. Feuchte"
+    promNames: ['rel. Feuchte', 'humidity', 'rel_feuchte'],
+    queryNames: ['rel. Feuchte', 'relfeuchte', 'luftfeuchte', 'humidity'],
+    slug: 'humidity'
+  },
 {
   key: 'Lux',
   label: 'Lux',
