@@ -530,45 +530,40 @@
     empty: false
   });
 
-  const METRIC_CONFIG = {
-    CO2: { unit: 'ppm', decimals: 0, label: 'CO₂', apiName: 'co2' },
-    'PM1.0': { unit: 'µg/m³', decimals: 1, label: 'PM1', apiName: 'pm1' },
-    'PM2.5': { unit: 'µg/m³', decimals: 1, label: 'PM2.5', apiName: 'pm25' },
-    PM10: { unit: 'µg/m³', decimals: 1, label: 'PM10', apiName: 'pm10' },
-    TVOC: { unit: 'ppb', decimals: 0, label: 'TVOC', apiName: 'tvoc' },
-    Temperatur: { unit: '°C', decimals: 1, label: 'Temperatur', apiName: 'temp_final' },
-    'rel. Feuchte': { unit: '%', decimals: 0, label: 'rel. Feuchte', apiName: 'humidity' },
-    Lux: { unit: 'lx', decimals: 0, label: 'Lux', apiName: 'lux' },
-    Luftdruck: { unit: 'hPa', decimals: 1, label: 'Luftdruck', apiName: 'pressure_hpa' },
-    Farbtemperatur: { unit: 'K', decimals: 0, label: 'CCT', apiName: 'cct_k' }
-  };
+const METRIC_CONFIG = {
+  CO2:           { unit: 'ppm',   decimals: 0, label: 'CO₂' },
+  'PM1.0':       { unit: 'µg/m³', decimals: 1, label: 'PM1' },
+  'PM2.5':       { unit: 'µg/m³', decimals: 1, label: 'PM2.5' },
+  PM10:          { unit: 'µg/m³', decimals: 1, label: 'PM10' },
+  TVOC:          { unit: 'ppb',   decimals: 0, label: 'TVOC' },
+  Temperatur:    { unit: '°C',   decimals: 1, label: 'Temperatur' },
+  'rel. Feuchte':{ unit: '%',    decimals: 1, label: 'rel. Feuchte' },
+  Lux:           { unit: 'lx',   decimals: 0, label: 'Lux' },
+  Luftdruck:     { unit: 'hPa',  decimals: 1, label: 'Luftdruck' },
+  Farbtemperatur:{ unit: 'K',    decimals: 0, label: 'CCT' }
+};
+
 
   const NOW_KEY_ALIASES = new Map([
-    ['temperatur', 'Temperatur'],
-    ['temperature', 'Temperatur'],
-    ['temperature_final', 'Temperatur'],
-    ['temperatur__bme_kalibriert_', 'Temperatur'],
-    ['temperatur_kalibriert', 'Temperatur'],
-    ['temp', 'Temperatur'],
-    ['temp_final', 'Temperatur'],
-    ['co2', 'CO2'],
-    ['co2_ppm', 'CO2'],
-    ['pm1', 'PM1.0'],
-    ['pm1.0', 'PM1.0'],
-    ['pm 1', 'PM1.0'],
-    ['pm10', 'PM10'],
-    ['pm 10', 'PM10'],
-    ['pm25', 'PM2.5'],
-    ['pm2_5', 'PM2.5'],
-    ['tvoc', 'TVOC'],
-    ['voc', 'TVOC'],
-    ['humidity', 'rel. Feuchte'],
-    ['rel_feuchte', 'rel. Feuchte'],
-    ['pressure_hpa', 'Luftdruck'],
-    ['pressure', 'Luftdruck'],
-    ['lux', 'Lux'],
-    ['cct', 'Farbtemperatur'],
-    ['cct_k', 'Farbtemperatur']
+  ['temperatur', 'Temperatur'],
+  ['temperature', 'Temperatur'],
+  ['temp_final', 'Temperatur'],
+  ['co2', 'CO2'],
+  ['co2_ppm', 'CO2'],
+  ['pm1', 'PM1.0'],
+  ['pm1.0', 'PM1.0'],
+  ['pm25', 'PM2.5'],
+  ['pm2_5', 'PM2.5'],
+  ['pm10', 'PM10'],
+  ['tvoc', 'TVOC'],
+  ['voc', 'TVOC'],
+  ['humidity', 'rel. Feuchte'],
+  ['rel_feuchte', 'rel. Feuchte'],
+  ['pressure_hpa', 'Luftdruck'],
+  ['pressure', 'Luftdruck'],
+  ['lux', 'Lux'],
+  ['cct_k', 'Farbtemperatur'],
+  ['cct', 'Farbtemperatur']
   ]);
 
   const STATUS_TONES = {
@@ -922,89 +917,91 @@
     Luftdruck: [{ value: 1013, unit: 'hPa', label: 'Referenz 1013 hPa' }]
   };
 
-  const CHART_DEFINITIONS = {
-    CO2: {
-      key: 'CO2',
-      title: 'CO₂',
-      metrics: ['CO2'],
-      colors: ['#10b981'],
-      yTitle: 'ppm',
-      yBounds: { min: 0, max: 2500 }
-    },
-    PM: {
-      key: 'PM',
-      title: 'Feinstaub',
-      sub: 'PM1.0 / PM2.5 / PM10',
-      metrics: ['PM1.0', 'PM2.5', 'PM10'],
-      colors: ['#06b6d4', '#3b82f6', '#0f766e'],
-      yTitle: 'µg/m³',
-      yBounds: { min: 0, max: 100 }
-    },
-    Temperatur: {
-      key: 'Temperatur',
-      title: 'Temperatur',
-      metrics: ['Temperatur'],
-      colors: ['#f97316'],
-      yTitle: '°C',
-      yBounds: { min: -10, max: 40 }
-    },
-    'rel. Feuchte': {
-      key: 'rel. Feuchte',
-      title: 'rel. Feuchte',
-      metrics: ['rel. Feuchte'],
-      colors: ['#06b6d4'],
-      yTitle: '%',
-      yBounds: { min: 0, max: 100 }
-    },
-    TVOC: {
-      key: 'TVOC',
-      title: 'TVOC',
-      metrics: ['TVOC'],
-      colors: ['#3b82f6'],
-      yTitle: 'ppb',
-      yBounds: { min: 0, max: 1000 }
-    },
-    Lux: {
-      key: 'Lux',
-      title: 'Beleuchtungsstärke',
-      metrics: ['Lux'],
-      colors: ['#facc15'],
-      yTitle: 'lx',
-      yBounds: { min: 0, max: 1200 }
-    },
-    Farbtemperatur: {
-      key: 'Farbtemperatur',
-      title: 'Farbtemperatur',
-      metrics: ['Farbtemperatur'],
-      colors: ['#38bdf8'],
-      yTitle: 'K',
-      yBounds: { min: 1800, max: 7000 }
-    },
-    Luftdruck: {
-      key: 'Luftdruck',
-      title: 'Luftdruck',
-      metrics: ['Luftdruck'],
-      colors: ['#a855f7'],
-      yTitle: 'hPa',
-      yBounds: { min: 950, max: 1050 },
-      optional: true
-    }
-  };
+const CHART_DEFINITIONS = {
+  CO2: {
+    key: 'CO2',
+    title: 'CO₂',
+    metrics: ['CO2'],
+    colors: ['#10b981'],
+    yTitle: 'ppm',
+    yBounds: { min: 0, max: 2500 }
+  },
+  PM: {
+    key: 'PM',
+    title: 'Feinstaub',
+    sub: 'PM1.0 / PM2.5 / PM10',
+    metrics: ['PM1.0', 'PM2.5', 'PM10'],
+    colors: ['#06b6d4', '#3b82f6', '#0f766e'],
+    yTitle: 'µg/m³',
+    yBounds: { min: 0, max: 100 }
+  },
+  TVOC: {
+    key: 'TVOC',
+    title: 'TVOC',
+    metrics: ['TVOC'],
+    colors: ['#3b82f6'],
+    yTitle: 'ppb',
+    yBounds: { min: 0, max: 1000 }
+  },
+  Temperatur: {
+    key: 'Temperatur',
+    title: 'Temperatur',
+    metrics: ['Temperatur'],
+    colors: ['#f97316'],
+    yTitle: '°C',
+    yBounds: { min: 15, max: 30 }
+  },
+  'rel. Feuchte': {
+    key: 'rel. Feuchte',
+    title: 'Relative Feuchte',
+    metrics: ['rel. Feuchte'],
+    colors: ['#06b6d4'],
+    yTitle: '%',
+    yBounds: { min: 0, max: 100 }
+  },
+  Lux: {
+    key: 'Lux',
+    title: 'Beleuchtungsstärke',
+    metrics: ['Lux'],
+    colors: ['#facc15'],
+    yTitle: 'lx',
+    yBounds: { min: 0, max: 1200 }
+  },
+  Farbtemperatur: {
+    key: 'Farbtemperatur',
+    title: 'Farbtemperatur',
+    metrics: ['Farbtemperatur'],
+    colors: ['#38bdf8'],
+    yTitle: 'K',
+    yBounds: { min: 1800, max: 7000 }
+  },
+  Luftdruck: {
+    key: 'Luftdruck',
+    title: 'Luftdruck',
+    metrics: ['Luftdruck'],
+    colors: ['#a855f7'],
+    yTitle: 'hPa',
+    yBounds: { min: 950, max: 1050 },
+    optional: true
+  }
+};
 
-  const METRIC_TO_CHART_KEY = {
-    CO2: 'CO2',
-    'PM1.0': 'PM',
-    'PM2.5': 'PM',
-    PM10: 'PM',
-    TVOC: 'TVOC',
-    Temperatur: 'Temperatur',
-    'rel. Feuchte': 'rel. Feuchte',
-    Lux: 'Lux',
-    Farbtemperatur: 'Farbtemperatur',
-    Luftdruck: 'Luftdruck'
-  };
+const METRIC_TO_CHART_KEY = {
+  CO2: 'CO2',
+  'PM1.0': 'PM',
+  'PM2.5': 'PM',
+  PM10: 'PM',
+  TVOC: 'TVOC',
+  Temperatur: 'Temperatur',
+  'rel. Feuchte': 'rel. Feuchte',
+  Lux: 'Lux',
+  Farbtemperatur: 'Farbtemperatur',
+  Luftdruck: 'Luftdruck'
+};
 
-  const HERO_METRICS = ['CO2', 'PM2.5', 'PM1.0', 'PM10', 'TVOC', 'rel. Feuchte'];
+
+ const HERO_METRICS = ['CO2', 'PM2.5', 'PM1.0', 'PM10', 'TVOC', 'rel. Feuchte'];
+
 
   const state = {
     range: TIME_RANGES['24h'],
