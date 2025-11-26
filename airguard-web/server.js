@@ -14,98 +14,97 @@ if (typeof fetch !== 'function') {
 const METRICS = [
   {
     key: 'CO2',
-    label: 'CO₂',
+    label: 'CO\u2082',
     unit: 'ppm',
     decimals: 0,
-    // Prometheus-Label name: "CO2"
-    promNames: ['CO2', 'CO₂', 'co2_ppm', 'co2'],
-    queryNames: ['CO₂', 'CO2', 'co2', 'co2_ppm'],
+    // MUSS dem Prometheus-Label name="CO2" entsprechen:
+    promNames: ['CO2', 'co2_ppm', 'co2'],
+    queryNames: ['CO\u2082', 'CO2', 'co2', 'co2_ppm'],
     slug: 'co2'
   },
-{
-  key: 'PM1.0',
-  label: 'PM1',
-  unit: 'µg/m³',
-  decimals: 1,
-  promNames: ['PM1.0', 'PM1', 'pm1', 'pm1.0'],
-  queryNames: ['PM1', 'PM1.0', 'pm1'],
-  slug: 'pm1'
-},
-{
-  key: 'PM2.5',
-  label: 'PM2.5',
-  unit: 'µg/m³',
-  decimals: 1,
-  promNames: ['PM2.5', 'pm25', 'pm2_5', 'pm2.5'],
-  queryNames: ['PM2.5', 'pm2.5', 'pm25'],
-  slug: 'pm25'
-},
-{
-  key: 'PM10',
-  label: 'PM10',
-  unit: 'µg/m³',
-  decimals: 1,
-  promNames: ['PM10', 'pm10'],
-  queryNames: ['PM10', 'pm10'],
-  slug: 'pm10'
-},
+  {
+    key: 'PM1.0',
+    label: 'PM1',
+    unit: 'µg/m³',
+    decimals: 1,
+    promNames: ['PM1.0', 'PM1', 'pm1', 'pm1.0'],
+    queryNames: ['PM1', 'PM1.0', 'pm1'],
+    slug: 'pm1'
+  },
+  {
+    key: 'PM2.5',
+    label: 'PM2.5',
+    unit: 'µg/m³',
+    decimals: 1,
+    promNames: ['PM2.5', 'pm25', 'pm2_5', 'pm2.5'],
+    queryNames: ['PM2.5', 'pm2.5', 'pm25'],
+    slug: 'pm25'
+  },
+  {
+    key: 'PM10',
+    label: 'PM10',
+    unit: 'µg/m³',
+    decimals: 1,
+    promNames: ['PM10', 'pm10'],
+    queryNames: ['PM10', 'pm10'],
+    slug: 'pm10'
+  },
   {
     key: 'Temperatur',
     label: 'Temperatur',
     unit: '°C',
     decimals: 1,
-    // Prometheus-Label name: "Temperatur"
-    promNames: ['Temperatur', 'temp_final', 'temperatur', 'temperatur_kalibriert', 'temperatur__bme_kalibriert_', 'temperature', 'temp'],
-    queryNames: ['Temperatur', 'temperatur', 'temperature', 'temp', 'temp_final', 'temperature_final'],
+    promNames: ['Temperatur', 'temp_final', 'temperatur', 'temperature', 'temp'],
+    queryNames: ['Temperatur', 'temperatur', 'temperature', 'temp', 'temp_final'],
     slug: 'temp_final'
   },
-    {
+  {
     key: 'rel. Feuchte',
     label: 'rel. Feuchte',
     unit: '%',
     decimals: 1,
-    // Prometheus-Label name: "rel. Feuchte"
     promNames: ['rel. Feuchte', 'humidity', 'rel_feuchte'],
     queryNames: ['rel. Feuchte', 'relfeuchte', 'luftfeuchte', 'humidity'],
     slug: 'humidity'
   },
-{
-  key: 'Lux',
-  label: 'Lux',
-  unit: 'lx',
-  decimals: 0,
-  promNames: ['Lux', 'lux', 'beleuchtungsstaerke'],
-  queryNames: ['Lux', 'lux'],
-  slug: 'lux'
-},
-{
-  key: 'Farbtemperatur',
-  label: 'CCT',
-  unit: 'K',
-  decimals: 0,
-  promNames: ['Farbtemperatur', 'CCT', 'cct_k', 'cct', 'farbtemperatur'],
-  queryNames: ['CCT', 'Farbtemperatur', 'cct', 'cct_k'],
-  slug: 'cct_k'
-},
-{
-  key: 'Luftdruck',
-  label: 'Luftdruck',
-  unit: 'hPa',
-  decimals: 1,
-  promNames: ['Luftdruck', 'pressure_hpa', 'pressure', 'luftdruck'],
-  queryNames: ['Luftdruck', 'druck', 'pressure_hpa'],
-  slug: 'pressure_hpa'
-},
-{
-  key: 'TVOC',
-  label: 'TVOC',
-  unit: 'ppb',
-  decimals: 0,
-  promNames: ['TVOC', 'tvoc'],
-  queryNames: ['TVOC', 'voc', 'tvoc'],
-  slug: 'tvoc'
-}
+  {
+    key: 'Lux',
+    label: 'Lux',
+    unit: 'lx',
+    decimals: 0,
+    promNames: ['Lux', 'lux', 'beleuchtungsstaerke'],
+    queryNames: ['Lux', 'lux'],
+    slug: 'lux'
+  },
+  {
+    key: 'Farbtemperatur',
+    label: 'CCT',
+    unit: 'K',
+    decimals: 0,
+    promNames: ['Farbtemperatur', 'CCT', 'cct_k', 'cct', 'farbtemperatur'],
+    queryNames: ['CCT', 'Farbtemperatur', 'cct', 'cct_k'],
+    slug: 'cct_k'
+  },
+  {
+    key: 'Luftdruck',
+    label: 'Luftdruck',
+    unit: 'hPa',
+    decimals: 1,
+    promNames: ['Luftdruck', 'pressure_hpa', 'pressure', 'luftdruck'],
+    queryNames: ['Luftdruck', 'druck', 'pressure_hpa'],
+    slug: 'pressure_hpa'
+  },
+  {
+    key: 'TVOC',
+    label: 'TVOC',
+    unit: 'ppb',
+    decimals: 0,
+    promNames: ['TVOC', 'tvoc'],
+    queryNames: ['TVOC', 'voc', 'tvoc'],
+    slug: 'tvoc'
+  }
 ];
+
 
 
 
