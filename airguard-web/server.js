@@ -107,20 +107,12 @@ const METRICS = [
 
 const QUERY_LOOKUP = new Map();
 const KNOWN_QUERY_KEYS = new Set();
+const SERIES_PROM_NAME_CACHE = new Map();
 
 for (const metric of METRICS) {
-  const promList =
-    Array.isArray(metric.promNames) && metric.promNames.length > 0
-      ? metric.promNames
-      : [metric.key];
-
-  // Alias-Liste weiter pflegen
+  const promList = Array.isArray(metric.promNames) && metric.promNames.length > 0 ? metric.promNames : [metric.key];
   metric.promNames = promList;
-
-  // WICHTIG: der Prometheus-Labelname ist IMMER der Metric-Key
-  // (und der ist bei dir exakt der ESPHome-Name / Prometheus-`name`):
-  // CO2, PM1.0, PM2.5, PM10, Temperatur, rel. Feuchte, Lux, Farbtemperatur, Luftdruck, TVOC
-  metric.promQueryName = metric.key;
+  metric.promQueryName = promList[0];
 
   const aliases = new Set([
     metric.key,
@@ -130,13 +122,17 @@ for (const metric of METRICS) {
     ...(metric.promNames || []),
     ...(metric.queryNames || [])
   ]);
-
   for (const alias of aliases) {
     if (!alias) continue;
     const normalized = normalizeQueryName(alias);
     if (!normalized) continue;
     QUERY_LOOKUP.set(normalized, metric);
-    KNOWN_QUERY_KEYS.add(alias);
+  }
+
+  const slug = metric.slug || normalizeQueryName(metric.key);
+  if (slug) {
+    metric.slug = slug;
+    KNOWN_QUERY_KEYS.add(slug);
   }
 }
 
