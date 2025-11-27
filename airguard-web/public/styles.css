@@ -230,6 +230,7 @@ a {
   font-weight: 600;
   letter-spacing: 0.01em;
   white-space: normal;
+  max-width: 100%;
   position: sticky;
   top: 0.5rem;
   z-index: 3;
@@ -855,12 +856,11 @@ a {
 .chart-modal__content {
   --modal-padding: clamp(18px, 4vw, 26px);
   position: relative;
-  width: min(90vw, 480px);
-  max-height: 85vh;
+  width: min(480px, 92vw);
+  max-height: 90vh;
   background: var(--bg-surface);
-  border-radius: 20px;
-  padding: calc(var(--modal-padding) + env(safe-area-inset-top)) var(--modal-padding)
-    calc(var(--modal-padding) + env(safe-area-inset-bottom));
+  border-radius: 18px;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
   border: 1px solid rgba(148, 163, 184, 0.22);
   box-shadow: 0 18px 28px rgba(15, 23, 42, 0.16);
   display: grid;
@@ -973,7 +973,7 @@ a {
   position: sticky;
   top: calc(env(safe-area-inset-top) + var(--tabs-offset, 74px));
   display: flex;
-  gap: var(--space-2);
+  gap: 6px;
   justify-content: flex-start;
   flex-wrap: wrap;
   overflow-x: auto;
@@ -999,8 +999,8 @@ a {
   border: 1px solid rgba(148, 163, 184, 0.4);
   background: rgba(148, 163, 184, 0.1);
   border-radius: 999px;
-  padding: 0.55rem 1.4rem;
-  font-size: 0.95rem;
+  padding: 0.55rem 0.9rem;
+  font-size: 0.9rem;
   font-weight: 600;
   color: var(--text-muted);
   cursor: pointer;
@@ -1009,6 +1009,7 @@ a {
   touch-action: manipulation;
   text-align: center;
   line-height: 1.1;
+  white-space: nowrap;
   scroll-snap-align: center;
 }
 
@@ -1026,8 +1027,7 @@ a {
 .chart-modal__canvas {
   position: relative;
   width: 100%;
-  height: auto;
-  min-height: clamp(240px, 45vh, 420px);
+  height: clamp(220px, 45vh, 320px);
   padding: 12px;
 }
 
@@ -1038,8 +1038,8 @@ a {
 
 .chart-modal__canvas canvas {
   width: 100% !important;
-  height: auto !important;
-  aspect-ratio: 16 / 9;
+  height: 100% !important;
+  aspect-ratio: auto;
   transition: opacity var(--transition-base);
 }
 
@@ -1655,31 +1655,99 @@ a {
 }
 
 @media (max-width: 768px) {
-  .app-shell {
-    padding: calc(var(--space-6) * 0.7) calc(var(--space-4) * 0.7) calc(var(--space-7) * 0.7);
+  html,
+  body {
+    overflow-x: hidden;
+  }
+
+  .app-shell,
+  .page {
+    width: 100%;
+    max-width: 100%;
+    padding: calc(var(--space-6) * 0.7) 12px calc(var(--space-7) * 0.7);
     gap: calc(var(--space-6) * 0.7);
   }
 
   .hero {
-    padding: clamp(1.6rem, 5vw, 2rem);
-    gap: calc(var(--space-6) * 0.7);
+    margin-inline: 0;
+    border-radius: 18px;
+    padding: 16px;
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
   }
 
-  .main-content,
+  .hero-left h1 {
+    font-size: clamp(1.4rem, 5vw, 1.8rem);
+  }
+
+  .hero-sub {
+    font-size: 0.9rem;
+  }
+
+  .health-card {
+    align-items: center;
+  }
+
+  .health-ring {
+    margin: 0 auto;
+    max-width: 220px;
+  }
+
+  .hero-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .mini-grid,
   .mini-metric-grid,
   .status-grid,
-  .circadian-bars {
-    gap: calc(var(--space-3) * 0.7);
+  .chart-grid,
+  .metrics-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
   }
 
-  .mini-card,
-  .status-card,
-  .circadian-card {
-    padding: calc(var(--space-4) * 0.7);
+  .mini-card {
+    padding: 12px;
+    border-radius: 14px;
+    grid-template-columns: auto 1fr;
+    gap: var(--space-3);
   }
 
-  .section-heading {
-    margin-bottom: calc(var(--space-3) * 0.7);
+  .mini-value {
+    font-size: 1.3rem;
+  }
+
+  .mini-chart {
+    height: 52px;
+  }
+
+  .status-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .status-card {
+    padding: 12px 14px;
+    border-radius: 16px;
+  }
+
+  .metric-head h3 {
+    font-size: 0.95rem;
+    white-space: nowrap;
+  }
+
+  .status-note,
+  .status-tip {
+    font-size: 0.9rem;
+  }
+
+  .settings-badge {
+    position: static;
+    top: auto;
+    align-self: stretch;
+    max-width: 100%;
+    white-space: normal;
+    font-size: 0.85rem;
   }
 }
 
@@ -1773,22 +1841,22 @@ a {
   }
 }
 
-@media (max-width: 480px) {
-  .chart-modal__content {
-    --modal-padding: 18px;
+  @media (max-width: 480px) {
+    .chart-modal__content {
+      --modal-padding: 18px;
+    }
+
+    .modal-range-tabs {
+      justify-content: flex-start;
+      gap: 6px;
+    }
   }
 
-  .modal-range-tabs {
-    justify-content: flex-start;
-    gap: 0.65rem;
+  @media (min-width: 376px) and (max-width: 480px) {
+    .chart-modal__canvas {
+      height: clamp(220px, 45dvh, 320px);
+    }
   }
-}
-
-@media (min-width: 376px) and (max-width: 480px) {
-  .chart-modal__canvas {
-    height: clamp(240px, 45dvh, 360px);
-  }
-}
 
 @media (max-width: 375px) {
   .chart-modal__content {
@@ -1812,58 +1880,10 @@ a {
 @media (max-width: 860px) {
   .app-shell {
     width: 100%;
-    padding-inline: var(--space-3);
+    padding-inline: clamp(12px, 3vw, var(--space-3));
   }
 
   .hero {
     border-radius: var(--radius-md);
-  }
-
-  .status-grid {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  }
-
-  .mini-metric-grid {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  }
-}
-
-@media (max-width: 620px) {
-  .hero {
-    padding: var(--space-5);
-  }
-
-  .status-grid {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  }
-
-  .mini-card {
-    grid-template-columns: auto 1fr;
-  }
-}
-
-@media (max-width: 460px) {
-  .status-grid {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: var(--space-2);
-  }
-
-  .mini-metric-grid {
-    gap: var(--space-2);
-  }
-
-  .status-card,
-  .mini-card {
-    border-radius: var(--radius-md);
-  }
-
-  .mini-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 14px;
-  }
-
-  .mini-value {
-    font-size: 1.4rem;
   }
 }

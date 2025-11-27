@@ -121,12 +121,14 @@
     }
   };
 
-  const safeTooltip = {
+  const safeTooltipPlugin = {
     id: 'safeTooltip',
-    afterEvent(chart) {
-      if (!chart?.tooltip?._active || !chart.tooltip?._active[0]) {
-        return;
-      }
+    beforeEvent(chart, args) {
+      const tooltip = chart.tooltip;
+      if (!tooltip || !Array.isArray(tooltip._active)) return;
+      tooltip._active = tooltip._active.filter(
+        (item) => item && item.element && typeof item.element.x === 'number'
+      );
     }
   };
 
@@ -226,7 +228,7 @@
     }
   }
 
-  Chart.register(targetGuidePlugin, tooltipGuardPlugin, safeTooltip);
+  Chart.register(targetGuidePlugin, tooltipGuardPlugin, safeTooltipPlugin);
   Chart.defaults.font.family = "'Inter','Segoe UI',system-ui,sans-serif";
   Chart.defaults.color = '#6b7280';
   Chart.defaults.plugins.legend.labels.usePointStyle = true;
@@ -1774,26 +1776,33 @@ const METRIC_TO_CHART_KEY = {
   }
 
   function classifyTemperature(v) {
-    if (v < 19) return { status: 'Zu niedrig', color: 'blue' };
-    if (v > 26) return { status: 'Zu hoch', color: 'red' };
-    return { status: 'Optimal', color: 'green' };
+    if (v < 19) return { status: 'Zu niedrig', color: 'red' };
+    if (v < 20) return { status: 'Leicht kühl', color: 'yellow' };
+    if (v <= 24) return { status: 'Optimal', color: 'green' };
+    if (v <= 26) return { status: 'Etwas warm', color: 'yellow' };
+    return { status: 'Zu hoch', color: 'red' };
   }
 
   function classifyHumidity(v) {
-    if (v < 30) return { status: 'Zu trocken', color: 'blue' };
-    if (v > 60) return { status: 'Zu feucht', color: 'orange' };
-    return { status: 'Optimal', color: 'green' };
+    if (v < 35) return { status: 'Sehr trocken', color: 'red' };
+    if (v < 40) return { status: 'Leicht trocken', color: 'yellow' };
+    if (v <= 55) return { status: 'Optimal', color: 'green' };
+    if (v <= 60) return { status: 'Etwas feucht', color: 'blue' };
+    if (v <= 70) return { status: 'Sehr feucht', color: 'yellow' };
+    return { status: 'Extrem feucht', color: 'red' };
   }
 
   function classifyCO2(v) {
     if (v < 800) return { status: 'Hervorragend', color: 'green' };
-    if (v < 1200) return { status: 'Erhöht', color: 'yellow' };
+    if (v < 1000) return { status: 'Stabil', color: 'blue' };
+    if (v < 1400) return { status: 'Erhöht', color: 'yellow' };
     return { status: 'Schlecht', color: 'red' };
   }
 
   function classifyTVOC(v) {
     if (v < 150) return { status: 'Hervorragend', color: 'green' };
-    if (v < 400) return { status: 'Erhöht', color: 'yellow' };
+    if (v < 300) return { status: 'Gut', color: 'blue' };
+    if (v < 600) return { status: 'Erhöht', color: 'yellow' };
     return { status: 'Schlecht', color: 'red' };
   }
 
@@ -1829,7 +1838,10 @@ const METRIC_TO_CHART_KEY = {
         const cls = classifyCO2(value);
         let note = 'Luft sehr frisch.';
         let tip = 'Kein Handlungsbedarf.';
-        if (cls.status === 'Erhöht') {
+        if (cls.status === 'Stabil') {
+          note = 'CO₂ stabil – alles im Rahmen.';
+          tip = 'Gelegentlich stoßlüften.';
+        } else if (cls.status === 'Erhöht') {
           note = 'CO₂ erhöht – Konzentration sinkt.';
           tip = 'Jetzt querlüften.';
         } else if (cls.status === 'Schlecht') {
@@ -1878,7 +1890,10 @@ const METRIC_TO_CHART_KEY = {
         const cls = classifyTVOC(value);
         let note = 'VOC-Belastung sehr niedrig.';
         let tip = 'Keine Aktion erforderlich.';
-        if (cls.status === 'Erhöht') {
+        if (cls.status === 'Gut') {
+          note = 'VOC-Bereich unauffällig.';
+          tip = 'Regelmäßig kurz lüften.';
+        } else if (cls.status === 'Erhöht') {
           note = 'Flüchtige Stoffe nehmen zu.';
           tip = 'Quellen prüfen und lüften.';
         } else if (cls.status === 'Schlecht') {
@@ -1888,30 +1903,37 @@ const METRIC_TO_CHART_KEY = {
         return statusFromClassification(cls, note, tip);
       }
       case 'Temperatur': {
-        const cls = classifyTemperature(value);
-        let note = 'Im Wohlfühlbereich.';
-        let tip = 'Temperatur beibehalten.';
-        if (cls.status === 'Zu niedrig') {
-          note = 'Deutlich zu kühl.';
-          tip = 'Heizung anpassen oder wärmer kleiden.';
-        } else if (cls.status === 'Zu hoch') {
-          note = 'Sehr warm – belastend.';
-          tip = 'Aktiv kühlen und konsequent lüften.';
+        if (value < 19) {
+          return buildStatus('poor', 'Deutlich zu kühl.', 'Heizung anpassen oder wärmer kleiden.');
         }
-        return statusFromClassification(cls, note, tip);
+        if (value < 20) {
+          return buildStatus('elevated', 'Leicht unter Komfort.', 'Behutsam aufheizen.');
+        }
+        if (value <= 24) {
+          return buildStatus('excellent', 'Im Wohlfühlbereich.', 'Temperatur beibehalten.');
+        }
+        if (value <= 26) {
+          return buildStatus('elevated', 'Etwas warm.', 'Stoßlüften oder Beschattung nutzen.');
+        }
+        return buildStatus('poor', 'Sehr warm – belastend.', 'Aktiv kühlen und konsequent lüften.');
       }
       case 'rel. Feuchte': {
-        const cls = classifyHumidity(value);
-        let note = 'Wohlfühlfeuchte.';
-        let tip = 'Aktuelles Verhalten passt.';
-        if (cls.status === 'Zu trocken') {
-          note = 'Luft sehr trocken.';
-          tip = 'Befeuchten oder Pflanzen aufstellen.';
-        } else if (cls.status === 'Zu feucht') {
-          note = 'Sehr feucht – Schimmelgefahr.';
-          tip = 'Stoßlüften und trocknen.';
+        if (value < 35) {
+          return buildStatus('poor', 'Luft sehr trocken.', 'Befeuchten oder Pflanzen aufstellen.');
         }
-        return statusFromClassification(cls, note, tip);
+        if (value < 40) {
+          return buildStatus('elevated', 'Leicht trocken.', 'Sanft befeuchten oder lüften.');
+        }
+        if (value <= 55) {
+          return buildStatus('excellent', 'Wohlfühlfeuchte.', 'Aktuelles Verhalten passt.');
+        }
+        if (value <= 60) {
+          return buildStatus('good', 'Etwas feucht.', 'Regelmäßig lüften.');
+        }
+        if (value <= 70) {
+          return buildStatus('elevated', 'Sehr feucht – Schimmelgefahr.', 'Stoßlüften und trocknen.');
+        }
+        return buildStatus('poor', 'Extrem feucht.', 'Entfeuchter einsetzen und dauerhaft lüften.');
       }
       case 'Lux':
         if (value < 100) {
