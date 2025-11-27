@@ -561,6 +561,17 @@ const METRIC_CONFIG = {
   Farbtemperatur:{ unit: 'K',    decimals: 0, label: 'CCT' }
 };
 
+ const METRIC_ICONS = {
+   CO2: 'icon-cloud',
+   PM10: 'icon-dots',
+   'PM2.5': 'icon-dots',
+   'PM1.0': 'icon-dots',
+   TVOC: 'icon-flask',
+   Temperatur: 'icon-thermometer',
+   'rel. Feuchte': 'icon-droplet',
+   Luftdruck: 'icon-gauge'
+ };
+
 
   const NOW_KEY_ALIASES = new Map([
   ['temperatur', 'Temperatur'],
@@ -1010,7 +1021,8 @@ const METRIC_TO_CHART_KEY = {
 
 
  const KEY_METRICS = ['CO2', 'TVOC', 'Temperatur', 'rel. Feuchte'];
- const SPARKLINE_METRICS = ['CO2', 'PM2.5', 'PM1.0', 'PM10', 'TVOC', 'rel. Feuchte'];
+ const TREND_METRICS = ['CO2', 'PM2.5', 'PM1.0', 'PM10', 'TVOC', 'Temperatur', 'rel. Feuchte', 'Luftdruck'];
+ const SPARKLINE_METRICS = TREND_METRICS;
 
   const state = {
     range: TIME_RANGES['24h'],
@@ -1177,14 +1189,7 @@ const METRIC_TO_CHART_KEY = {
       setupCardModalTrigger(card, metric);
     });
 
-    const miniCards = document.querySelectorAll('.mini-card');
-    miniCards.forEach((card) => {
-      const metric = card.getAttribute('data-metric');
-      if (!metric) return;
-      ui.sparklineCards.set(metric, card);
-      createSparkline(metric, card);
-      setupCardModalTrigger(card, metric);
-    });
+    renderTrendCards();
 
     const statusCards = document.querySelectorAll('.status-card');
     statusCards.forEach((card) => {
@@ -1582,6 +1587,36 @@ const METRIC_TO_CHART_KEY = {
     state.sparklines.set(metric, chart);
   }
 
+  function renderTrendCards() {
+    const grid = document.querySelector('[data-trend-grid]');
+    if (!grid) return;
+    grid.innerHTML = '';
+    TREND_METRICS.forEach((metric) => {
+      const config = METRIC_CONFIG[metric];
+      const card = document.createElement('article');
+      card.className = 'trend-card mini-card skeleton';
+      card.setAttribute('data-metric', metric);
+      const icon = METRIC_ICONS[metric] || 'icon-dots';
+      const label = config?.label || metric;
+      const unit = config?.unit || '';
+      card.innerHTML = `
+        <span class="mini-icon" aria-hidden="true"><svg><use href="#${icon}" /></svg></span>
+        <div class="mini-meta">
+          <h3>${label}</h3>
+          <p class="mini-value">—</p>
+          <span class="mini-unit">${unit}</span>
+        </div>
+        <div class="mini-chart" aria-hidden="true">
+          <canvas></canvas>
+        </div>
+      `;
+      grid.appendChild(card);
+      ui.sparklineCards.set(metric, card);
+      createSparkline(metric, card);
+      setupCardModalTrigger(card, metric);
+    });
+  }
+
   function setupTimers() {
     state.timers.push(setInterval(() => refreshNow().catch(handleError), NOW_REFRESH_MS));
     state.timers.push(setInterval(() => preloadSeries(true).catch(handleError), CHART_REFRESH_MS));
@@ -1921,37 +1956,40 @@ const METRIC_TO_CHART_KEY = {
         return statusFromClassification(cls, note, tip);
       }
       case 'Temperatur': {
-        if (value < 19) {
-          return buildStatus('poor', 'Deutlich zu kühl.', 'Heizung anpassen oder wärmer kleiden.');
+        if (value < 18) {
+          return buildStatus('poor', 'Deutlich zu kühl.', 'Heizung anpassen, Zugluft vermeiden.');
         }
         if (value < 20) {
-          return buildStatus('elevated', 'Leicht unter Komfort.', 'Behutsam aufheizen.');
+          return buildStatus('elevated', 'Kühl.', 'Sanft aufheizen bis in den Komfortbereich.');
         }
-        if (value <= 24) {
+        if (value <= 23) {
           return buildStatus('excellent', 'Im Wohlfühlbereich.', 'Temperatur beibehalten.');
         }
-        if (value <= 26) {
-          return buildStatus('elevated', 'Etwas warm.', 'Stoßlüften oder Beschattung nutzen.');
+        if (value <= 25) {
+          return buildStatus('good', 'Etwas warm.', 'Kurz lüften oder beschatten.');
         }
-        return buildStatus('poor', 'Sehr warm – belastend.', 'Aktiv kühlen und konsequent lüften.');
+        if (value <= 27) {
+          return buildStatus('elevated', 'Warm – abkühlen.', 'Beschattung und Lüftung nutzen.');
+        }
+        return buildStatus('poor', 'Sehr warm.', 'Aktiv kühlen und konsequent lüften.');
       }
       case 'rel. Feuchte': {
-        if (value < 35) {
-          return buildStatus('poor', 'Luft sehr trocken.', 'Befeuchten oder Pflanzen aufstellen.');
+        if (value < 30) {
+          return buildStatus('poor', 'Luft sehr trocken.', 'Befeuchten oder Pflanzen einsetzen.');
         }
         if (value < 40) {
-          return buildStatus('elevated', 'Leicht trocken.', 'Sanft befeuchten oder lüften.');
+          return buildStatus('elevated', 'Trocken.', 'Leicht befeuchten oder sanft lüften.');
         }
         if (value <= 55) {
           return buildStatus('excellent', 'Wohlfühlfeuchte.', 'Aktuelles Verhalten passt.');
         }
         if (value <= 60) {
-          return buildStatus('good', 'Etwas feucht.', 'Regelmäßig lüften.');
+          return buildStatus('good', 'Leicht feucht.', 'Regelmäßig lüften.');
         }
         if (value <= 70) {
-          return buildStatus('elevated', 'Sehr feucht – Schimmelgefahr.', 'Stoßlüften und trocknen.');
+          return buildStatus('elevated', 'Feucht.', 'Stoßlüften und trocknen.');
         }
-        return buildStatus('poor', 'Extrem feucht.', 'Entfeuchter einsetzen und dauerhaft lüften.');
+        return buildStatus('poor', 'Sehr feucht.', 'Entfeuchter einsetzen und konsequent lüften.');
       }
       case 'Lux':
         if (value < 100) {
@@ -3133,6 +3171,18 @@ const METRIC_TO_CHART_KEY = {
       sparkline.data.datasets[0].backgroundColor = colorWithAlpha(color, 0.18);
       scheduleChartUpdate(sparkline, 'none');
       if (card) {
+        const labelEl = card.querySelector('.mini-meta h3');
+        const valueEl = card.querySelector('.mini-value');
+        const unitEl = card.querySelector('.mini-unit');
+        if (labelEl) labelEl.textContent = METRIC_CONFIG[metric]?.label || metric;
+        if (unitEl) unitEl.textContent = METRIC_CONFIG[metric]?.unit || '';
+        if (valueEl) {
+          valueEl.textContent = sample?.value != null
+            ? formatNumber(sample.value, METRIC_CONFIG[metric]?.decimals)
+            : '—';
+        }
+        card.classList.remove('skeleton');
+        card.classList.add('ready');
         const container = card.querySelector('.mini-chart');
         if (container) {
           container.classList.toggle('is-empty', data.length < 2);
