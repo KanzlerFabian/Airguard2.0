@@ -1551,11 +1551,11 @@ const METRIC_TO_CHART_KEY = {
           {
             data: [],
             borderColor: color,
-            backgroundColor: colorWithAlpha(color, 0.16),
-            tension: 0.35,
+            backgroundColor: colorWithAlpha(color, 0.1),
+            tension: 0.4,
             fill: 'start',
             pointRadius: 0,
-            borderWidth: 2,
+            borderWidth: 1.6,
             spanGaps: true
           }
         ]
