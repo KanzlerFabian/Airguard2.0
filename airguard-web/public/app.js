@@ -121,6 +121,15 @@
     }
   };
 
+  const safeTooltip = {
+    id: 'safeTooltip',
+    afterEvent(chart) {
+      if (!chart?.tooltip?._active || !chart.tooltip?._active[0]) {
+        return;
+      }
+    }
+  };
+
   function chartHasUsableData(chart) {
     const datasets = chart?.data?.datasets;
     if (!Array.isArray(datasets) || datasets.length === 0) {
@@ -217,7 +226,7 @@
     }
   }
 
-  Chart.register(targetGuidePlugin, tooltipGuardPlugin);
+  Chart.register(targetGuidePlugin, tooltipGuardPlugin, safeTooltip);
   Chart.defaults.font.family = "'Inter','Segoe UI',system-ui,sans-serif";
   Chart.defaults.color = '#6b7280';
   Chart.defaults.plugins.legend.labels.usePointStyle = true;
@@ -1518,6 +1527,14 @@ const METRIC_TO_CHART_KEY = {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     const color = definition.colors?.[0] || '#0ea5e9';
+    const existing = state.sparklines.get(metric);
+    if (existing) {
+      try {
+        existing.destroy();
+      } catch (error) {
+        console.warn('Sparkline konnte nicht bereinigt werden', error);
+      }
+    }
     const chart = new Chart(ctx, {
       type: 'line',
       data: {
@@ -1756,23 +1773,71 @@ const METRIC_TO_CHART_KEY = {
     updateHealthCard(statuses);
   }
 
+  function classifyTemperature(v) {
+    if (v < 19) return { status: 'Zu niedrig', color: 'blue' };
+    if (v > 26) return { status: 'Zu hoch', color: 'red' };
+    return { status: 'Optimal', color: 'green' };
+  }
+
+  function classifyHumidity(v) {
+    if (v < 30) return { status: 'Zu trocken', color: 'blue' };
+    if (v > 60) return { status: 'Zu feucht', color: 'orange' };
+    return { status: 'Optimal', color: 'green' };
+  }
+
+  function classifyCO2(v) {
+    if (v < 800) return { status: 'Hervorragend', color: 'green' };
+    if (v < 1200) return { status: 'Erhöht', color: 'yellow' };
+    return { status: 'Schlecht', color: 'red' };
+  }
+
+  function classifyTVOC(v) {
+    if (v < 150) return { status: 'Hervorragend', color: 'green' };
+    if (v < 400) return { status: 'Erhöht', color: 'yellow' };
+    return { status: 'Schlecht', color: 'red' };
+  }
+
+  const CLASSIFICATION_TONE_MAP = {
+    green: 'excellent',
+    yellow: 'warning',
+    orange: 'warning',
+    red: 'poor',
+    blue: 'good'
+  };
+
+  function statusFromClassification(classification, note = '', tip = '') {
+    if (!classification) {
+      return buildStatus('neutral', note, tip);
+    }
+    const tone = CLASSIFICATION_TONE_MAP[classification.color] || 'neutral';
+    return {
+      intent: tone,
+      tone,
+      label: classification.status,
+      note,
+      tip
+    };
+  }
+
   function determineStatus(metric, value) {
     if (!isFinite(value)) {
       return { tone: 'neutral', intent: 'neutral', label: 'n/v', note: '', tip: '' };
     }
 
     switch (metric) {
-      case 'CO2':
-        if (value <= 800) {
-          return buildStatus('excellent', 'Luft sehr frisch.', 'Kein Handlungsbedarf.');
+      case 'CO2': {
+        const cls = classifyCO2(value);
+        let note = 'Luft sehr frisch.';
+        let tip = 'Kein Handlungsbedarf.';
+        if (cls.status === 'Erhöht') {
+          note = 'CO₂ erhöht – Konzentration sinkt.';
+          tip = 'Jetzt querlüften.';
+        } else if (cls.status === 'Schlecht') {
+          note = 'Sehr hohe CO₂-Belastung.';
+          tip = 'Fenster öffnen oder Lüftung aktivieren.';
         }
-        if (value <= 1000) {
-          return buildStatus('good', 'CO₂ im stabilen Bereich.', 'Regelmäßiges Lüften hält das Niveau.');
-        }
-        if (value <= 1400) {
-          return buildStatus('elevated', 'CO₂ steigt – Konzentration sinkt.', 'Jetzt querlüften.');
-        }
-        return buildStatus('poor', 'Sehr hohe CO₂-Belastung.', 'Fenster öffnen oder Lüftung aktivieren.');
+        return statusFromClassification(cls, note, tip);
+      }
       case 'PM1.0':
         if (value <= 5) {
           return buildStatus('excellent', 'Sehr geringe PM1-Belastung.', 'Keine Maßnahmen erforderlich.');
@@ -1809,48 +1874,45 @@ const METRIC_TO_CHART_KEY = {
           return buildStatus('poor', 'Hohe PM10-Werte.', 'Gründlich lüften und Oberflächen reinigen.');
         }
         return buildStatus('poor', 'Extrem hohe PM10-Belastung.', 'Intensiv lüften und Luftreiniger einsetzen.');
-      case 'TVOC':
-        if (value <= 150) {
-          return buildStatus('excellent', 'VOC-Belastung sehr niedrig.', 'Keine Aktion erforderlich.');
+      case 'TVOC': {
+        const cls = classifyTVOC(value);
+        let note = 'VOC-Belastung sehr niedrig.';
+        let tip = 'Keine Aktion erforderlich.';
+        if (cls.status === 'Erhöht') {
+          note = 'Flüchtige Stoffe nehmen zu.';
+          tip = 'Quellen prüfen und lüften.';
+        } else if (cls.status === 'Schlecht') {
+          note = 'Hohe VOC-Belastung.';
+          tip = 'Lüften und Auslöser reduzieren.';
         }
-        if (value <= 300) {
-          return buildStatus('good', 'VOC unauffällig.', 'Regelmäßiges Lüften beibehmen.');
+        return statusFromClassification(cls, note, tip);
+      }
+      case 'Temperatur': {
+        const cls = classifyTemperature(value);
+        let note = 'Im Wohlfühlbereich.';
+        let tip = 'Temperatur beibehalten.';
+        if (cls.status === 'Zu niedrig') {
+          note = 'Deutlich zu kühl.';
+          tip = 'Heizung anpassen oder wärmer kleiden.';
+        } else if (cls.status === 'Zu hoch') {
+          note = 'Sehr warm – belastend.';
+          tip = 'Aktiv kühlen und konsequent lüften.';
         }
-        if (value <= 600) {
-          return buildStatus('elevated', 'Flüchtige Stoffe nehmen zu.', 'Quellen prüfen und lüften.');
+        return statusFromClassification(cls, note, tip);
+      }
+      case 'rel. Feuchte': {
+        const cls = classifyHumidity(value);
+        let note = 'Wohlfühlfeuchte.';
+        let tip = 'Aktuelles Verhalten passt.';
+        if (cls.status === 'Zu trocken') {
+          note = 'Luft sehr trocken.';
+          tip = 'Befeuchten oder Pflanzen aufstellen.';
+        } else if (cls.status === 'Zu feucht') {
+          note = 'Sehr feucht – Schimmelgefahr.';
+          tip = 'Stoßlüften und trocknen.';
         }
-        return buildStatus('poor', 'Hohe VOC-Belastung.', 'Lüften und Auslöser reduzieren.');
-      case 'Temperatur':
-        if (value < 19) {
-          return buildStatus('poor', 'Deutlich zu kühl.', 'Heizung anpassen oder wärmer kleiden.');
-        }
-        if (value < 20) {
-          return buildStatus('elevated', 'Leicht unter Komfort.', 'Behutsam aufheizen.');
-        }
-        if (value <= 24) {
-          return buildStatus('excellent', 'Im Wohlfühlbereich.', 'Temperatur beibehalten.');
-        }
-        if (value <= 26) {
-          return buildStatus('elevated', 'Etwas warm.', 'Stoßlüften oder Beschattung nutzen.');
-        }
-        return buildStatus('poor', 'Sehr warm – belastend.', 'Aktiv kühlen und konsequent lüften.');
-      case 'rel. Feuchte':
-        if (value < 35) {
-          return buildStatus('poor', 'Luft sehr trocken.', 'Befeuchten oder Pflanzen aufstellen.');
-        }
-        if (value < 40) {
-          return buildStatus('elevated', 'Leicht trocken.', 'Sanft befeuchten oder lüften.');
-        }
-        if (value <= 55) {
-          return buildStatus('excellent', 'Wohlfühlfeuchte.', 'Aktuelles Verhalten passt.');
-        }
-        if (value <= 60) {
-          return buildStatus('good', 'Etwas feucht.', 'Regelmäßig lüften.');
-        }
-        if (value <= 70) {
-          return buildStatus('elevated', 'Sehr feucht – Schimmelgefahr.', 'Stoßlüften und trocknen.');
-        }
-        return buildStatus('poor', 'Extrem feucht.', 'Entfeuchter einsetzen und dauerhaft lüften.');
+        return statusFromClassification(cls, note, tip);
+      }
       case 'Lux':
         if (value < 100) {
           return buildStatus('poor', 'Licht deutlich zu schwach.', 'Helligkeit erhöhen oder Tageslicht nutzen.');
@@ -2383,8 +2445,14 @@ const METRIC_TO_CHART_KEY = {
   }
 
   function ensureCircadianChart(kind, definition, metricKey) {
-    if (state.circadianCharts[kind]) {
-      return state.circadianCharts[kind];
+    const existing = state.circadianCharts[kind];
+    if (existing) {
+      try {
+        existing.destroy();
+      } catch (error) {
+        console.warn('Circadian-Chart konnte nicht bereinigt werden', error);
+      }
+      state.circadianCharts[kind] = null;
     }
     const canvas = kind === 'lux' ? ui.circadianLuxCanvas : ui.circadianCctCanvas;
     if (!canvas) return null;

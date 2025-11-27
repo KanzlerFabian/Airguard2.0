@@ -92,11 +92,11 @@ a {
 }
 
 .app-shell {
-  width: min(1180px, 94vw);
-  padding: var(--space-6) var(--space-4) var(--space-7);
+  width: min(1180px, 100vw);
+  padding: clamp(1.6rem, 4vw, 2.6rem) clamp(1.2rem, 4vw, 2.1rem) var(--space-7);
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: clamp(var(--space-4), 4vw, var(--space-7));
 }
 
 .hero {
@@ -104,7 +104,7 @@ a {
   gap: var(--space-6);
   background: var(--bg-surface);
   border-radius: var(--radius-lg);
-  padding: clamp(2.2rem, 2.5vw, 2.8rem);
+  padding: clamp(1.8rem, 3vw, 2.6rem);
   box-shadow: var(--shadow-soft);
   border: 1px solid rgba(148, 163, 184, 0.14);
 }
@@ -113,6 +113,11 @@ a {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+}
+
+.hero-left h1 {
+  font-size: clamp(1.7rem, 4vw, 2.6rem);
+  line-height: 1.15;
 }
 
 .hero-sub {
@@ -130,12 +135,15 @@ a {
   gap: var(--space-3);
   justify-items: center;
   border: 1px solid rgba(6, 182, 212, 0.14);
+  width: 100%;
+  max-width: 100%;
 }
 
 .health-ring {
   position: relative;
   width: clamp(160px, 24vw, 200px);
   aspect-ratio: 1/1;
+  margin: 0 auto;
 }
 
 .health-ring svg {
@@ -179,6 +187,7 @@ a {
   font-size: 1.05rem;
   color: var(--tone-teal);
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .health-detail {
@@ -212,7 +221,7 @@ a {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0.45rem 0.9rem;
+  padding: 0.35rem 0.75rem;
   border-radius: 999px;
   border: 1px solid rgba(239, 68, 68, 0.35);
   background: rgba(239, 68, 68, 0.1);
@@ -220,7 +229,11 @@ a {
   font-size: 0.85rem;
   font-weight: 600;
   letter-spacing: 0.01em;
-  white-space: nowrap;
+  white-space: normal;
+  position: sticky;
+  top: 0.5rem;
+  z-index: 3;
+  align-self: flex-start;
 }
 
 .ghost-btn {
@@ -255,8 +268,8 @@ a {
 
 .mini-metric-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
 }
 
 .mini-card {
@@ -274,6 +287,9 @@ a {
   cursor: pointer;
   transition: transform var(--transition-base), box-shadow var(--transition-base), border var(--transition-base);
   text-align: right;
+  width: 100%;
+  max-width: 100%;
+  overflow: visible;
 }
 
 .mini-card:hover,
@@ -292,6 +308,7 @@ a {
   display: grid;
   place-items: center;
   color: var(--tone-teal);
+  flex-shrink: 0;
 }
 
 .mini-icon svg {
@@ -327,7 +344,7 @@ a {
   position: relative;
   grid-column: 1 / -1;
   width: 100%;
-  height: 54px;
+  min-height: clamp(48px, 12vw, 68px);
   margin-top: var(--space-2);
   background: linear-gradient(180deg, rgba(14, 165, 233, 0.08), rgba(16, 185, 129, 0.05));
   border-radius: calc(var(--radius-md) - 6px);
@@ -393,8 +410,8 @@ a {
 
 .status-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: clamp(12px, 2vw, 16px);
 }
 
 .status-card {
@@ -408,6 +425,9 @@ a {
   cursor: pointer;
   transition: transform var(--transition-base), box-shadow var(--transition-base), border var(--transition-base);
   text-align: right;
+  width: 100%;
+  max-width: 100%;
+  overflow: visible;
 }
 
 .status-card:hover,
@@ -438,6 +458,7 @@ a {
   color: var(--tone-teal);
   transition: background var(--transition-base), color var(--transition-base);
   grid-area: icon;
+  flex-shrink: 0;
 }
 
 .metric-icon svg {
@@ -504,6 +525,7 @@ a {
   background: rgba(148, 163, 184, 0.18);
   color: var(--text-muted);
   transition: background var(--transition-base), color var(--transition-base);
+  white-space: nowrap;
 }
 
 .badge[data-tone="excellent"],
@@ -816,7 +838,7 @@ a {
   background: rgba(11, 17, 28, 0.38);
   backdrop-filter: blur(6px);
   z-index: 60;
-  touch-action: none;
+  touch-action: pan-y;
 }
 
 .chart-modal[hidden] {
@@ -833,10 +855,10 @@ a {
 .chart-modal__content {
   --modal-padding: clamp(18px, 4vw, 26px);
   position: relative;
-  width: min(640px, 92vw);
-  max-height: 90dvh;
+  width: min(90vw, 480px);
+  max-height: 85vh;
   background: var(--bg-surface);
-  border-radius: 16px;
+  border-radius: 20px;
   padding: calc(var(--modal-padding) + env(safe-area-inset-top)) var(--modal-padding)
     calc(var(--modal-padding) + env(safe-area-inset-bottom));
   border: 1px solid rgba(148, 163, 184, 0.22);
@@ -952,8 +974,8 @@ a {
   top: calc(env(safe-area-inset-top) + var(--tabs-offset, 74px));
   display: flex;
   gap: var(--space-2);
-  justify-content: space-between;
-  flex-wrap: nowrap;
+  justify-content: flex-start;
+  flex-wrap: wrap;
   overflow-x: auto;
   overscroll-behavior: contain;
   scroll-snap-type: x proximity;
@@ -1004,12 +1026,20 @@ a {
 .chart-modal__canvas {
   position: relative;
   width: 100%;
-  height: clamp(220px, 40dvh, 340px);
+  height: auto;
+  min-height: clamp(240px, 45vh, 420px);
+  padding: 12px;
+}
+
+.modal-chart-container {
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .chart-modal__canvas canvas {
   width: 100% !important;
-  height: 100% !important;
+  height: auto !important;
+  aspect-ratio: 16 / 9;
   transition: opacity var(--transition-base);
 }
 
@@ -1259,7 +1289,7 @@ a {
   background: rgba(11, 17, 28, 0.38);
   backdrop-filter: blur(6px);
   z-index: 55;
-  touch-action: none;
+  touch-action: pan-y;
 }
 
 .circadian-modal[hidden] {
@@ -1276,10 +1306,10 @@ a {
 .circadian-modal__content {
   --circadian-padding: clamp(18px, 4vw, 26px);
   position: relative;
-  width: min(620px, 94vw);
-  max-height: 90dvh;
+  width: min(90vw, 480px);
+  max-height: 85vh;
   background: var(--bg-surface);
-  border-radius: 18px;
+  border-radius: 20px;
   border: 1px solid rgba(148, 163, 184, 0.22);
   box-shadow: 0 18px 30px rgba(15, 23, 42, 0.16);
   padding: calc(var(--circadian-padding) + env(safe-area-inset-top))
@@ -1371,7 +1401,9 @@ a {
 
 .circadian-modal__chart canvas {
   width: 100% !important;
-  height: clamp(200px, 32dvh, 320px) !important;
+  height: auto !important;
+  min-height: clamp(200px, 35vh, 320px) !important;
+  aspect-ratio: 16 / 9;
 }
 
 .circadian-modal__info {
@@ -1788,11 +1820,11 @@ a {
   }
 
   .status-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   }
 
   .mini-metric-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   }
 }
 
@@ -1802,7 +1834,7 @@ a {
   }
 
   .status-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   }
 
   .mini-card {
@@ -1812,7 +1844,7 @@ a {
 
 @media (max-width: 460px) {
   .status-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: var(--space-2);
   }
 
