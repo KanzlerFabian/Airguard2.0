@@ -57,36 +57,111 @@
   <div class="app-shell">
     <header class="hero" aria-labelledby="hero-title">
       <div class="hero-left">
-        <h1 id="hero-title">AirGuard Innenraum-Qualität</h1>
-        <p class="hero-sub">Live-Überblick für gesunde Luft & Wohlbefinden</p>
-        <div class="health-card" role="status" aria-live="polite">
-          <div class="health-ring" aria-hidden="true">
-            <svg viewBox="0 0 120 120">
-              <defs>
-                <linearGradient id="health-gradient" x1="0" y1="1" x2="1" y2="0">
-                  <stop offset="0%" stop-color="#06b6d4" />
-                  <stop offset="100%" stop-color="#10b981" />
-                </linearGradient>
-              </defs>
-              <circle class="health-bg" cx="60" cy="60" r="54"></circle>
-              <circle class="health-progress" cx="60" cy="60" r="54" stroke-dasharray="339.292" stroke-dashoffset="339.292"></circle>
-            </svg>
-            <div class="health-value">
-              <span id="health-score" class="health-score">—</span>
-              <span id="health-label" class="health-label">Nicht verfügbar</span>
-            </div>
-          </div>
-          <p id="health-detail" class="health-detail">Werte werden geladen …</p>
-          <p id="offline-indicator" class="offline-indicator" hidden>Offline – letzte Daten unbekannt</p>
+        <div class="hero-heading">
+          <h1 id="hero-title">AirGuard Innenraum-Qualität</h1>
+          <p class="hero-sub">Live-Überblick für gesunde Luft & Wohlbefinden</p>
         </div>
-        <div class="hero-actions">
-          <button id="install-btn" type="button" class="ghost-btn" hidden>App installieren</button>
-          <button id="notify-btn" type="button" class="ghost-btn" hidden>Benachrichtigungen aktivieren</button>
-          <span id="pwa-status-badge" class="settings-badge" hidden>Offline-Cache deaktiviert (kein gültiges Zertifikat)</span>
+        <div class="hero-body">
+          <div class="health-card" role="status" aria-live="polite">
+            <div class="health-ring" aria-hidden="true">
+              <svg viewBox="0 0 120 120">
+                <defs>
+                  <linearGradient id="health-gradient" x1="0" y1="1" x2="1" y2="0">
+                    <stop offset="0%" stop-color="#06b6d4" />
+                    <stop offset="100%" stop-color="#10b981" />
+                  </linearGradient>
+                </defs>
+                <circle class="health-bg" cx="60" cy="60" r="54"></circle>
+                <circle class="health-progress" cx="60" cy="60" r="54" stroke-dasharray="339.292" stroke-dashoffset="339.292"></circle>
+              </svg>
+              <div class="health-value">
+                <span id="health-score" class="health-score">—</span>
+                <span id="health-label" class="health-label">Nicht verfügbar</span>
+              </div>
+            </div>
+            <p id="health-detail" class="health-detail">Werte werden geladen …</p>
+            <p id="offline-indicator" class="offline-indicator" hidden>Offline – letzte Daten unbekannt</p>
+          </div>
+          <div class="hero-actions">
+            <button id="install-btn" type="button" class="ghost-btn" hidden>App installieren</button>
+            <button id="notify-btn" type="button" class="ghost-btn" hidden>Benachrichtigungen aktivieren</button>
+            <span id="pwa-status-badge" class="settings-badge" hidden>Offline-Cache deaktiviert (kein gültiges Zertifikat)</span>
+          </div>
         </div>
       </div>
       <div class="hero-right" aria-labelledby="hero-metrics-title">
-        <h2 id="hero-metrics-title" class="section-title">Kernwerte</h2>
+        <div class="core-panel">
+          <div class="core-panel__head">
+            <div>
+              <p class="eyebrow">Kernmetriken</p>
+              <h2 id="hero-metrics-title">Luft & Komfort im Blick</h2>
+            </div>
+            <p class="hero-update">Letzte Aktualisierung: <time id="last-updated">—</time></p>
+          </div>
+          <div class="core-grid">
+            <article class="core-card skeleton" data-metric="CO2">
+              <div class="core-label">
+                <span class="pill-icon" aria-hidden="true"><svg><use href="#icon-cloud" /></svg></span>
+                <div class="core-text">
+                  <span class="core-name">CO₂</span>
+                  <span class="core-unit">ppm</span>
+                </div>
+              </div>
+              <div class="core-value">
+                <span class="core-number">—</span>
+                <span class="core-badge" data-tone="neutral">—</span>
+              </div>
+            </article>
+            <article class="core-card skeleton" data-metric="TVOC">
+              <div class="core-label">
+                <span class="pill-icon" aria-hidden="true"><svg><use href="#icon-flask" /></svg></span>
+                <div class="core-text">
+                  <span class="core-name">TVOC</span>
+                  <span class="core-unit">ppb</span>
+                </div>
+              </div>
+              <div class="core-value">
+                <span class="core-number">—</span>
+                <span class="core-badge" data-tone="neutral">—</span>
+              </div>
+            </article>
+            <article class="core-card skeleton" data-metric="Temperatur">
+              <div class="core-label">
+                <span class="pill-icon" aria-hidden="true"><svg><use href="#icon-thermometer" /></svg></span>
+                <div class="core-text">
+                  <span class="core-name">Temperatur</span>
+                  <span class="core-unit">°C</span>
+                </div>
+              </div>
+              <div class="core-value">
+                <span class="core-number">—</span>
+                <span class="core-badge" data-tone="neutral">—</span>
+              </div>
+            </article>
+            <article class="core-card skeleton" data-metric="rel. Feuchte">
+              <div class="core-label">
+                <span class="pill-icon" aria-hidden="true"><svg><use href="#icon-droplet" /></svg></span>
+                <div class="core-text">
+                  <span class="core-name">rel. Feuchte</span>
+                  <span class="core-unit">%</span>
+                </div>
+              </div>
+              <div class="core-value">
+                <span class="core-number">—</span>
+                <span class="core-badge" data-tone="neutral">—</span>
+              </div>
+            </article>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <section class="mini-section" aria-labelledby="mini-heading">
+        <div class="section-heading">
+          <h2 id="mini-heading">Kernwerte Verlauf</h2>
+          <p>Feinstaub, Gase und Komfortfaktoren im Tagesprofil</p>
+        </div>
         <div class="mini-metric-grid">
           <article class="mini-card skeleton" data-metric="CO2">
             <span class="mini-icon" aria-hidden="true"><svg><use href="#icon-cloud" /></svg></span>
@@ -155,11 +230,8 @@
             </div>
           </article>
         </div>
-        <p class="hero-update">Letzte Aktualisierung: <time id="last-updated">—</time></p>
-      </div>
-    </header>
+      </section>
 
-    <main class="main-content">
       <section class="status-section" aria-labelledby="status-heading">
         <div class="section-heading">
           <h2 id="status-heading">Statusübersicht</h2>
@@ -369,12 +441,12 @@
           <button type="button" class="ghost-btn chart-modal__retry" id="chart-modal-retry">Erneut laden</button>
         </div>
       </div>
-      <div class="chart-modal__info">
-        <dl id="chart-modal-insight" class="chart-modal__insight"></dl>
-      </div>
       <div class="chart-modal__scale" id="chart-modal-scale">
         <svg id="chart-modal-scale-svg" class="chart-scale" viewBox="0 0 100 48" role="presentation" aria-hidden="true"></svg>
         <p id="chart-modal-scale-caption" class="chart-modal__scale-caption">—</p>
+      </div>
+      <div class="chart-modal__info">
+        <dl id="chart-modal-insight" class="chart-modal__insight"></dl>
       </div>
 
     </div>

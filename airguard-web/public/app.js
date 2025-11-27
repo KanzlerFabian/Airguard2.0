@@ -231,6 +231,13 @@
   Chart.register(targetGuidePlugin, tooltipGuardPlugin, safeTooltipPlugin);
   Chart.defaults.font.family = "'Inter','Segoe UI',system-ui,sans-serif";
   Chart.defaults.color = '#6b7280';
+  Chart.defaults.borderColor = 'rgba(148, 163, 184, 0.28)';
+  Chart.defaults.elements.line.borderWidth = 2;
+  Chart.defaults.elements.line.tension = 0.35;
+  Chart.defaults.elements.point.radius = 0;
+  Chart.defaults.scale.grid.color = 'rgba(148, 163, 184, 0.14)';
+  Chart.defaults.scale.grid.borderColor = 'rgba(148, 163, 184, 0.24)';
+  Chart.defaults.scale.ticks.color = '#94a3b8';
   Chart.defaults.plugins.legend.labels.usePointStyle = true;
   Chart.defaults.plugins.legend.position = 'bottom';
   Chart.defaults.plugins.tooltip.mode = 'index';
@@ -607,10 +614,10 @@ const METRIC_CONFIG = {
       min: 400,
       max: 2000,
       segments: [
-        { from: 400, to: 800, label: 'Optimal', tone: 'excellent' },
-        { from: 800, to: 1000, label: 'Stabil', tone: 'good' },
-        { from: 1000, to: 1400, label: 'Lüften', tone: 'elevated' },
-        { from: 1400, to: 2000, label: 'Alarm', tone: 'poor' }
+        { from: 400, to: 800, label: 'Hervorragend', tone: 'excellent' },
+        { from: 800, to: 1000, label: 'Gut', tone: 'good' },
+        { from: 1000, to: 1400, label: 'Erhöht', tone: 'elevated' },
+        { from: 1400, to: 2000, label: 'Schlecht', tone: 'poor' }
       ],
       ticks: [{ at: 400 }, { at: 800 }, { at: 1000 }, { at: 1400 }, { at: 2000 }]
     },
@@ -656,19 +663,10 @@ const METRIC_CONFIG = {
   const METRIC_INSIGHTS = {
     CO2: {
       sections: [
-        { title: 'Bedeutung', text: 'CO₂ zeigt, wie verbraucht die Raumluft ist und ob ausreichend Frischluft vorhanden ist.' },
-        {
-          title: 'Gesunde Werte',
-          text: '400–800 ppm optimal, 800–1000 ppm stabil, 1000–1400 ppm Lüften einplanen, ab 1400 ppm Alarm.'
-        },
-        {
-          title: 'Auswirkungen',
-          text: 'Steigt CO₂ über 1000 ppm, sinken Konzentration und Wohlbefinden; ab 1400 ppm drohen Kopfschmerzen und Müdigkeit.'
-        },
-        {
-          title: 'Verbesserung',
-          text: 'Regelmäßig querlüften (5–10 Minuten) oder Lüftungssystem aktivieren – besonders bei mehreren Personen im Raum.'
-        }
+        { title: 'Bedeutung', text: 'CO₂ zeigt, wie viel verbrauchte Luft im Raum bleibt und ob genug Frischluft zirkuliert.' },
+        { title: 'Gesunde Werte', text: '400–800 ppm hervorragend, 800–1000 ppm gut, 1000–1400 ppm erhöht, ab 1400 ppm schlecht.' },
+        { title: 'Auswirkungen', text: 'Hohe CO₂-Werte mindern Wachheit und Konzentration; ab ~1400 ppm drohen Kopfschmerzen und Müdigkeit.' },
+        { title: 'Verbesserung', text: 'Stoß- und Querlüften, Türspalt offen lassen, Lüftung oder Filter aktivieren sobald der Trend steigt.' }
       ],
       scale: {
         unit: 'ppm',
@@ -676,19 +674,19 @@ const METRIC_CONFIG = {
         max: 2000,
         caption: 'Bewertung orientiert sich an Innenraumempfehlungen für CO₂.',
         bands: [
-          { label: 'Optimal', min: 400, max: 800, tone: 'excellent' },
-          { label: 'Stabil', min: 800, max: 1000, tone: 'good' },
-          { label: 'Lüften', min: 1000, max: 1400, tone: 'elevated' },
-          { label: 'Alarm', min: 1400, max: 2000, tone: 'poor' }
+          { label: 'Hervorragend', min: 400, max: 800, tone: 'excellent' },
+          { label: 'Gut', min: 800, max: 1000, tone: 'good' },
+          { label: 'Erhöht', min: 1000, max: 1400, tone: 'elevated' },
+          { label: 'Schlecht', min: 1400, max: 2000, tone: 'poor' }
         ]
       }
     },
     'PM2.5': {
       sections: [
-        { title: 'Bedeutung', text: 'Feinstaub besteht aus winzigen Partikeln, die tief in die Lunge gelangen.' },
-        { title: 'Gesunde Werte', text: 'Unter 5 µg/m³ optimal, bis 12 µg/m³ gut.' },
-        { title: 'Auswirkungen', text: 'Langfristige Belastung kann Atemwege reizen und Entzündungen fördern.' },
-        { title: 'Verbesserung', text: 'Innenquellen vermeiden (Kerzen, Kochen, Staub), Luftreiniger mit HEPA-Filter verwenden.' }
+        { title: 'Bedeutung', text: 'Feinstaub gelangt tief in die Lunge – besonders relevant bei längeren Aufenthalten im Raum.' },
+        { title: 'Gesunde Werte', text: '≤ 5 µg/m³ hervorragend, ≤ 12 µg/m³ gut, ≤ 25 µg/m³ erhöht, > 25 µg/m³ schlecht.' },
+        { title: 'Auswirkungen', text: 'Steigende PM2.5-Werte reizen Atemwege und erhöhen auf Dauer das Risiko für Entzündungen.' },
+        { title: 'Verbesserung', text: 'Innenquellen reduzieren (Kochen, Kerzen, Staub), kurz und kräftig lüften, HEPA-Filter nutzen.' }
       ],
       scale: {
         unit: 'µg/m³',
@@ -696,10 +694,10 @@ const METRIC_CONFIG = {
         max: 60,
         caption: 'Grenzwerte angelehnt an WHO-Empfehlungen für Feinstaub.',
         stops: [
-          { value: 5, label: 'Rein', tone: 'excellent' },
-          { value: 12, label: 'Okay', tone: 'good' },
-          { value: 25, label: 'Belastet', tone: 'elevated' },
-          { value: 50, label: 'Kritisch', tone: 'poor' }
+          { value: 5, label: 'Hervorragend', tone: 'excellent' },
+          { value: 12, label: 'Gut', tone: 'good' },
+          { value: 25, label: 'Erhöht', tone: 'elevated' },
+          { value: 50, label: 'Schlecht', tone: 'poor' }
         ]
       }
     },
@@ -711,7 +709,7 @@ const METRIC_CONFIG = {
         },
         {
           title: 'Gesunde Werte',
-          text: '≤ 5 µg/m³ optimal, ≤ 12 µg/m³ gut, ≤ 35 µg/m³ erhöht, > 35 µg/m³ hoch.'
+          text: '≤ 5 µg/m³ hervorragend, ≤ 12 µg/m³ gut, ≤ 35 µg/m³ erhöht, > 35 µg/m³ schlecht.'
         },
         {
           title: 'Auswirkungen',
@@ -728,7 +726,7 @@ const METRIC_CONFIG = {
         max: 60,
         caption: 'Bewertung orientiert sich an Leitwerten für PM1 in Innenräumen.',
         bands: [
-          { label: 'Optimal', min: 0, max: 5, tone: 'excellent' },
+          { label: 'Hervorragend', min: 0, max: 5, tone: 'excellent' },
           { label: 'Gut', min: 5, max: 12, tone: 'good' },
           { label: 'Erhöht', min: 12, max: 35, tone: 'elevated' },
           { label: 'Schlecht', min: 35, max: 60, tone: 'poor' }
@@ -743,7 +741,7 @@ const METRIC_CONFIG = {
         },
         {
           title: 'Gesunde Werte',
-          text: '≤ 20 µg/m³ optimal, ≤ 40 µg/m³ gut, ≤ 60 µg/m³ erhöht, > 100 µg/m³ hoch.'
+          text: '≤ 20 µg/m³ hervorragend, ≤ 40 µg/m³ gut, ≤ 60 µg/m³ erhöht, > 100 µg/m³ schlecht.'
         },
         {
           title: 'Auswirkungen',
@@ -760,7 +758,7 @@ const METRIC_CONFIG = {
         max: 120,
         caption: 'Bewertung orientiert sich an Innenraum-Richtwerten für PM10.',
         bands: [
-          { label: 'Optimal', min: 0, max: 20, tone: 'excellent' },
+          { label: 'Hervorragend', min: 0, max: 20, tone: 'excellent' },
           { label: 'Gut', min: 20, max: 40, tone: 'good' },
           { label: 'Erhöht', min: 40, max: 60, tone: 'elevated' },
           { label: 'Schlecht', min: 60, max: 120, tone: 'poor', display: `> 100${NARROW_SPACE}µg/m³` }
@@ -770,9 +768,9 @@ const METRIC_CONFIG = {
     TVOC: {
       sections: [
         { title: 'Bedeutung', text: 'TVOCs entstehen durch Ausdünstungen aus Möbeln, Farben, Reinigern oder Parfums.' },
-        { title: 'Gesunde Werte', text: 'Unter 150 ppb ideal, bis 300 ppb gut.' },
-        { title: 'Auswirkungen', text: 'Hohe Werte können Kopfschmerzen, Reizungen oder Schwindel verursachen.' },
-        { title: 'Verbesserung', text: 'Regelmäßig lüften, Duft- und Chemikalienquellen reduzieren.' }
+        { title: 'Gesunde Werte', text: '≤ 150 ppb hervorragend, ≤ 300 ppb gut, ≤ 600 ppb erhöht, > 600 ppb schlecht.' },
+        { title: 'Auswirkungen', text: 'Steigende TVOC-Werte können Kopfschmerzen, Reizungen oder Schwindel auslösen.' },
+        { title: 'Verbesserung', text: 'Kurz und intensiv lüften, Duft- und Chemikalienquellen reduzieren, Filter prüfen.' }
       ],
       scale: {
         unit: 'ppb',
@@ -780,10 +778,10 @@ const METRIC_CONFIG = {
         max: 1200,
         caption: 'Bewertung orientiert sich an Innenraum-Leitwerten für VOC.',
         stops: [
-          { value: 150, label: 'Niedrig', tone: 'excellent' },
-          { value: 300, label: 'Unauffällig', tone: 'good' },
-          { value: 600, label: 'Ansteigen', tone: 'elevated' },
-          { value: 1000, label: 'Hoch', tone: 'poor' }
+          { value: 150, label: 'Hervorragend', tone: 'excellent' },
+          { value: 300, label: 'Gut', tone: 'good' },
+          { value: 600, label: 'Erhöht', tone: 'elevated' },
+          { value: 1000, label: 'Schlecht', tone: 'poor' }
         ]
       }
     },
@@ -1011,8 +1009,8 @@ const METRIC_TO_CHART_KEY = {
 };
 
 
- const HERO_METRICS = ['CO2', 'PM2.5', 'PM1.0', 'PM10', 'TVOC', 'rel. Feuchte'];
-
+ const KEY_METRICS = ['CO2', 'TVOC', 'Temperatur', 'rel. Feuchte'];
+ const SPARKLINE_METRICS = ['CO2', 'PM2.5', 'PM1.0', 'PM10', 'TVOC', 'rel. Feuchte'];
 
   const state = {
     range: TIME_RANGES['24h'],
@@ -1043,7 +1041,8 @@ const METRIC_TO_CHART_KEY = {
   };
 
   const ui = {
-    heroCards: new Map(),
+    coreCards: new Map(),
+    sparklineCards: new Map(),
     statusCards: new Map(),
     lastUpdated: null,
     healthScore: null,
@@ -1170,11 +1169,19 @@ const METRIC_TO_CHART_KEY = {
       });
     }
 
+    const coreCards = document.querySelectorAll('.core-card');
+    coreCards.forEach((card) => {
+      const metric = card.getAttribute('data-metric');
+      if (!metric) return;
+      ui.coreCards.set(metric, card);
+      setupCardModalTrigger(card, metric);
+    });
+
     const miniCards = document.querySelectorAll('.mini-card');
     miniCards.forEach((card) => {
       const metric = card.getAttribute('data-metric');
       if (!metric) return;
-      ui.heroCards.set(metric, card);
+      ui.sparklineCards.set(metric, card);
       createSparkline(metric, card);
       setupCardModalTrigger(card, metric);
     });
@@ -1544,11 +1551,11 @@ const METRIC_TO_CHART_KEY = {
           {
             data: [],
             borderColor: color,
-            backgroundColor: colorWithAlpha(color, 0.2),
-            tension: 0.4,
+            backgroundColor: colorWithAlpha(color, 0.16),
+            tension: 0.35,
             fill: 'start',
             pointRadius: 0,
-            borderWidth: 1,
+            borderWidth: 2,
             spanGaps: true
           }
         ]
@@ -1750,27 +1757,38 @@ const METRIC_TO_CHART_KEY = {
   }
 
   function updateHero(data) {
-    const metrics = HERO_METRICS;
+    const metrics = KEY_METRICS;
     const statuses = {};
+
     metrics.forEach((metric) => {
-      const card = ui.heroCards.get(metric);
+      const card = ui.coreCards.get(metric);
       const sample = data[metric];
       const config = METRIC_CONFIG[metric];
       if (!card || !config) return;
+      const valueEl = card.querySelector('.core-number');
+      const badge = card.querySelector('.core-badge');
       if (!sample || !isFinite(sample.value)) {
-        card.querySelector('.mini-value').textContent = '—';
-        card.querySelector('.mini-unit').textContent = config.unit;
+        if (valueEl) valueEl.textContent = '—';
+        if (badge) badge.textContent = 'Keine Daten';
+        card.dataset.tone = 'neutral';
         card.classList.add('ready');
-        card.dataset.intent = 'neutral';
         return;
       }
       const status = determineStatus(metric, sample.value);
-      card.querySelector('.mini-value').textContent = formatNumber(sample.value, config.decimals);
-      card.querySelector('.mini-unit').textContent = config.unit;
-      card.classList.add('ready');
-      card.dataset.intent = status.intent || status.tone || 'neutral';
       statuses[metric] = status;
+      if (valueEl) valueEl.textContent = formatNumber(sample.value, config.decimals);
+      if (badge) {
+        badge.textContent = status.label;
+        badge.dataset.tone = status.tone || status.intent || 'neutral';
+      }
+      card.dataset.tone = status.intent || status.tone || 'neutral';
+      card.classList.add('ready');
     });
+
+    const pmSample = data['PM2.5'];
+    if (pmSample && isFinite(pmSample.value)) {
+      statuses['PM2.5'] = determineStatus('PM2.5', pmSample.value);
+    }
 
     updateHealthCard(statuses);
   }
@@ -1794,7 +1812,7 @@ const METRIC_TO_CHART_KEY = {
 
   function classifyCO2(v) {
     if (v < 800) return { status: 'Hervorragend', color: 'green' };
-    if (v < 1000) return { status: 'Stabil', color: 'blue' };
+    if (v < 1000) return { status: 'Gut', color: 'blue' };
     if (v < 1400) return { status: 'Erhöht', color: 'yellow' };
     return { status: 'Schlecht', color: 'red' };
   }
@@ -1838,8 +1856,8 @@ const METRIC_TO_CHART_KEY = {
         const cls = classifyCO2(value);
         let note = 'Luft sehr frisch.';
         let tip = 'Kein Handlungsbedarf.';
-        if (cls.status === 'Stabil') {
-          note = 'CO₂ stabil – alles im Rahmen.';
+        if (cls.status === 'Gut') {
+          note = 'CO₂ gut – alles im Rahmen.';
           tip = 'Gelegentlich stoßlüften.';
         } else if (cls.status === 'Erhöht') {
           note = 'CO₂ erhöht – Konzentration sinkt.';
@@ -1979,8 +1997,8 @@ const METRIC_TO_CHART_KEY = {
   function updateHealthCard(statuses) {
     if (!ui.healthScore || !ui.healthLabel || !ui.healthDetail || !ui.healthProgress) return;
     const score = computeHealthScore();
-    const tone = score >= 80 ? 'excellent' : score >= 60 ? 'good' : score >= 30 ? 'elevated' : 'poor';
-    const label = score >= 80 ? 'Ausgezeichnet' : score >= 60 ? 'Gut' : score >= 30 ? 'Mittel' : 'Schlecht';
+    const tone = score >= 80 ? 'excellent' : score >= 60 ? 'good' : score >= 40 ? 'elevated' : 'poor';
+    const label = score >= 80 ? 'Hervorragend' : score >= 60 ? 'Gut' : score >= 40 ? 'Erhöht' : 'Schlecht';
     ui.healthScore.textContent = String(score);
     ui.healthLabel.textContent = label;
     ui.healthLabel.style.color = toneToColor(tone);
@@ -3096,7 +3114,7 @@ const METRIC_TO_CHART_KEY = {
     }
 
     function updateSparklines() {
-    HERO_METRICS.forEach((metric) => {
+    SPARKLINE_METRICS.forEach((metric) => {
       const sparkline = state.sparklines.get(metric);
       if (!sparkline) return;
       const definition = getDefinitionForMetric(metric);
@@ -3106,7 +3124,7 @@ const METRIC_TO_CHART_KEY = {
       if (!cached) return;
       const data = prepareSparklineData(cached[metric] || []);
       sparkline.data.datasets[0].data = data;
-      const card = ui.heroCards.get(metric);
+      const card = ui.sparklineCards.get(metric);
       const sample = state.now?.[metric];
       const status = sample && isFinite(sample.value) ? determineStatus(metric, sample.value) : null;
       const tone = status?.tone || status?.intent || 'neutral';
