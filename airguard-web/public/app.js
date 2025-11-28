@@ -230,13 +230,14 @@
 
   Chart.register(targetGuidePlugin, tooltipGuardPlugin, safeTooltipPlugin);
   Chart.defaults.font.family = "'Inter','Segoe UI',system-ui,sans-serif";
-  Chart.defaults.color = '#6b7280';
-  Chart.defaults.borderColor = 'rgba(148, 163, 184, 0.28)';
-  Chart.defaults.elements.line.borderWidth = 2;
-  Chart.defaults.elements.line.tension = 0.35;
+  Chart.defaults.color = '#64748b';
+  Chart.defaults.borderColor = 'rgba(148, 163, 184, 0.2)';
+  Chart.defaults.elements.line.borderWidth = 2.25;
+  Chart.defaults.elements.line.tension = 0.32;
   Chart.defaults.elements.point.radius = 0;
+  Chart.defaults.elements.point.hitRadius = 10;
   Chart.defaults.scale.grid.color = 'rgba(148, 163, 184, 0.14)';
-  Chart.defaults.scale.grid.borderColor = 'rgba(148, 163, 184, 0.24)';
+  Chart.defaults.scale.grid.borderColor = 'rgba(148, 163, 184, 0.18)';
   Chart.defaults.scale.ticks.color = '#94a3b8';
   Chart.defaults.plugins.legend.labels.usePointStyle = true;
   Chart.defaults.plugins.legend.position = 'bottom';
@@ -259,10 +260,10 @@
     };
     Chart.defaults.plugins.tooltip.position = 'clamped';
     Chart.defaults.plugins.tooltip.displayColors = false;
-    Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(15, 23, 42, 0.92)';
-    Chart.defaults.plugins.tooltip.padding = 10;
+    Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(15, 23, 42, 0.9)';
+    Chart.defaults.plugins.tooltip.padding = 12;
     Chart.defaults.plugins.tooltip.caretSize = 6;
-    Chart.defaults.plugins.tooltip.cornerRadius = 10;
+    Chart.defaults.plugins.tooltip.cornerRadius = 12;
   }
 
   const scheduledChartUpdates = new WeakMap();
@@ -1560,10 +1561,10 @@ const METRIC_TO_CHART_KEY = {
             data: [],
             borderColor: color,
             backgroundColor: colorWithAlpha(color, 0.1),
-            tension: 0.4,
+            tension: 0.32,
             fill: 'start',
             pointRadius: 0,
-            borderWidth: 1.6,
+            borderWidth: Chart.defaults.elements.line.borderWidth,
             spanGaps: true
           }
         ]
@@ -2556,8 +2557,8 @@ const METRIC_TO_CHART_KEY = {
             data: [],
             borderColor: color,
             backgroundColor: colorWithAlpha(color, 0.2),
-            borderWidth: 2,
-            tension: 0.35,
+            borderWidth: Chart.defaults.elements.line.borderWidth,
+            tension: 0.32,
             pointRadius: 0,
             fill: 'origin',
             spanGaps: true
@@ -2570,18 +2571,7 @@ const METRIC_TO_CHART_KEY = {
         animation: false,
         plugins: {
           legend: { display: false },
-          tooltip: {
-            enabled: false,
-            displayColors: false,
-            backgroundColor: 'rgba(15, 23, 42, 0.92)',
-            padding: 8,
-            callbacks: {
-              label(context) {
-                const cfg = METRIC_CONFIG[metricKey];
-                return formatWithUnit(context.parsed.y, cfg?.unit || '', cfg?.decimals ?? 0);
-              }
-            }
-          },
+          tooltip: { enabled: false },
           targetGuides: { guides: [] }
         },
         scales: {
@@ -3816,12 +3806,12 @@ const METRIC_TO_CHART_KEY = {
         data: clonePoints(data[metric] || []),
         borderColor: color,
         backgroundColor: colorWithAlpha(color, 0.12),
-        tension: 0.35,
+        tension: 0.32,
         fill: 'start',
         pointRadius: 0,
         pointHitRadius: 18,
         pointHoverRadius: 4,
-        borderWidth: 2,
+        borderWidth: Chart.defaults.elements.line.borderWidth,
         spanGaps: true
       };
     });
