@@ -349,39 +349,44 @@
     <div class="chart-modal__backdrop" aria-hidden="true" data-close="true"></div>
     <div class="chart-modal__content" tabindex="-1">
       <button type="button" class="chart-modal__close" aria-label="Schließen" data-close="true">×</button>
-      <header class="chart-modal__header">
-        <div class="chart-modal__heading">
+      <header class="modal-header chart-modal__header">
+        <div class="modal-header__titles">
           <div class="chart-modal__title-group">
             <h3 id="chart-modal-title">Verlauf</h3>
             <p id="chart-modal-sub" class="chart-modal__sub">—</p>
           </div>
+        </div>
+        <div class="modal-header__meta">
           <div id="chart-modal-current" class="chart-modal__current" data-tone="neutral">
-            <span id="chart-modal-current-value" class="chart-modal__current-value">—</span>
-            <span id="chart-modal-current-unit" class="chart-modal__current-unit">—</span>
+            <div class="chart-modal__current-main">
+              <span id="chart-modal-current-value" class="chart-modal__current-value">—</span>
+              <span id="chart-modal-current-unit" class="chart-modal__current-unit">—</span>
+            </div>
             <span id="chart-modal-current-label" class="chart-modal__current-label">—</span>
           </div>
         </div>
       </header>
-      <nav class="modal-range-tabs" role="tablist" aria-label="Zeitfenster">
-        <button type="button" role="tab" aria-selected="true" class="modal-tab" data-range="24h">24 h</button>
-        <button type="button" role="tab" aria-selected="false" class="modal-tab" data-range="7d">7 Tage</button>
-        <button type="button" role="tab" aria-selected="false" class="modal-tab" data-range="30d">30 Tage</button>
-      </nav>
-      <div class="chart-modal__canvas modal-chart-container">
-        <canvas id="chart-modal-canvas" aria-describedby="chart-modal-sub"></canvas>
-        <div class="chart-modal__state" id="chart-modal-state" hidden>
-          <p id="chart-modal-state-text">Lade Diagramm …</p>
-          <button type="button" class="ghost-btn chart-modal__retry" id="chart-modal-retry">Erneut laden</button>
+      <div class="modal-body chart-modal__body">
+        <nav class="modal-range-tabs" role="tablist" aria-label="Zeitfenster">
+          <button type="button" role="tab" aria-selected="true" class="modal-tab" data-range="24h">24 h</button>
+          <button type="button" role="tab" aria-selected="false" class="modal-tab" data-range="7d">7 Tage</button>
+          <button type="button" role="tab" aria-selected="false" class="modal-tab" data-range="30d">30 Tage</button>
+        </nav>
+        <div class="chart-modal__canvas modal-chart-container">
+          <canvas id="chart-modal-canvas" aria-describedby="chart-modal-sub"></canvas>
+          <div class="chart-modal__state" id="chart-modal-state" hidden>
+            <p id="chart-modal-state-text">Lade Diagramm …</p>
+            <button type="button" class="ghost-btn chart-modal__retry" id="chart-modal-retry">Erneut laden</button>
+          </div>
+        </div>
+        <div class="chart-modal__scale" id="chart-modal-scale">
+          <svg id="chart-modal-scale-svg" class="chart-scale" viewBox="0 0 100 48" role="presentation" aria-hidden="true"></svg>
+          <p id="chart-modal-scale-caption" class="chart-modal__scale-caption">—</p>
+        </div>
+        <div class="chart-modal__info">
+          <dl id="chart-modal-insight" class="chart-modal__insight"></dl>
         </div>
       </div>
-      <div class="chart-modal__scale" id="chart-modal-scale">
-        <svg id="chart-modal-scale-svg" class="chart-scale" viewBox="0 0 100 48" role="presentation" aria-hidden="true"></svg>
-        <p id="chart-modal-scale-caption" class="chart-modal__scale-caption">—</p>
-      </div>
-      <div class="chart-modal__info">
-        <dl id="chart-modal-insight" class="chart-modal__insight"></dl>
-      </div>
-
     </div>
   </div>
 
@@ -389,80 +394,84 @@
     <div class="circadian-modal__backdrop" aria-hidden="true" data-close="true"></div>
     <div class="circadian-modal__content" tabindex="-1">
       <button type="button" class="circadian-modal__close" aria-label="Schließen" data-close="true">×</button>
-      <header class="circadian-modal__header">
-        <div class="circadian-modal__title-row">
+      <header class="modal-header circadian-modal__header">
+        <div class="modal-header__titles">
           <h3 id="circadian-modal-title">Circadian Light</h3>
+          <p id="circadian-modal-summary" class="circadian-modal__summary">Empfehlungen werden geladen …</p>
+        </div>
+        <div class="modal-header__meta">
           <span id="circadian-modal-status" class="badge" data-tone="neutral">—</span>
         </div>
-        <p id="circadian-modal-summary" class="circadian-modal__summary">Empfehlungen werden geladen …</p>
       </header>
-      <div class="circadian-modal__charts">
-        <article class="circadian-modal__chart" data-kind="lux">
-          <header>
-            <h4>Lux</h4>
-            <span id="circadian-modal-lux-value" class="circadian-modal__value">—</span>
-          </header>
-          <canvas id="circadian-modal-lux-canvas" aria-label="Lux Verlauf (24 h)"></canvas>
-        </article>
-        <article class="circadian-modal__chart" data-kind="cct">
-          <header>
-            <h4>CCT</h4>
-            <span id="circadian-modal-cct-value" class="circadian-modal__value">—</span>
-          </header>
-          <canvas id="circadian-modal-cct-canvas" aria-label="CCT Verlauf (24 h)"></canvas>
-        </article>
-      </div>
-      <div class="circadian-modal__info">
-        <section>
-          <h4>Bedeutung</h4>
-          <p>Lichtstärke (Lux) und Farbtemperatur (CCT) steuern Wachheit und Entspannung – wichtig für deinen Tagesrhythmus.</p>
-        </section>
-        <section>
-          <h4>Empfehlung (nach Tageszeit)</h4>
-          <ul>
-            <li>Morgen (07–11 Uhr): 500–1 000 lx, 5 000–6 000 K</li>
-            <li>Tag (11–17 Uhr): 500–1 000 lx, 4 000–5 000 K</li>
-            <li>Abend (17–22 Uhr): 50–300 lx, 2 700–3 500 K</li>
-          </ul>
-        </section>
-        <section>
-          <h4>Verbessern</h4>
-          <p>Tagsüber hell und neutral/kühl beleuchten; abends Licht dimmen und wärmer wählen. Mischlicht vermeiden; blendfrei ausrichten.</p>
-        </section>
-      </div>
-      <div class="circadian-modal__scales">
-        <div class="circadian-scale" data-kind="lux">
-          <div class="circadian-scale__title-row">
-            <span class="circadian-scale__title">Lux-Skala</span>
-            <span id="circadian-scale-lux-value" class="circadian-scale__current">—</span>
-          </div>
-          <div class="circadian-scale__track">
-            <div class="circadian-scale__segments" data-kind="lux"></div>
-            <div id="circadian-scale-lux-marker" class="circadian-scale__marker" data-tone="neutral">
-              <span class="circadian-scale__marker-dot"></span>
-              <span class="circadian-scale__marker-label">—</span>
-            </div>
-          </div>
-          <div class="circadian-scale__labels" data-kind="lux"></div>
+      <div class="modal-body circadian-modal__body">
+        <div class="circadian-modal__charts">
+          <article class="circadian-modal__chart" data-kind="lux">
+            <header>
+              <h4>Lux</h4>
+              <span id="circadian-modal-lux-value" class="circadian-modal__value">—</span>
+            </header>
+            <canvas id="circadian-modal-lux-canvas" aria-label="Lux Verlauf (24 h)"></canvas>
+          </article>
+          <article class="circadian-modal__chart" data-kind="cct">
+            <header>
+              <h4>CCT</h4>
+              <span id="circadian-modal-cct-value" class="circadian-modal__value">—</span>
+            </header>
+            <canvas id="circadian-modal-cct-canvas" aria-label="CCT Verlauf (24 h)"></canvas>
+          </article>
         </div>
-        <div class="circadian-scale" data-kind="cct">
-          <div class="circadian-scale__title-row">
-            <span class="circadian-scale__title">CCT-Skala</span>
-            <span id="circadian-scale-cct-value" class="circadian-scale__current">—</span>
-          </div>
-          <div class="circadian-scale__track">
-            <div class="circadian-scale__segments" data-kind="cct"></div>
-            <div id="circadian-scale-cct-marker" class="circadian-scale__marker" data-tone="neutral">
-              <span class="circadian-scale__marker-dot"></span>
-              <span class="circadian-scale__marker-label">—</span>
-            </div>
-          </div>
-          <div class="circadian-scale__labels" data-kind="cct"></div>
+        <div class="circadian-modal__info">
+          <section>
+            <h4>Bedeutung</h4>
+            <p>Lichtstärke (Lux) und Farbtemperatur (CCT) steuern Wachheit und Entspannung – wichtig für deinen Tagesrhythmus.</p>
+          </section>
+          <section>
+            <h4>Empfehlung (nach Tageszeit)</h4>
+            <ul>
+              <li>Morgen (07–11 Uhr): 500–1 000 lx, 5 000–6 000 K</li>
+              <li>Tag (11–17 Uhr): 500–1 000 lx, 4 000–5 000 K</li>
+              <li>Abend (17–22 Uhr): 50–300 lx, 2 700–3 500 K</li>
+            </ul>
+          </section>
+          <section>
+            <h4>Verbessern</h4>
+            <p>Tagsüber hell und neutral/kühl beleuchten; abends Licht dimmen und wärmer wählen. Mischlicht vermeiden; blendfrei ausrichten.</p>
+          </section>
         </div>
+        <div class="circadian-modal__scales">
+          <div class="circadian-scale" data-kind="lux">
+            <div class="circadian-scale__title-row">
+              <span class="circadian-scale__title">Lux-Skala</span>
+              <span id="circadian-scale-lux-value" class="circadian-scale__current">—</span>
+            </div>
+            <div class="circadian-scale__track">
+              <div class="circadian-scale__segments" data-kind="lux"></div>
+              <div id="circadian-scale-lux-marker" class="circadian-scale__marker" data-tone="neutral">
+                <span class="circadian-scale__marker-dot"></span>
+                <span class="circadian-scale__marker-label">—</span>
+              </div>
+            </div>
+            <div class="circadian-scale__labels" data-kind="lux"></div>
+          </div>
+          <div class="circadian-scale" data-kind="cct">
+            <div class="circadian-scale__title-row">
+              <span class="circadian-scale__title">CCT-Skala</span>
+              <span id="circadian-scale-cct-value" class="circadian-scale__current">—</span>
+            </div>
+            <div class="circadian-scale__track">
+              <div class="circadian-scale__segments" data-kind="cct"></div>
+              <div id="circadian-scale-cct-marker" class="circadian-scale__marker" data-tone="neutral">
+                <span class="circadian-scale__marker-dot"></span>
+                <span class="circadian-scale__marker-label">—</span>
+              </div>
+            </div>
+            <div class="circadian-scale__labels" data-kind="cct"></div>
+          </div>
+        </div>
+        <footer class="circadian-modal__footer">
+          <p>Empfehlungen basieren auf üblichen Innenraum-Leitlinien für komfortables Arbeiten und Entspannen.</p>
+        </footer>
       </div>
-      <footer class="circadian-modal__footer">
-        <p>Empfehlungen basieren auf üblichen Innenraum-Leitlinien für komfortables Arbeiten und Entspannen.</p>
-      </footer>
     </div>
   </div>
 </body>
