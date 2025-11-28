@@ -2979,7 +2979,14 @@ const METRIC_TO_CHART_KEY = {
     );
     const baseRange = TIME_RANGES[SPARKLINE_RANGE_KEY] || TIME_RANGES['24h'];
     state.range = baseRange;
-    await Promise.all(definitions.map((definition) => ensureSeries(definition, baseRange, force)));
+    const requiredDefinitions = definitions.filter((definition) => !definition.optional);
+    const optionalDefinitions = definitions.filter((definition) => definition.optional);
+
+    await Promise.all(requiredDefinitions.map((definition) => ensureSeries(definition, baseRange, force)));
+
+    await Promise.all(
+      optionalDefinitions.map((definition) => ensureSeries(definition, baseRange, force, { optional: true }))
+    );
     updateSparklines();
     if (state.now) {
       updateStatusCards(state.now);
@@ -2987,15 +2994,25 @@ const METRIC_TO_CHART_KEY = {
   }
 
   async function ensureSeries(definition, range, force, options = {}) {
+    const { optional } = options;
     const normalizedRange = { ...range, ...resolveRangeParams(range) };
     const cacheKey = `${definition.key}_${normalizedRange.range}`;
     if (!force && state.chartDataCache.has(cacheKey)) {
       return state.chartDataCache.get(cacheKey);
     }
-    const series = await fetchSeries(definition.metrics, normalizedRange, options);
-    const smoothed = smoothSeries(series);
-    state.chartDataCache.set(cacheKey, smoothed);
-    return smoothed;
+    try {
+      const series = await fetchSeries(definition.metrics, normalizedRange, options);
+      const smoothed = smoothSeries(series);
+      state.chartDataCache.set(cacheKey, smoothed);
+      return smoothed;
+    } catch (error) {
+      if (optional && error?.code === 'unknown_metric') {
+        console.warn(`Optional series ${definition.key} skipped:`, error);
+        state.chartDataCache.set(cacheKey, {});
+        return state.chartDataCache.get(cacheKey);
+      }
+      throw error;
+    }
   }
 
   async function fetchSeries(metrics, range = state.range, options = {}) {
