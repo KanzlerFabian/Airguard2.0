@@ -537,7 +537,8 @@
     ['rel. Feuchte', ['rel. Feuchte', 'rel_feuchte', 'humidity']],
     ['PM1.0', ['PM1.0', 'pm1', 'pm_1']],
     ['PM2.5', ['PM2.5', 'pm2_5', 'pm25']],
-    ['PM10', ['PM10', 'pm10']]
+    ['PM10', ['PM10', 'pm10']],
+    ['Luftdruck', ['Luftdruck', 'pressure_hpa', 'pressure']]
   ]);
 
   const modalConfig = createConfigStore({
@@ -637,12 +638,13 @@ const METRIC_CONFIG = {
       min: 16,
       max: 30,
       segments: [
-        { from: 16, to: 19, label: 'Kühl', tone: 'elevated', detail: `< 19${NARROW_SPACE}°C` },
-        { from: 19, to: 22, label: 'Komfort', tone: 'excellent' },
-        { from: 22, to: 28, label: 'Warm', tone: 'elevated' },
-        { from: 28, to: 30, label: 'Heiß', tone: 'poor', detail: `≥ 30${NARROW_SPACE}°C` }
+        { from: 16, to: 18, label: 'Zu kalt', tone: 'poor', detail: `< 18${NARROW_SPACE}°C` },
+        { from: 18, to: 20, label: 'Etwas kühl', tone: 'good' },
+        { from: 20, to: 23, label: 'Wohlfühlen', tone: 'excellent' },
+        { from: 23, to: 25, label: 'Etwas warm', tone: 'good' },
+        { from: 25, to: 30, label: 'Zu warm', tone: 'poor', detail: `≥ 25${NARROW_SPACE}°C` }
       ],
-      ticks: [{ at: 16 }, { at: 19 }, { at: 22 }, { at: 25 }, { at: 28 }, { at: 30 }]
+      ticks: [{ at: 16 }, { at: 18 }, { at: 20 }, { at: 23 }, { at: 25 }, { at: 30 }]
     },
     'Luftdruck': {
       unit: 'hPa',
@@ -661,13 +663,13 @@ const METRIC_CONFIG = {
       min: 20,
       max: 80,
       segments: [
-        { from: 20, to: 35, label: 'Trocken', tone: 'poor' },
-        { from: 35, to: 40, label: 'Übergang', tone: 'elevated' },
-        { from: 40, to: 55, label: 'Wohlfühl', tone: 'excellent' },
-        { from: 55, to: 60, label: 'Übergang', tone: 'elevated' },
-        { from: 60, to: 80, label: 'Feucht/Nass', tone: 'poor' }
+        { from: 20, to: 30, label: 'Sehr trocken', tone: 'poor', detail: '< 30%' },
+        { from: 30, to: 40, label: 'Trocken', tone: 'elevated' },
+        { from: 40, to: 60, label: 'Wohlfühlfeuchte', tone: 'excellent' },
+        { from: 60, to: 70, label: 'Etwas feucht', tone: 'elevated' },
+        { from: 70, to: 80, label: 'Sehr feucht', tone: 'poor', detail: '≥ 70%' }
       ],
-      ticks: [{ at: 20 }, { at: 35 }, { at: 40 }, { at: 55 }, { at: 60 }, { at: 80 }]
+      ticks: [{ at: 20 }, { at: 30 }, { at: 40 }, { at: 60 }, { at: 70 }, { at: 80 }]
     }
   };
 
@@ -801,10 +803,10 @@ const METRIC_CONFIG = {
         { title: 'Bedeutung', text: 'Raumtemperatur beeinflusst direkt das Wohlbefinden, die Konzentration und den Schlaf.' },
         {
           title: 'Gesunde Werte',
-          text: '19–22 °C Komfort, darunter kühl, 22–28 °C warm und ab 30 °C deutlich zu heiß.'
+          text: '20–23 °C Wohlfühlbereich, 18–19 °C leicht kühl, über 25 °C klar zu warm.'
         },
-        { title: 'Auswirkungen', text: 'Zu kalt: Unbehagen, trockene Luft. Zu warm: Müdigkeit, sinkende Leistungsfähigkeit.' },
-        { title: 'Verbesserung', text: 'Heizen, Beschatten oder Lüften, um die Komfortzone zu halten; Schlafzimmer kühler, Arbeitsräume wärmer.' }
+        { title: 'Auswirkungen', text: 'Kühle Räume können frösteln lassen; zu warme Luft macht träge und belastet den Schlaf.' },
+        { title: 'Verbesserung', text: 'Heizung feinjustieren, beschatten oder lüften, um im 20–23 °C Komfortband zu bleiben.' }
       ],
       scale: {
         unit: '°C',
@@ -812,19 +814,20 @@ const METRIC_CONFIG = {
         max: 30,
         caption: 'Bewertung orientiert sich an Empfehlungen für Innenraumtemperaturen.',
         bands: [
-          { label: 'Kühl', min: 16, max: 19, tone: 'elevated', display: `< 19${NARROW_SPACE}°C` },
-          { label: 'Komfort', min: 19, max: 22, tone: 'excellent' },
-          { label: 'Warm', min: 22, max: 28, tone: 'elevated' },
-          { label: 'Heiß', min: 28, max: 30, tone: 'poor', display: `≥ 30${NARROW_SPACE}°C` }
+          { label: 'Zu kalt', min: 16, max: 18, tone: 'poor', display: `< 18${NARROW_SPACE}°C` },
+          { label: 'Etwas kühl', min: 18, max: 20, tone: 'good' },
+          { label: 'Wohlfühlen', min: 20, max: 23, tone: 'excellent' },
+          { label: 'Etwas warm', min: 23, max: 25, tone: 'good' },
+          { label: 'Zu warm', min: 25, max: 30, tone: 'poor', display: `≥ 25${NARROW_SPACE}°C` }
         ]
       }
     },
     'rel. Feuchte': {
       sections: [
         { title: 'Bedeutung', text: 'Gibt an, wie viel Wasserdampf die Luft enthält – wichtig für Wohlbefinden und Schimmelprävention.' },
-        { title: 'Gesunde Werte', text: '40–55 % ideal, 35–40 % leicht trocken, über 60 % deutlich feucht.' },
-        { title: 'Auswirkungen', text: 'Unter 35 % trockene Schleimhäute; über 60 % Schimmelgefahr.' },
-        { title: 'Verbesserung', text: 'Luftbefeuchter oder Pflanzen bei Trockenheit, Stoßlüften oder Entfeuchter bei hoher Feuchte.' }
+        { title: 'Gesunde Werte', text: '40–60 % Wohlfühlfeuchte, 30–39 % trocken, ab 70 % sehr feucht.' },
+        { title: 'Auswirkungen', text: 'Unter 30 % trocknen Schleimhäute aus; über 60 % steigt Schimmelgefahr.' },
+        { title: 'Verbesserung', text: 'Bei Trockenheit befeuchten; bei Feuchte stoßlüften oder entfeuchten, um 40–60 % zu halten.' }
       ],
       scale: {
         unit: '%',
@@ -832,11 +835,11 @@ const METRIC_CONFIG = {
         max: 80,
         caption: 'Komfortband nach Innenraumempfehlungen für relative Feuchte.',
         bands: [
-          { label: 'Trocken', min: 20, max: 35, tone: 'poor' },
-          { label: 'Übergang', min: 35, max: 40, tone: 'elevated' },
-          { label: 'Wohlfühl', min: 40, max: 55, tone: 'excellent' },
-          { label: 'Übergang', min: 55, max: 60, tone: 'elevated' },
-          { label: 'Feucht/Nass', min: 60, max: 80, tone: 'poor' }
+          { label: 'Sehr trocken', min: 20, max: 30, tone: 'poor' },
+          { label: 'Trocken', min: 30, max: 40, tone: 'elevated' },
+          { label: 'Wohlfühl', min: 40, max: 60, tone: 'excellent' },
+          { label: 'Etwas feucht', min: 60, max: 70, tone: 'elevated' },
+          { label: 'Sehr feucht', min: 70, max: 80, tone: 'poor' }
         ]
       }
     },
@@ -907,9 +910,9 @@ const METRIC_CONFIG = {
     Luftdruck: {
       sections: [
         { title: 'Bedeutung', text: 'Luftdruck schwankt mit dem Wetter und beeinflusst Kreislauf und Wohlbefinden.' },
-        { title: 'Gesunde Werte', text: '980–1030 hPa normal, darunter Tiefdruck, darüber Hochdruck.' },
-        { title: 'Auswirkungen', text: 'Sinkender Druck kann Kopfschmerzen oder Wetterfühligkeit auslösen.' },
-        { title: 'Verbesserung', text: 'Keine direkte Steuerung möglich – dient zur Beobachtung von Wettertrends.' }
+        { title: 'Gesunde Werte', text: '980–1030 hPa üblich; darunter Tiefdruck, darüber Hochdruck.' },
+        { title: 'Auswirkungen', text: 'Fällt der Druck, sind Kreislauf und Wetterfühligkeit häufiger belastet.' },
+        { title: 'Verbesserung', text: 'Keine direkte Steuerung möglich – dient der Beobachtung von Wettertrends.' }
       ],
       scale: {
         unit: 'hPa',
@@ -1957,39 +1960,33 @@ const METRIC_TO_CHART_KEY = {
       }
       case 'Temperatur': {
         if (value < 18) {
-          return buildStatus('poor', 'Deutlich zu kühl.', 'Heizung anpassen, Zugluft vermeiden.');
+          return buildStatus('poor', 'Zu kalt – ggf. Heizung anpassen.', 'Heizung anpassen, Zugluft vermeiden.', 'Zu kalt');
         }
         if (value < 20) {
-          return buildStatus('elevated', 'Kühl.', 'Sanft aufheizen bis in den Komfortbereich.');
+          return buildStatus('good', 'Etwas kühl.', 'Sanft aufheizen bis in den Komfortbereich.', 'Etwas kühl');
         }
         if (value <= 23) {
-          return buildStatus('excellent', 'Im Wohlfühlbereich.', 'Temperatur beibehalten.');
+          return buildStatus('excellent', 'Im Wohlfühlbereich.', 'Temperatur beibehalten.', 'Wohlfühlbereich');
         }
         if (value <= 25) {
-          return buildStatus('good', 'Etwas warm.', 'Kurz lüften oder beschatten.');
+          return buildStatus('good', 'Etwas warm.', 'Kurz lüften oder beschatten.', 'Etwas warm');
         }
-        if (value <= 27) {
-          return buildStatus('elevated', 'Warm – abkühlen.', 'Beschattung und Lüftung nutzen.');
-        }
-        return buildStatus('poor', 'Sehr warm.', 'Aktiv kühlen und konsequent lüften.');
+        return buildStatus('poor', 'Zu warm – ggf. kühlen bzw. lüften.', 'Beschattung oder aktive Kühlung nutzen.', 'Zu warm');
       }
       case 'rel. Feuchte': {
         if (value < 30) {
-          return buildStatus('poor', 'Luft sehr trocken.', 'Befeuchten oder Pflanzen einsetzen.');
+          return buildStatus('poor', 'Sehr trockene Luft – befeuchten.', 'Luftbefeuchter oder Pflanzen nutzen.', 'Sehr trocken');
         }
         if (value < 40) {
-          return buildStatus('elevated', 'Trocken.', 'Leicht befeuchten oder sanft lüften.');
-        }
-        if (value <= 55) {
-          return buildStatus('excellent', 'Wohlfühlfeuchte.', 'Aktuelles Verhalten passt.');
+          return buildStatus('elevated', 'Trockene Luft.', 'Sanft befeuchten oder kürzer lüften.', 'Trocken');
         }
         if (value <= 60) {
-          return buildStatus('good', 'Leicht feucht.', 'Regelmäßig lüften.');
+          return buildStatus('excellent', 'Wohlfühlfeuchte.', 'Aktuelles Verhalten passt.', 'Wohlfühlfeuchte');
         }
         if (value <= 70) {
-          return buildStatus('elevated', 'Feucht.', 'Stoßlüften und trocknen.');
+          return buildStatus('elevated', 'Etwas feuchte Luft.', 'Regelmäßig stoßlüften und trocknen.', 'Feucht');
         }
-        return buildStatus('poor', 'Sehr feucht.', 'Entfeuchter einsetzen und konsequent lüften.');
+        return buildStatus('poor', 'Sehr feuchte Luft – Schimmelgefahr.', 'Entfeuchter einsetzen und konsequent lüften.', 'Sehr feucht');
       }
       case 'Lux':
         if (value < 100) {
@@ -2005,6 +2002,18 @@ const METRIC_TO_CHART_KEY = {
           return buildStatus('good', 'Kräftiges Licht unterstützt.', 'Blendquellen prüfen.');
         }
         return buildStatus('poor', 'Sehr hell – Blendgefahr.', 'Licht dimmen oder indirekt ausrichten.');
+      case 'Luftdruck': {
+        if (value < 980) {
+          return buildStatus('elevated', 'Tiefdruck – Wetterwechsel wahrscheinlich.', 'Kreislauf im Blick behalten.', 'Tiefdruck');
+        }
+        if (value <= 1005) {
+          return buildStatus('excellent', 'Stabiler Druck.', 'Keine Aktion nötig.', 'Stabil');
+        }
+        if (value <= 1030) {
+          return buildStatus('good', 'Hochdruck, trockene Luft.', 'Nach Gefühl lüften.', 'Hochdruck');
+        }
+        return buildStatus('excellent', 'Sehr hoher Druck, stabil.', 'Nur beobachten.', 'Hochdruck');
+      }
       case 'Farbtemperatur':
         if (value < 3200) {
           return buildStatus('elevated', 'Sehr warmes Licht – beruhigend.', 'Für Fokusphasen etwas kühler wählen.');
@@ -2021,12 +2030,12 @@ const METRIC_TO_CHART_KEY = {
     }
   }
 
-  function buildStatus(intent, note, tip) {
+  function buildStatus(intent, note, tip, labelOverride) {
     const tone = intent || 'neutral';
     return {
       intent: tone,
       tone,
-      label: STATUS_LABELS[tone] || STATUS_LABELS.neutral,
+      label: labelOverride || STATUS_LABELS[tone] || STATUS_LABELS.neutral,
       note,
       tip
     };
@@ -2092,9 +2101,9 @@ const METRIC_TO_CHART_KEY = {
         if (value <= 1500) return 30;
         return 10;
       case 'rel. Feuchte': {
-        if (value >= 30 && value <= 60) return 100;
-        if ((value >= 27 && value < 30) || (value > 60 && value <= 65)) return 70;
-        if ((value >= 24 && value < 27) || (value > 65 && value <= 70)) return 45;
+        if (value >= 40 && value <= 60) return 100;
+        if ((value >= 30 && value < 40) || (value > 60 && value <= 70)) return 70;
+        if ((value >= 25 && value < 30) || (value > 70 && value <= 75)) return 45;
         return 20;
       }
       default:
@@ -2965,7 +2974,9 @@ const METRIC_TO_CHART_KEY = {
   }
 
   async function preloadSeries(force) {
-    const definitions = Object.values(CHART_DEFINITIONS).filter((definition) => !definition.optional);
+    const definitions = Object.values(CHART_DEFINITIONS).filter(
+      (definition) => !definition.optional || definition.metrics.some((metric) => SPARKLINE_METRICS.includes(metric))
+    );
     const baseRange = TIME_RANGES[SPARKLINE_RANGE_KEY] || TIME_RANGES['24h'];
     state.range = baseRange;
     await Promise.all(definitions.map((definition) => ensureSeries(definition, baseRange, force)));
@@ -3468,16 +3479,16 @@ const METRIC_TO_CHART_KEY = {
     const max = rawMax > min ? rawMax : min + 1;
     const span = Math.max(max - min, 1);
     const viewBoxWidth = 320;
-    const viewBoxHeight = 68;
-    const trackPadding = 6;
-    const markerPadding = 6;
+    const viewBoxHeight = 88;
+    const trackPadding = 8;
+    const markerPadding = 8;
     const trackStart = trackPadding;
     const trackEnd = viewBoxWidth - trackPadding;
-    const trackHeight = 10;
-    const trackY = 36;
-    const labelY = trackY - trackHeight / 2 - 8;
+    const trackHeight = 14;
+    const trackY = 44;
+    const labelY = trackY - trackHeight / 2 - 10;
     const tickBaseY = trackY + trackHeight / 2;
-    const tickLabelY = tickBaseY + 12;
+    const tickLabelY = tickBaseY + 14;
 
     svg.setAttribute('viewBox', `0 0 ${viewBoxWidth} ${viewBoxHeight}`);
     svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
@@ -4245,6 +4256,7 @@ const METRIC_TO_CHART_KEY = {
 
   function hideToast() {
     if (!ui.toast) return;
+    window.clearTimeout(ui.toast._timer);
     ui.toast.hidden = true;
   }
 

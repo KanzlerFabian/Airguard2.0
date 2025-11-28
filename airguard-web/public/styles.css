@@ -190,6 +190,7 @@ a {
   justify-content: center;
   gap: var(--space-1);
   text-align: center;
+  padding: 0 var(--space-3);
 }
 
 .health-score {
@@ -201,7 +202,9 @@ a {
   font-size: 1.05rem;
   color: var(--tone-teal);
   font-weight: 600;
-  white-space: nowrap;
+  white-space: normal;
+  line-height: 1.25;
+  max-width: 12ch;
 }
 
 .health-detail {
@@ -425,8 +428,9 @@ a {
 .trend-grid,
 .mini-metric-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: clamp(12px, 1.4vw, 16px);
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: clamp(12px, 1.4vw, 18px);
+  align-items: stretch;
 }
 
 .trend-card,
@@ -504,7 +508,7 @@ a {
   position: relative;
   grid-column: 1 / -1;
   width: 100%;
-  min-height: clamp(72px, 14vw, 110px);
+  min-height: clamp(82px, 14vw, 120px);
   margin-top: var(--space-2);
   background: linear-gradient(180deg, rgba(14, 165, 233, 0.06), rgba(16, 185, 129, 0.04));
   border-radius: calc(var(--radius-md) - 6px);
@@ -548,9 +552,27 @@ a {
 }
 
 @media (min-width: 1024px) {
-  .trend-grid,
   .mini-metric-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 900px) {
+  .trend-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1200px) {
+  .trend-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .trend-grid,
+  .mini-metric-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -1080,8 +1102,8 @@ a {
 .chart-modal__content {
   --modal-padding: clamp(18px, 4vw, 26px);
   position: relative;
-  width: min(900px, 95vw);
-  max-height: 95dvh;
+  width: min(960px, 95vw);
+  max-height: 96dvh;
   background: var(--bg-surface);
   border-radius: 20px;
   padding: 18px 18px calc(18px + env(safe-area-inset-bottom));
@@ -1114,14 +1136,9 @@ a {
 }
 
 .chart-modal__header {
-  position: sticky;
-  top: env(safe-area-inset-top);
   display: grid;
   gap: 0.35rem;
-  padding: 10px 0 12px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.88));
-  backdrop-filter: blur(4px);
-  z-index: 2;
+  padding: 4px 0 10px;
 }
 
 .chart-modal__heading {
@@ -1194,8 +1211,6 @@ a {
 }
 
 .modal-range-tabs {
-  position: sticky;
-  top: calc(env(safe-area-inset-top) + var(--tabs-offset, 74px));
   display: flex;
   gap: 6px;
   justify-content: flex-start;
@@ -1205,9 +1220,7 @@ a {
   scroll-snap-type: x proximity;
   scrollbar-width: none;
   touch-action: pan-x;
-  padding: 0 0 0.75rem;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.86));
-  backdrop-filter: blur(4px);
+  padding: 4px 0 0.75rem;
   z-index: 1;
   --tab-tone-bg: rgba(14, 165, 233, 0.16);
   --tab-tone-color: #0ea5e9;
@@ -1383,8 +1396,9 @@ a {
   display: grid;
   gap: var(--space-2);
   background: rgba(148, 163, 184, 0.08);
-  padding: var(--space-3);
+  padding: var(--space-4);
   border-radius: var(--radius-md);
+  min-height: 56px;
 }
 
 .chart-scale {
@@ -1421,14 +1435,14 @@ a {
 }
 
 .chart-scale__segment-label {
-  font-size: 3.8px;
+  font-size: 4.6px;
   font-weight: 600;
   fill: #475569;
   text-anchor: middle;
 }
 
 .chart-scale__segment-sub {
-  font-size: 3.2px;
+  font-size: 3.8px;
   font-weight: 500;
   fill: #94a3b8;
 }
@@ -1439,7 +1453,7 @@ a {
 }
 
 .chart-scale__tick-label {
-  font-size: 3.2px;
+  font-size: 3.8px;
   fill: #94a3b8;
   text-anchor: middle;
 }
@@ -1632,8 +1646,8 @@ a {
 .circadian-modal__content {
   --circadian-padding: clamp(18px, 4vw, 26px);
   position: relative;
-  width: min(90vw, 480px);
-  max-height: 85vh;
+  width: min(960px, 95vw);
+  max-height: 92vh;
   background: var(--bg-surface);
   border-radius: 20px;
   border: 1px solid rgba(148, 163, 184, 0.22);
@@ -1667,14 +1681,9 @@ a {
 }
 
 .circadian-modal__header {
-  position: sticky;
-  top: env(safe-area-inset-top);
   display: grid;
   gap: 0.5rem;
-  padding: 12px 0 16px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.88));
-  backdrop-filter: blur(4px);
-  z-index: 2;
+  padding: 12px 0 10px;
 }
 
 .circadian-modal__title-row {
@@ -2014,6 +2023,18 @@ a {
     align-items: center;
   }
 
+  .health-value {
+    gap: 0.4rem;
+  }
+
+  .health-score {
+    font-size: clamp(2.2rem, 6vw, 2.8rem);
+  }
+
+  .health-label {
+    font-size: 0.95rem;
+  }
+
   .health-ring {
     margin: 0 auto;
     max-width: 220px;
@@ -2122,6 +2143,7 @@ a {
   gap: 0.8rem;
   box-shadow: 0 24px 40px rgba(15, 23, 42, 0.3);
   z-index: 100;
+  pointer-events: auto;
 }
 
 .toast-close {
@@ -2130,6 +2152,8 @@ a {
   color: inherit;
   font-size: 1.2rem;
   cursor: pointer;
+  padding: 0.25rem;
+  line-height: 1;
 }
 
 .skeleton {
