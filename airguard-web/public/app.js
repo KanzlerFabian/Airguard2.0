@@ -1833,20 +1833,20 @@ const METRIC_TO_CHART_KEY = {
   }
 
   function classifyTemperature(v) {
-    if (v < 19) return { status: 'Zu niedrig', color: 'red' };
-    if (v < 20) return { status: 'Leicht kühl', color: 'yellow' };
-    if (v <= 24) return { status: 'Optimal', color: 'green' };
-    if (v <= 26) return { status: 'Etwas warm', color: 'yellow' };
-    return { status: 'Zu hoch', color: 'red' };
+    if (v < 18) return { status: 'Kühl', color: 'red' };
+    if (v < 20) return { status: 'Kühl', color: 'yellow' };
+    if (v <= 24) return { status: 'Wohlfühlbereich', color: 'green' };
+    if (v <= 26) return { status: 'Warm', color: 'yellow' };
+    return { status: 'Heiß', color: 'red' };
   }
 
   function classifyHumidity(v) {
-    if (v < 35) return { status: 'Sehr trocken', color: 'red' };
-    if (v < 40) return { status: 'Leicht trocken', color: 'yellow' };
-    if (v <= 55) return { status: 'Optimal', color: 'green' };
-    if (v <= 60) return { status: 'Etwas feucht', color: 'blue' };
-    if (v <= 70) return { status: 'Sehr feucht', color: 'yellow' };
-    return { status: 'Extrem feucht', color: 'red' };
+    if (v < 35) return { status: 'Trocken', color: 'red' };
+    if (v < 40) return { status: 'Trocken', color: 'yellow' };
+    if (v <= 55) return { status: 'Wohlfühlbereich', color: 'green' };
+    if (v <= 60) return { status: 'Feucht', color: 'blue' };
+    if (v <= 70) return { status: 'Feucht', color: 'yellow' };
+    return { status: 'Sehr feucht', color: 'red' };
   }
 
   function classifyCO2(v) {
@@ -1961,28 +1961,28 @@ const METRIC_TO_CHART_KEY = {
       }
       case 'Temperatur': {
         if (value < 18) {
-          return buildStatus('poor', 'Zu kalt – ggf. Heizung anpassen.', 'Heizung anpassen, Zugluft vermeiden.', 'Zu kalt');
+          return buildStatus('poor', 'Zu kühl – ggf. Heizung anpassen.', 'Heizung anpassen, Zugluft vermeiden.', 'Kühl');
         }
         if (value < 20) {
-          return buildStatus('good', 'Etwas kühl.', 'Sanft aufheizen bis in den Komfortbereich.', 'Etwas kühl');
+          return buildStatus('elevated', 'Kühl.', 'Sanft aufheizen bis in den Komfortbereich.', 'Kühl');
         }
         if (value <= 23) {
           return buildStatus('excellent', 'Im Wohlfühlbereich.', 'Temperatur beibehalten.', 'Wohlfühlbereich');
         }
         if (value <= 25) {
-          return buildStatus('good', 'Etwas warm.', 'Kurz lüften oder beschatten.', 'Etwas warm');
+          return buildStatus('good', 'Leicht warm.', 'Kurz lüften oder beschatten.', 'Warm');
         }
-        return buildStatus('poor', 'Zu warm – ggf. kühlen bzw. lüften.', 'Beschattung oder aktive Kühlung nutzen.', 'Zu warm');
+        return buildStatus('poor', 'Sehr warm – ggf. kühlen bzw. lüften.', 'Beschattung oder aktive Kühlung nutzen.', 'Heiß');
       }
       case 'rel. Feuchte': {
         if (value < 30) {
-          return buildStatus('poor', 'Sehr trockene Luft – befeuchten.', 'Luftbefeuchter oder Pflanzen nutzen.', 'Sehr trocken');
+          return buildStatus('poor', 'Sehr trockene Luft – befeuchten.', 'Luftbefeuchter oder Pflanzen nutzen.', 'Trocken');
         }
         if (value < 40) {
           return buildStatus('elevated', 'Trockene Luft.', 'Sanft befeuchten oder kürzer lüften.', 'Trocken');
         }
         if (value <= 60) {
-          return buildStatus('excellent', 'Wohlfühlfeuchte.', 'Aktuelles Verhalten passt.', 'Wohlfühlfeuchte');
+          return buildStatus('excellent', 'Wohlfühlbereich.', 'Aktuelles Verhalten passt.', 'Wohlfühlbereich');
         }
         if (value <= 70) {
           return buildStatus('elevated', 'Etwas feuchte Luft.', 'Regelmäßig stoßlüften und trocknen.', 'Feucht');
@@ -2046,7 +2046,7 @@ const METRIC_TO_CHART_KEY = {
     if (!ui.healthScore || !ui.healthLabel || !ui.healthDetail || !ui.healthProgress) return;
     const score = computeHealthScore();
     const tone = score >= 80 ? 'excellent' : score >= 60 ? 'good' : score >= 40 ? 'elevated' : 'poor';
-    const label = score >= 80 ? 'Hervorragend' : score >= 60 ? 'Gut' : score >= 40 ? 'Erhöht' : 'Schlecht';
+    const label = score >= 80 ? 'Hervorragend' : score >= 60 ? 'Gut' : score >= 40 ? 'Mittel' : 'Schlecht';
     ui.healthScore.textContent = String(score);
     ui.healthLabel.textContent = label;
     ui.healthLabel.style.color = toneToColor(tone);
