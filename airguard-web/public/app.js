@@ -1026,7 +1026,7 @@ const METRIC_TO_CHART_KEY = {
 
  const KEY_METRICS = ['CO2', 'TVOC', 'Temperatur', 'rel. Feuchte'];
  const TREND_METRICS = ['CO2', 'PM2.5', 'PM1.0', 'PM10', 'TVOC', 'Temperatur', 'rel. Feuchte', 'Luftdruck'];
- const SPARKLINE_METRICS = TREND_METRICS;
+ const SPARKLINE_METRICS = KEY_METRICS;
 
   const state = {
     range: TIME_RANGES['24h'],
@@ -1190,10 +1190,10 @@ const METRIC_TO_CHART_KEY = {
       const metric = card.getAttribute('data-metric');
       if (!metric) return;
       ui.coreCards.set(metric, card);
+      ui.sparklineCards.set(metric, card);
+      createSparkline(metric, card);
       setupCardModalTrigger(card, metric);
     });
-
-    renderTrendCards();
 
     const statusCards = document.querySelectorAll('.status-card');
     statusCards.forEach((card) => {
@@ -1538,7 +1538,7 @@ const METRIC_TO_CHART_KEY = {
 
   function createSparkline(metric, card) {
     if (!card) return;
-    const canvas = card.querySelector('.mini-chart canvas');
+    const canvas = card.querySelector('.mini-chart canvas, .core-spark canvas');
     if (!canvas) return;
     const definition = getDefinitionForMetric(metric);
     if (!definition) return;
@@ -2055,7 +2055,8 @@ const METRIC_TO_CHART_KEY = {
       .filter((metric) => statuses[metric])
       .map((metric) => `${metricLabel(metric)} ${statuses[metric].label}`)
       .join(' • ');
-    ui.healthDetail.textContent = detail || 'Werte werden geladen …';
+    const placeholder = 'Aktuelle Luftqualität basierend auf CO₂, TVOC, Temperatur und Luftfeuchtigkeit.';
+    ui.healthDetail.textContent = detail || placeholder;
 
     const dashoffset = CIRCUMFERENCE * (1 - score / 100);
     ui.healthProgress.setAttribute('stroke-dashoffset', dashoffset.toFixed(2));
@@ -3172,9 +3173,9 @@ const METRIC_TO_CHART_KEY = {
       sparkline.data.datasets[0].backgroundColor = colorWithAlpha(color, 0.18);
       scheduleChartUpdate(sparkline, 'none');
       if (card) {
-        const labelEl = card.querySelector('.mini-meta h3');
-        const valueEl = card.querySelector('.mini-value');
-        const unitEl = card.querySelector('.mini-unit');
+        const labelEl = card.querySelector('.mini-meta h3, .core-name');
+        const valueEl = card.querySelector('.mini-value, .core-number');
+        const unitEl = card.querySelector('.mini-unit, .core-unit');
         if (labelEl) labelEl.textContent = METRIC_CONFIG[metric]?.label || metric;
         if (unitEl) unitEl.textContent = METRIC_CONFIG[metric]?.unit || '';
         if (valueEl) {
@@ -3184,7 +3185,7 @@ const METRIC_TO_CHART_KEY = {
         }
         card.classList.remove('skeleton');
         card.classList.add('ready');
-        const container = card.querySelector('.mini-chart');
+        const container = card.querySelector('.mini-chart, .core-spark');
         if (container) {
           container.classList.toggle('is-empty', data.length < 2);
         }

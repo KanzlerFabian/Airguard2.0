@@ -55,11 +55,13 @@
     </symbol>
   </svg>
   <div class="app-shell">
+    <div class="status-banner" id="offline-indicator" hidden></div>
+
     <header class="hero" aria-labelledby="hero-title">
       <div class="hero-left">
         <div class="hero-heading">
           <h1 id="hero-title">AirGuard Innenraum-Qualität</h1>
-          <p class="hero-sub">Live-Überblick für gesunde Luft & Wohlbefinden</p>
+          <p class="hero-sub">Heute · Überblick deiner Innenraumluft</p>
         </div>
         <div class="hero-body">
           <div class="health-card" role="status" aria-live="polite">
@@ -74,13 +76,12 @@
                 <circle class="health-bg" cx="60" cy="60" r="54"></circle>
                 <circle class="health-progress" cx="60" cy="60" r="54" stroke-dasharray="339.292" stroke-dashoffset="339.292"></circle>
               </svg>
-              <div class="health-value">
-                <span id="health-score" class="health-score">—</span>
-                <span id="health-label" class="health-label">Nicht verfügbar</span>
-              </div>
+            <div class="health-value">
+              <span id="health-score" class="health-score">—</span>
+              <span id="health-label" class="health-label">Nicht verfügbar</span>
             </div>
-            <p id="health-detail" class="health-detail">Werte werden geladen …</p>
-            <p id="offline-indicator" class="offline-indicator" hidden>Offline – letzte Daten unbekannt</p>
+            </div>
+            <p id="health-detail" class="health-detail">Aktuelle Luftqualität basierend auf CO₂, TVOC, Temperatur und Luftfeuchtigkeit.</p>
           </div>
           <div class="hero-actions">
             <button id="install-btn" type="button" class="ghost-btn" hidden>App installieren</button>
@@ -111,6 +112,9 @@
                 <span class="core-number">—</span>
                 <span class="core-badge" data-tone="neutral">—</span>
               </div>
+              <div class="core-spark" aria-hidden="true">
+                <canvas></canvas>
+              </div>
             </article>
             <article class="core-card core-metric-card skeleton" data-metric="TVOC">
               <div class="core-label">
@@ -123,6 +127,9 @@
               <div class="core-value">
                 <span class="core-number">—</span>
                 <span class="core-badge" data-tone="neutral">—</span>
+              </div>
+              <div class="core-spark" aria-hidden="true">
+                <canvas></canvas>
               </div>
             </article>
             <article class="core-card core-metric-card skeleton" data-metric="Temperatur">
@@ -137,6 +144,9 @@
                 <span class="core-number">—</span>
                 <span class="core-badge" data-tone="neutral">—</span>
               </div>
+              <div class="core-spark" aria-hidden="true">
+                <canvas></canvas>
+              </div>
             </article>
             <article class="core-card core-metric-card skeleton" data-metric="rel. Feuchte">
               <div class="core-label">
@@ -150,6 +160,9 @@
                 <span class="core-number">—</span>
                 <span class="core-badge" data-tone="neutral">—</span>
               </div>
+              <div class="core-spark" aria-hidden="true">
+                <canvas></canvas>
+              </div>
             </article>
           </div>
         </div>
@@ -157,6 +170,65 @@
     </header>
 
     <main class="main-content">
+      <section class="circadian-section" aria-labelledby="circadian-heading">
+        <div class="section-heading">
+          <h2 id="circadian-heading">Circadianes Licht</h2>
+          <p>Kurzer Überblick für Lux & Farbtemperatur</p>
+        </div>
+        <article class="circadian-card skeleton" data-chart-target="Circadian">
+          <div class="circadian-main">
+            <span class="circadian-icon" aria-hidden="true"><svg><use href="#icon-gradient-sun" /></svg></span>
+            <div class="circadian-copy">
+              <p class="circadian-phase">Phase wird geladen …</p>
+              <h3 class="circadian-status">—</h3>
+              <p class="circadian-tip">—</p>
+            </div>
+          </div>
+          <div class="circadian-cycle">
+            <div class="cycle-track" aria-hidden="true">
+              <span class="cycle-icon cycle-icon--sun" aria-hidden="true">☀</span>
+              <span class="cycle-icon cycle-icon--moon" aria-hidden="true">☾</span>
+              <span class="cycle-marker" data-period="day">☀</span>
+            </div>
+            <div class="cycle-labels">
+              <span>00:00</span>
+              <span id="circadian-cycle-label">—:—</span>
+              <span>24:00</span>
+            </div>
+          </div>
+          <div class="circadian-badges">
+            <span id="lux-eval" class="badge" data-tone="neutral">Lux</span>
+            <span id="cct-eval" class="badge" data-tone="neutral">CCT</span>
+          </div>
+          <div class="circadian-bars">
+            <div class="bar-group">
+              <div class="bar-label">CCT</div>
+              <div class="bar-track" data-kind="cct" data-range-label="Ziel —">
+                <span class="bar-range"></span>
+                <span class="bar-marker"></span>
+              </div>
+              <div class="bar-meta">
+                <span id="cct-now">— K</span>
+                <span id="cct-target">Ziel —</span>
+                <span><span class="badge" data-tone="neutral">Heute</span></span>
+              </div>
+            </div>
+            <div class="bar-group">
+              <div class="bar-label">Lux</div>
+              <div class="bar-track" data-kind="lux" data-range-label="Ziel —">
+                <span class="bar-range"></span>
+                <span class="bar-marker"></span>
+              </div>
+              <div class="bar-meta">
+                <span id="lux-now">— lx</span>
+                <span id="lux-target">Ziel —</span>
+                <span><span class="badge" data-tone="neutral">Balance</span></span>
+              </div>
+            </div>
+          </div>
+        </article>
+      </section>
+
       <section class="status-section" aria-labelledby="status-heading">
         <div class="section-heading">
           <h2 id="status-heading">Statusübersicht</h2>
@@ -173,6 +245,19 @@
               <span class="trend" aria-live="polite">—</span>
             </header>
             <p class="status-value"><span class="value">—</span> <span class="unit">ppm</span></p>
+            <p class="status-note">—</p>
+            <p class="status-tip">—</p>
+          </article>
+          <article class="status-card skeleton" data-metric="TVOC" data-chart-target="TVOC">
+            <header>
+              <span class="metric-icon" aria-hidden="true"><svg><use href="#icon-flask" /></svg></span>
+              <div class="metric-head">
+                <h3>TVOC</h3>
+                <span class="badge" data-tone="neutral">Lädt …</span>
+              </div>
+              <span class="trend" aria-live="polite">—</span>
+            </header>
+            <p class="status-value"><span class="value">—</span> <span class="unit">ppb</span></p>
             <p class="status-note">—</p>
             <p class="status-tip">—</p>
           </article>
@@ -215,19 +300,6 @@
             <p class="status-note">—</p>
             <p class="status-tip">—</p>
           </article>
-          <article class="status-card skeleton" data-metric="TVOC" data-chart-target="TVOC">
-            <header>
-              <span class="metric-icon" aria-hidden="true"><svg><use href="#icon-flask" /></svg></span>
-              <div class="metric-head">
-                <h3>TVOC</h3>
-                <span class="badge" data-tone="neutral">Lädt …</span>
-              </div>
-              <span class="trend" aria-live="polite">—</span>
-            </header>
-            <p class="status-value"><span class="value">—</span> <span class="unit">ppb</span></p>
-            <p class="status-note">—</p>
-            <p class="status-tip">—</p>
-          </article>
           <article class="status-card skeleton" data-metric="Temperatur" data-chart-target="Temperatur">
             <header>
               <span class="metric-icon" aria-hidden="true"><svg><use href="#icon-thermometer" /></svg></span>
@@ -264,73 +336,31 @@
               <span class="trend" aria-live="polite">Trend wird ermittelt …</span>
             </header>
             <p class="status-value"><span class="value">—</span> <span class="unit">hPa</span></p>
-            <p class="status-note">—</p>
-            <p class="status-tip">—</p>
+          <p class="status-note">—</p>
+          <p class="status-tip">—</p>
+        </article>
+        </div>
+      </section>
+
+      <section class="insights-section" aria-labelledby="insights-heading">
+        <div class="section-heading">
+          <h2 id="insights-heading">Tägliche Insights</h2>
+          <p>Kurzanalysen deiner Luftqualität.</p>
+        </div>
+        <div class="insights-grid" data-insights-grid>
+          <article class="insight-card">
+            <h3>Beispiel-Insight</h3>
+            <p>CO₂ war heute zeitweise erhöht.</p>
+          </article>
+          <article class="insight-card">
+            <h3>Beispiel-Insight</h3>
+            <p>Luftfeuchte überwiegend im Wohlfühlbereich.</p>
+          </article>
+          <article class="insight-card">
+            <h3>Beispiel-Insight</h3>
+            <p>TVOC bleibt stabil – weiter so.</p>
           </article>
         </div>
-      </section>
-
-      <section class="mini-section" aria-labelledby="mini-heading">
-        <div class="section-heading">
-          <h2 id="mini-heading">Verläufe & Trends</h2>
-          <p>Feinstaub, Gase und Komfortfaktoren im Tagesprofil.</p>
-        </div>
-        <div class="trend-grid" data-trend-grid></div>
-      </section>
-
-      <section class="circadian-section" aria-labelledby="circadian-heading">
-        <div class="section-heading">
-          <h2 id="circadian-heading">Circadian Light</h2>
-          <p>Optimierte Beleuchtung nach Tageszeit</p>
-        </div>
-        <article class="circadian-card skeleton" data-chart-target="Circadian">
-          <div class="circadian-main">
-            <span class="circadian-icon" aria-hidden="true"><svg><use href="#icon-gradient-sun" /></svg></span>
-            <div class="circadian-copy">
-              <p class="circadian-phase">Phase wird geladen …</p>
-              <h3 class="circadian-status">—</h3>
-              <p class="circadian-tip">—</p>
-            </div>
-          </div>
-          <div class="circadian-cycle">
-            <div class="cycle-track" aria-hidden="true">
-              <span class="cycle-icon cycle-icon--sun" aria-hidden="true">☀</span>
-              <span class="cycle-icon cycle-icon--moon" aria-hidden="true">☾</span>
-              <span class="cycle-marker" data-period="day">☀</span>
-            </div>
-            <div class="cycle-labels">
-              <span>00:00</span>
-              <span id="circadian-cycle-label">—:—</span>
-              <span>24:00</span>
-            </div>
-          </div>
-          <div class="circadian-bars">
-            <div class="bar-group">
-              <div class="bar-label">CCT</div>
-              <div class="bar-track" data-kind="cct" data-range-label="Ziel —">
-                <span class="bar-range"></span>
-                <span class="bar-marker"></span>
-              </div>
-              <div class="bar-meta">
-                <span id="cct-now">— K</span>
-                <span id="cct-target">Ziel —</span>
-                <span><span id="cct-eval" class="badge" data-tone="neutral">—</span></span>
-              </div>
-            </div>
-            <div class="bar-group">
-              <div class="bar-label">Lux</div>
-              <div class="bar-track" data-kind="lux" data-range-label="Ziel —">
-                <span class="bar-range"></span>
-                <span class="bar-marker"></span>
-              </div>
-              <div class="bar-meta">
-                <span id="lux-now">— lx</span>
-                <span id="lux-target">Ziel —</span>
-                <span><span id="lux-eval" class="badge" data-tone="neutral">—</span></span>
-              </div>
-            </div>
-          </div>
-        </article>
       </section>
 
     </main>
