@@ -1085,9 +1085,6 @@ const METRIC_TO_CHART_KEY = {
     installBtn: null,
     notifyBtn: null,
     pwaStatusBadge: null,
-    toast: null,
-    toastText: null,
-    toastClose: null,
     modalRoot: null,
     modalContent: null,
     modalHeader: null,
@@ -1170,23 +1167,6 @@ const METRIC_TO_CHART_KEY = {
     ui.installBtn = document.getElementById('install-btn');
     ui.notifyBtn = document.getElementById('notify-btn');
     ui.pwaStatusBadge = document.getElementById('pwa-status-badge');
-    ui.toast = document.querySelector('.toast');
-    ui.toastText = ui.toast?.querySelector('.toast-text') || null;
-    ui.toastClose = ui.toast?.querySelector('.toast-close') || null;
-    if (ui.toast) {
-      ui.toast.tabIndex = -1;
-      ui.toast.addEventListener('click', (event) => {
-        const isDirectToastClick = event.target === ui.toast || event.target === ui.toastText;
-        if (isDirectToastClick) {
-          hideToast();
-        }
-      });
-      ui.toast.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape') {
-          hideToast();
-        }
-      });
-    }
 
     if (ui.circadianCard) {
       ui.circadianCard.tabIndex = 0;
@@ -1329,13 +1309,6 @@ const METRIC_TO_CHART_KEY = {
       });
     }
 
-    if (ui.toastClose) {
-      ui.toastClose.addEventListener('click', (event) => {
-        event.stopPropagation();
-        hideToast();
-      });
-    }
-
     updateCircadianCycle(resolveCircadianPhase());
   }
 
@@ -1414,7 +1387,7 @@ const METRIC_TO_CHART_KEY = {
     const handlePointerDown = (event) => {
       if (event.pointerType === 'mouse') return;
       if (window.innerWidth >= SWIPE_CLOSE_MAX_WIDTH) return;
-      if (element.scrollTop > 2) return;
+      if (element.scrollTop > 0) return;
       pointerId = event.pointerId;
       startY = event.clientY;
       tracking = true;
@@ -1443,7 +1416,7 @@ const METRIC_TO_CHART_KEY = {
         element.releasePointerCapture?.(currentPointerId);
       }
       element.style.transition = 'transform 180ms ease';
-      if (deltaY > SWIPE_CLOSE_THRESHOLD && element.scrollTop <= 2) {
+      if (deltaY > SWIPE_CLOSE_THRESHOLD && element.scrollTop <= 0) {
         element.style.transform = '';
         onClose();
       } else {
@@ -3975,11 +3948,11 @@ const METRIC_TO_CHART_KEY = {
           },
           ticks: {
             maxRotation: 0,
-            maxTicksLimit: 5,
             autoSkip: true,
             autoSkipPadding: 12,
+            maxTicksLimit: window.innerWidth < 640 ? 4 : 7,
             color: '#94a3b8',
-            font: { size: 11 }
+            font: { size: window.innerWidth < 640 ? 10 : 11 }
           },
           grid: { display: false, drawBorder: false },
           border: { display: false }
@@ -3988,8 +3961,8 @@ const METRIC_TO_CHART_KEY = {
           title: { display: true, text: definition.yTitle, color: '#9ca3af' },
           ticks: {
             color: '#94a3b8',
-            maxTicksLimit: 5,
-            font: { size: 11 },
+            maxTicksLimit: window.innerWidth < 640 ? 4 : 5,
+            font: { size: window.innerWidth < 640 ? 10 : 11 },
             callback(value) {
               return formatScaleTick(value, definition.yTitle);
             }
@@ -4014,7 +3987,7 @@ const METRIC_TO_CHART_KEY = {
       return;
     }
     modalConfig.set({ loading: false, error: message, empty: false });
-    showToast(message);
+    console.warn(message);
   }
 
   function retryModalChart() {
@@ -4318,7 +4291,7 @@ const METRIC_TO_CHART_KEY = {
 
   function notify(message) {
     if (!('Notification' in window)) {
-      showToast(message);
+      console.warn(message);
       return;
     }
     if (Notification.permission === 'granted') {
@@ -4332,29 +4305,11 @@ const METRIC_TO_CHART_KEY = {
         });
       } catch (error) {
         console.warn('Notification fehlgeschlagen', error);
-        showToast(message);
+        console.warn(message);
       }
     } else {
-      showToast(message);
+      console.warn(message);
     }
-  }
-
-  function showToast(message) {
-    const text = typeof message === 'string' ? message.trim() : String(message ?? '').trim();
-    if (!ui.toast || !ui.toastText || !text) return;
-    ui.toastText.textContent = text;
-    ui.toast.hidden = false;
-    ui.toast.focus({ preventScroll: true });
-    window.clearTimeout(ui.toast._timer);
-    ui.toast._timer = window.setTimeout(() => {
-      ui.toast.hidden = true;
-    }, 6000);
-  }
-
-  function hideToast() {
-    if (!ui.toast) return;
-    window.clearTimeout(ui.toast._timer);
-    ui.toast.hidden = true;
   }
 
   function registerServiceWorker() {
@@ -4374,6 +4329,9 @@ const METRIC_TO_CHART_KEY = {
       })
       .catch((error) => {
         console.info('Service Worker Registrierung fehlgeschlagen', error?.message || 'Unbekannter Fehler');
+        if (ui.pwaStatusBadge) {
+          ui.pwaStatusBadge.hidden = true;
+        }
       });
   }
 
@@ -4390,7 +4348,7 @@ const METRIC_TO_CHART_KEY = {
       state.deferredPrompt.prompt();
       const choice = await state.deferredPrompt.userChoice;
       if (choice.outcome === 'accepted') {
-        showToast('AirGuard wurde installiert.');
+        console.warn('AirGuard wurde installiert.');
       }
       state.deferredPrompt = null;
       ui.installBtn.hidden = true;
@@ -4409,10 +4367,10 @@ const METRIC_TO_CHART_KEY = {
           const result = await Notification.requestPermission();
           if (result === 'granted') {
             ui.notifyBtn.hidden = true;
-            showToast('Benachrichtigungen aktiviert.');
+            console.warn('Benachrichtigungen aktiviert.');
             subscribeForPush().catch((error) => console.warn('Push Registrierung fehlgeschlagen', error));
           } else {
-            showToast('Benachrichtigungen nicht erlaubt.');
+            console.warn('Benachrichtigungen nicht erlaubt.');
           }
         } catch (error) {
           console.warn('Notification-Fehler', error);
@@ -4450,10 +4408,10 @@ const METRIC_TO_CHART_KEY = {
     const code = error?.code;
     if (code === 'backend_unreachable') {
       console.info('Backend nicht erreichbar, erneuter Versuch empfohlen.');
-      showToast('Backend nicht erreichbar. Bitte erneut versuchen.');
+      console.error('Backend nicht erreichbar. Bitte erneut versuchen.');
       return;
     }
     console.error(error);
-    showToast(typeof error === 'string' ? error : error?.message || 'Unbekannter Fehler');
+    console.error(typeof error === 'string' ? error : error?.message || 'Unbekannter Fehler');
   }
 })();
