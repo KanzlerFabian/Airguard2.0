@@ -1166,44 +1166,42 @@ a {
   --modal-padding: clamp(18px, 4vw, 26px);
   position: relative;
   width: min(960px, 95vw);
-  max-height: 96vh;
-  height: min(92vh, 900px);
+  max-height: calc(100vh - clamp(12px, 5vw, 32px) * 2);
   background: var(--bg-surface);
   border-radius: 20px;
-  padding: 18px 18px calc(18px + env(safe-area-inset-bottom));
+  padding: calc(14px + env(safe-area-inset-top)) 18px calc(16px + env(safe-area-inset-bottom));
   border: 1px solid rgba(148, 163, 184, 0.22);
   box-shadow: 0 18px 28px rgba(15, 23, 42, 0.16);
-  display: grid;
-  grid-template-rows: auto auto 1fr;
-  gap: clamp(0.85rem, 2vw, 1.1rem);
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.75rem, 2vw, 1.1rem);
+  overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
+  scrollbar-gutter: stable both;
 }
 
 .chart-modal__close {
-  position: sticky;
-  top: calc(env(safe-area-inset-top) + 0.75rem);
-  margin-left: auto;
-  background: rgba(15, 23, 42, 0.08);
-  border: none;
-  border-radius: 999px;
-  width: 44px;
-  height: 44px;
+  background: transparent;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  border-radius: 12px;
+  width: 36px;
+  height: 32px;
   display: grid;
   place-items: center;
-  font-size: 1.4rem;
+  font-size: 1.25rem;
   color: var(--text-muted);
   cursor: pointer;
   touch-action: manipulation;
-  z-index: 3;
+  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
 }
 
 .chart-modal__close:hover,
 .chart-modal__close:focus-visible,
 .circadian-modal__close:hover,
 .circadian-modal__close:focus-visible {
+  background: rgba(148, 163, 184, 0.16);
+  border-color: rgba(148, 163, 184, 0.7);
   transform: translateY(-1px);
   box-shadow: 0 16px 30px rgba(15, 23, 42, 0.14);
   outline: none;
@@ -1211,10 +1209,10 @@ a {
 
 .modal-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-md);
-  padding-right: var(--space-lg);
+  padding: 0 var(--space-xs);
 }
 
 .modal-header__titles {
@@ -1224,18 +1222,18 @@ a {
 }
 
 .modal-header__meta {
-  display: grid;
-  gap: var(--space-sm);
+  display: flex;
+  gap: 0.65rem;
   justify-content: flex-end;
-  align-items: start;
+  align-items: center;
 }
 
 .chart-modal__header {
-  padding: 4px 0 var(--space-sm);
+  padding: 2px 0 6px;
   position: sticky;
-  top: calc(env(safe-area-inset-top) + 0.2rem);
-  background: linear-gradient(var(--bg-surface) 85%, rgba(248, 250, 252, 0));
-  z-index: 2;
+  top: calc(env(safe-area-inset-top) + 8px);
+  background: linear-gradient(var(--bg-surface) 70%, rgba(248, 250, 252, 0));
+  z-index: 4;
 }
 
 .chart-modal__title-group {
@@ -1252,7 +1250,7 @@ a {
   padding: var(--space-sm) var(--space-md);
   background: rgba(148, 163, 184, 0.12);
   color: var(--text-strong);
-  min-width: 180px;
+  min-width: 160px;
   justify-content: center;
   transition: background var(--transition-base), color var(--transition-base), border var(--transition-base);
   border: 1px solid rgba(148, 163, 184, 0.2);
@@ -1315,12 +1313,12 @@ a {
 }
 
 .modal-body {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-lg);
-  overflow-y: auto;
-  padding-right: var(--space-sm);
-  padding-bottom: calc(var(--space-lg) + env(safe-area-inset-bottom));
+  padding: 0 var(--space-sm) calc(var(--space-lg) + env(safe-area-inset-bottom));
   min-height: 0;
+  flex: 1 1 auto;
 }
 
 .modal-range-tabs {
@@ -1333,8 +1331,11 @@ a {
   scroll-snap-type: x proximity;
   scrollbar-width: none;
   touch-action: pan-x;
-  padding: 4px 0 var(--space-sm);
-  z-index: 1;
+  padding: 6px 0 12px;
+  position: sticky;
+  top: var(--tabs-offset, 48px);
+  background: linear-gradient(var(--bg-surface) 60%, rgba(248, 250, 252, 0));
+  z-index: 3;
   --tab-tone-bg: rgba(14, 165, 233, 0.16);
   --tab-tone-color: #0ea5e9;
 }
@@ -1355,7 +1356,7 @@ a {
   color: var(--text-muted);
   cursor: pointer;
   transition: all var(--transition-base);
-  min-height: 44px;
+  min-height: 40px;
   touch-action: manipulation;
   text-align: center;
   line-height: 1.1;
@@ -1377,8 +1378,8 @@ a {
 .chart-modal__canvas {
   position: relative;
   width: 100%;
-  height: clamp(240px, 50vh, 360px);
-  padding: var(--space-sm);
+  height: clamp(260px, 42vh, 300px);
+  padding: var(--space-sm) var(--space-sm) calc(var(--space-sm) + 2px);
 }
 
 .modal-chart-container {
@@ -1508,10 +1509,10 @@ a {
 .chart-modal__scale {
   display: grid;
   gap: var(--space-sm);
-  background: rgba(148, 163, 184, 0.08);
-  padding: var(--space-md);
+  background: rgba(148, 163, 184, 0.06);
+  padding: var(--space-sm) var(--space-sm) var(--space-md);
   border-radius: var(--radius-md);
-  min-height: 56px;
+  min-height: 72px;
 }
 
 .chart-scale {
@@ -1548,16 +1549,16 @@ a {
 }
 
 .chart-scale__segment-label {
-  font-size: 4.6px;
-  font-weight: 600;
-  fill: #475569;
+  font-size: 6px;
+  font-weight: 700;
+  fill: #334155;
   text-anchor: middle;
 }
 
 .chart-scale__segment-sub {
-  font-size: 3.8px;
-  font-weight: 500;
-  fill: #94a3b8;
+  font-size: 4.6px;
+  font-weight: 600;
+  fill: #64748b;
 }
 
 .chart-scale__tick {
@@ -1566,8 +1567,8 @@ a {
 }
 
 .chart-scale__tick-label {
-  font-size: 3.8px;
-  fill: #94a3b8;
+  font-size: 5px;
+  fill: #64748b;
   text-anchor: middle;
 }
 
@@ -1621,8 +1622,8 @@ a {
 
 .chart-scale__marker-value {
   fill: #fff;
-  font-size: 3.2px;
-  font-weight: 600;
+  font-size: 4.6px;
+  font-weight: 700;
   text-anchor: middle;
   dominant-baseline: middle;
 }
@@ -1651,11 +1652,11 @@ a {
 
   .chart-modal__content {
     width: calc(100vw - 16px);
-    height: calc(96vh - 8px);
-    max-height: none;
+    height: auto;
+    max-height: calc(100vh - 8px);
     border-radius: 18px;
-    padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
-    gap: 1rem;
+    padding: 16px 16px calc(18px + env(safe-area-inset-bottom));
+    gap: 0.9rem;
   }
 
   .chart-modal__header {
@@ -1680,7 +1681,7 @@ a {
   }
 
   .chart-modal__canvas {
-    height: clamp(200px, 32vh, 240px);
+    height: clamp(240px, 40vh, 280px);
   }
 
   .chart-modal__info {
@@ -1768,42 +1769,42 @@ a {
   --circadian-padding: clamp(18px, 4vw, 26px);
   position: relative;
   width: min(960px, 95vw);
-  max-height: 92vh;
+  max-height: calc(100vh - clamp(12px, 5vw, 32px) * 2);
   background: var(--bg-surface);
   border-radius: 20px;
   border: 1px solid rgba(148, 163, 184, 0.22);
   box-shadow: 0 18px 30px rgba(15, 23, 42, 0.16);
-  padding: calc(var(--circadian-padding) + env(safe-area-inset-top))
-    var(--circadian-padding)
-    calc(var(--circadian-padding) + env(safe-area-inset-bottom));
-  display: grid;
+  padding: calc(14px + env(safe-area-inset-top)) 18px calc(var(--circadian-padding) + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
   gap: var(--space-4);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  scrollbar-gutter: stable;
+  scrollbar-gutter: stable both;
 }
 
 .circadian-modal__close {
-  position: absolute;
-  top: calc(env(safe-area-inset-top) + 0.75rem);
-  right: calc(env(safe-area-inset-right) + 0.75rem);
-  background: rgba(15, 23, 42, 0.08);
-  border: none;
-  border-radius: 999px;
-  width: 44px;
-  height: 44px;
+  background: transparent;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  border-radius: 12px;
+  width: 36px;
+  height: 32px;
   display: grid;
   place-items: center;
-  font-size: 1.4rem;
+  font-size: 1.25rem;
   color: var(--text-muted);
   cursor: pointer;
   touch-action: manipulation;
-  z-index: 3;
+  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
 }
 
 
 .circadian-modal__header {
-  padding: 4px 0 var(--space-sm);
+  padding: 2px 0 6px;
+  position: sticky;
+  top: calc(env(safe-area-inset-top) + 8px);
+  background: linear-gradient(var(--bg-surface) 70%, rgba(248, 250, 252, 0));
+  z-index: 4;
 }
 
 .circadian-modal__title-row h3 {
@@ -2327,43 +2328,43 @@ a {
 
 .toast {
   position: fixed;
-  inset: auto auto 1.25rem 50%;
-  transform: translateX(-50%);
-  background: rgba(15, 23, 42, 0.9);
-  color: #f8fafc;
-  border-radius: 18px;
-  padding: 0.95rem 1.25rem;
+  top: calc(env(safe-area-inset-top) + 12px);
+  right: calc(env(safe-area-inset-right) + 14px);
+  inset: auto;
+  background: #0b172b;
+  color: #e2e8f0;
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
   display: flex;
   align-items: center;
-  gap: 0.85rem;
-  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.28);
+  gap: 0.65rem;
+  box-shadow: 0 18px 32px rgba(15, 23, 42, 0.2);
   z-index: 100;
   pointer-events: auto;
-  max-width: min(520px, calc(100vw - 1.5rem));
-  line-height: 1.4;
-  backdrop-filter: blur(10px);
+  max-width: min(420px, calc(100vw - 2rem));
+  line-height: 1.35;
+  border: 1px solid rgba(148, 163, 184, 0.3);
 }
 
 .toast-close {
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  background: transparent;
   color: inherit;
-  font-size: 1.1rem;
+  font-size: 1rem;
   cursor: pointer;
-  padding: 0.4rem;
+  padding: 0.25rem;
   line-height: 1;
-  border-radius: 999px;
-  width: 36px;
-  height: 36px;
+  border-radius: 8px;
+  width: 28px;
+  height: 28px;
   display: grid;
   place-items: center;
-  transition: transform var(--transition-fast), background var(--transition-fast), border var(--transition-fast);
+  transition: transform var(--transition-fast), background var(--transition-fast);
 }
 
 .toast-close:hover,
 .toast-close:focus-visible {
-  background: rgba(255, 255, 255, 0.22);
-  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.08);
   transform: translateY(-1px);
   outline: none;
 }

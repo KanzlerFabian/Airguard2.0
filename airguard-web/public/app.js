@@ -1023,10 +1023,11 @@ const METRIC_TO_CHART_KEY = {
   Luftdruck: 'Luftdruck'
 };
 
-
- const KEY_METRICS = ['CO2', 'TVOC', 'Temperatur', 'rel. Feuchte'];
- const TREND_METRICS = ['CO2', 'PM2.5', 'PM1.0', 'PM10', 'TVOC', 'Temperatur', 'rel. Feuchte', 'Luftdruck'];
- const SPARKLINE_METRICS = KEY_METRICS;
+  const KEY_METRICS = ['CO2', 'TVOC', 'Temperatur', 'rel. Feuchte'];
+  const TREND_METRICS = ['CO2', 'PM2.5', 'PM1.0', 'PM10', 'TVOC', 'Temperatur', 'rel. Feuchte', 'Luftdruck'];
+  const SPARKLINE_METRICS = KEY_METRICS;
+  const SWIPE_CLOSE_THRESHOLD = 80;
+  const SWIPE_CLOSE_MAX_WIDTH = 768;
 
   const state = {
     range: TIME_RANGES['24h'],
@@ -1262,6 +1263,8 @@ const METRIC_TO_CHART_KEY = {
       button.addEventListener('click', closeChartModal);
     });
 
+    setupSwipeToClose(ui.modalContent, closeChartModal);
+
     if (ui.modalRoot) {
       ui.modalRoot.addEventListener('click', (event) => {
         if (event.target?.dataset?.close === 'true') {
@@ -1317,6 +1320,7 @@ const METRIC_TO_CHART_KEY = {
     ui.circadianModalCloseButtons.forEach((button) => {
       button.addEventListener('click', closeCircadianModal);
     });
+    setupSwipeToClose(ui.circadianModalContent, closeCircadianModal);
     if (ui.circadianModal) {
       ui.circadianModal.addEventListener('click', (event) => {
         if (event.target?.dataset?.close === 'true') {
@@ -1394,6 +1398,77 @@ const METRIC_TO_CHART_KEY = {
       body.style.width = '';
       body.style.left = '';
     }
+  }
+
+  function setupSwipeToClose(element, onClose) {
+    if (!element || typeof onClose !== 'function') return;
+    let startY = 0;
+    let pointerId = null;
+    let tracking = false;
+
+    const resetTransform = () => {
+      element.style.transition = '';
+      element.style.transform = '';
+    };
+
+    const handlePointerDown = (event) => {
+      if (event.pointerType === 'mouse') return;
+      if (window.innerWidth >= SWIPE_CLOSE_MAX_WIDTH) return;
+      if (element.scrollTop > 2) return;
+      pointerId = event.pointerId;
+      startY = event.clientY;
+      tracking = true;
+      element.setPointerCapture?.(pointerId);
+      element.style.transition = '';
+    };
+
+    const handlePointerMove = (event) => {
+      if (!tracking || event.pointerId !== pointerId) return;
+      const deltaY = event.clientY - startY;
+      if (deltaY <= 0) {
+        element.style.transform = '';
+        return;
+      }
+      const damped = Math.min(deltaY, SWIPE_CLOSE_THRESHOLD * 1.6) * 0.35;
+      element.style.transform = `translateY(${damped}px)`;
+    };
+
+    const endGesture = (event) => {
+      if (!tracking || (event.pointerId != null && event.pointerId !== pointerId)) return;
+      const deltaY = (event.clientY ?? startY) - startY;
+      const currentPointerId = pointerId;
+      tracking = false;
+      pointerId = null;
+      if (currentPointerId != null) {
+        element.releasePointerCapture?.(currentPointerId);
+      }
+      element.style.transition = 'transform 180ms ease';
+      if (deltaY > SWIPE_CLOSE_THRESHOLD && element.scrollTop <= 2) {
+        element.style.transform = '';
+        onClose();
+      } else {
+        element.style.transform = '';
+        window.setTimeout(() => {
+          element.style.transition = '';
+        }, 190);
+      }
+    };
+
+    const cancelGesture = () => {
+      tracking = false;
+      pointerId = null;
+      resetTransform();
+    };
+
+    element.addEventListener('pointerdown', handlePointerDown);
+    element.addEventListener('pointermove', handlePointerMove);
+    element.addEventListener('pointerup', endGesture);
+    element.addEventListener('pointercancel', cancelGesture);
+    element.addEventListener('scroll', () => {
+      if (!tracking && element.scrollTop > 2 && element.style.transform) {
+        resetTransform();
+      }
+    });
   }
 
   function getModalFocusables() {
@@ -1481,8 +1556,9 @@ const METRIC_TO_CHART_KEY = {
 
   function updateModalStickyOffsets() {
     if (!ui.modalTabList || !ui.modalHeader) return;
-    const headerHeight = ui.modalHeader.getBoundingClientRect().height || 0;
-    const offset = Math.max(Math.round(headerHeight + 12), 72);
+    const headerRect = ui.modalHeader.getBoundingClientRect();
+    const headerHeight = headerRect?.height || 0;
+    const offset = Math.max(Math.round(headerHeight + 10), 40);
     ui.modalTabList.style.setProperty('--tabs-offset', `${offset}px`);
   }
 
@@ -3487,16 +3563,16 @@ const METRIC_TO_CHART_KEY = {
     const max = rawMax > min ? rawMax : min + 1;
     const span = Math.max(max - min, 1);
     const viewBoxWidth = 320;
-    const viewBoxHeight = 88;
-    const trackPadding = 8;
-    const markerPadding = 8;
+    const viewBoxHeight = 118;
+    const trackPadding = 10;
+    const markerPadding = 12;
     const trackStart = trackPadding;
     const trackEnd = viewBoxWidth - trackPadding;
-    const trackHeight = 14;
-    const trackY = 44;
-    const labelY = trackY - trackHeight / 2 - 10;
+    const trackHeight = 30;
+    const trackY = 68;
+    const labelY = trackY - trackHeight / 2 - 12;
     const tickBaseY = trackY + trackHeight / 2;
-    const tickLabelY = tickBaseY + 14;
+    const tickLabelY = tickBaseY + 18;
 
     svg.setAttribute('viewBox', `0 0 ${viewBoxWidth} ${viewBoxHeight}`);
     svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
@@ -3595,7 +3671,7 @@ const METRIC_TO_CHART_KEY = {
         x1: x,
         y1: tickBaseY,
         x2: x,
-        y2: tickBaseY + 6
+        y2: tickBaseY + 8
       });
       tickGroup.append(line);
       const label = createSvgElement('text', {
@@ -3617,10 +3693,10 @@ const METRIC_TO_CHART_KEY = {
       class: `chart-scale__marker chart-scale__marker--${markerTone}`,
       transform: `translate(${markerX} ${trackY})`
     });
-    const markerLine = createSvgElement('line', { class: 'chart-scale__marker-line', x1: 0, y1: 0, x2: 0, y2: -12 });
-    const markerDot = createSvgElement('circle', { class: 'chart-scale__marker-dot', cx: 0, cy: 0, r: 3.2 });
-    const labelGroup = createSvgElement('g', { class: 'chart-scale__marker-label', transform: 'translate(0,-16)' });
-    const labelBg = createSvgElement('rect', { class: 'chart-scale__marker-label-bg', x: -24, y: -8, width: 48, height: 16 });
+    const markerLine = createSvgElement('line', { class: 'chart-scale__marker-line', x1: 0, y1: 0, x2: 0, y2: -18 });
+    const markerDot = createSvgElement('circle', { class: 'chart-scale__marker-dot', cx: 0, cy: 0, r: 4.2 });
+    const labelGroup = createSvgElement('g', { class: 'chart-scale__marker-label', transform: 'translate(0,-20)' });
+    const labelBg = createSvgElement('rect', { class: 'chart-scale__marker-label-bg', x: -24, y: -9, width: 48, height: 18 });
     const labelText = createSvgElement('text', { class: 'chart-scale__marker-value', x: 0, y: 0 });
     labelText.textContent = formatWithUnit(hasValue ? value : null, unit, decimals);
     labelGroup.append(labelBg, labelText);
@@ -3684,7 +3760,7 @@ const METRIC_TO_CHART_KEY = {
     } else if (rightEdge > viewBoxWidth - padding) {
       shift = (viewBoxWidth - padding) - rightEdge;
     }
-    group.setAttribute('transform', `translate(${shift.toFixed(2)},-16)`);
+    group.setAttribute('transform', `translate(${shift.toFixed(2)},-20)`);
   }
 
   function formatScaleTick(value, unit) {
@@ -3881,7 +3957,7 @@ const METRIC_TO_CHART_KEY = {
       responsive: true,
       maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
-      layout: { padding: { top: 8, right: 12, bottom: 8, left: 6 } },
+      layout: { padding: { top: 4, right: 10, bottom: 10, left: 8 } },
       plugins: {
         legend: { labels: { color: '#475569', boxWidth: 12, boxHeight: 12, padding: 12 } },
         tooltip: {
@@ -3893,8 +3969,18 @@ const METRIC_TO_CHART_KEY = {
       scales: {
         x: {
           type: 'time',
-          time: { unit: timeUnit, tooltipFormat: 'dd.MM.yyyy HH:mm' },
-          ticks: { maxRotation: 0, maxTicksLimit: 6, color: '#94a3b8' },
+          time: {
+            unit: timeUnit,
+            tooltipFormat: 'dd.MM.yyyy HH:mm'
+          },
+          ticks: {
+            maxRotation: 0,
+            maxTicksLimit: 5,
+            autoSkip: true,
+            autoSkipPadding: 12,
+            color: '#94a3b8',
+            font: { size: 11 }
+          },
           grid: { display: false, drawBorder: false },
           border: { display: false }
         },
@@ -3902,12 +3988,13 @@ const METRIC_TO_CHART_KEY = {
           title: { display: true, text: definition.yTitle, color: '#9ca3af' },
           ticks: {
             color: '#94a3b8',
-            maxTicksLimit: 6,
+            maxTicksLimit: 5,
+            font: { size: 11 },
             callback(value) {
               return formatScaleTick(value, definition.yTitle);
             }
           },
-          grid: { color: 'rgba(148, 163, 184, 0.12)', lineWidth: 1, drawBorder: false },
+          grid: { color: 'rgba(148, 163, 184, 0.14)', lineWidth: 1, drawBorder: false, drawTicks: false },
           border: { display: false },
           suggestedMin: definition.yBounds?.min,
           suggestedMax: definition.yBounds?.max
@@ -4253,8 +4340,9 @@ const METRIC_TO_CHART_KEY = {
   }
 
   function showToast(message) {
-    if (!ui.toast || !ui.toastText || !message) return;
-    ui.toastText.textContent = message;
+    const text = typeof message === 'string' ? message.trim() : String(message ?? '').trim();
+    if (!ui.toast || !ui.toastText || !text) return;
+    ui.toastText.textContent = text;
     ui.toast.hidden = false;
     ui.toast.focus({ preventScroll: true });
     window.clearTimeout(ui.toast._timer);
