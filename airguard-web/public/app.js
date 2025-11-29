@@ -1326,7 +1326,10 @@ const METRIC_TO_CHART_KEY = {
     }
 
     if (ui.toastClose) {
-      ui.toastClose.addEventListener('click', hideToast);
+      ui.toastClose.addEventListener('click', (event) => {
+        event.stopPropagation();
+        hideToast();
+      });
     }
 
     updateCircadianCycle(resolveCircadianPhase());
@@ -4250,7 +4253,7 @@ const METRIC_TO_CHART_KEY = {
   }
 
   function showToast(message) {
-    if (!ui.toast || !ui.toastText) return;
+    if (!ui.toast || !ui.toastText || !message) return;
     ui.toastText.textContent = message;
     ui.toast.hidden = false;
     ui.toast.focus({ preventScroll: true });

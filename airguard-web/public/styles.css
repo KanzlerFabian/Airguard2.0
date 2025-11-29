@@ -268,6 +268,10 @@ a {
   align-self: flex-start;
 }
 
+#pwa-status-badge {
+  display: none !important;
+}
+
 .ghost-btn {
   border: 1px solid var(--border-strong);
   background: rgba(255, 255, 255, 0.75);
@@ -1163,6 +1167,7 @@ a {
   position: relative;
   width: min(960px, 95vw);
   max-height: 96vh;
+  height: min(92vh, 900px);
   background: var(--bg-surface);
   border-radius: 20px;
   padding: 18px 18px calc(18px + env(safe-area-inset-bottom));
