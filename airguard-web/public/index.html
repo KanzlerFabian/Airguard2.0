@@ -378,7 +378,6 @@
   <div class="chart-modal" id="chart-modal" role="dialog" aria-modal="true" hidden>
     <div class="chart-modal__backdrop" aria-hidden="true" data-close="true"></div>
     <div class="chart-modal__content" tabindex="-1">
-      <button type="button" class="chart-modal__close" aria-label="Schließen" data-close="true">×</button>
       <header class="modal-header chart-modal__header">
         <div class="modal-header__titles">
           <div class="chart-modal__title-group">
@@ -394,6 +393,7 @@
             </div>
             <span id="chart-modal-current-label" class="chart-modal__current-label">—</span>
           </div>
+          <button type="button" class="chart-modal__close" aria-label="Schließen" data-close="true">×</button>
         </div>
       </header>
       <div class="modal-body chart-modal__body">
@@ -410,7 +410,7 @@
           </div>
         </div>
         <div class="chart-modal__scale" id="chart-modal-scale">
-          <svg id="chart-modal-scale-svg" class="chart-scale" viewBox="0 0 100 48" role="presentation" aria-hidden="true"></svg>
+          <svg id="chart-modal-scale-svg" class="chart-scale" viewBox="0 0 320 118" role="presentation" aria-hidden="true"></svg>
           <p id="chart-modal-scale-caption" class="chart-modal__scale-caption">—</p>
         </div>
         <div class="chart-modal__info">
@@ -423,7 +423,6 @@
   <div class="circadian-modal" id="circadian-modal" role="dialog" aria-modal="true" hidden>
     <div class="circadian-modal__backdrop" aria-hidden="true" data-close="true"></div>
     <div class="circadian-modal__content" tabindex="-1">
-      <button type="button" class="circadian-modal__close" aria-label="Schließen" data-close="true">×</button>
       <header class="modal-header circadian-modal__header">
         <div class="modal-header__titles">
           <h3 id="circadian-modal-title">Circadian Light</h3>
@@ -431,6 +430,7 @@
         </div>
         <div class="modal-header__meta">
           <span id="circadian-modal-status" class="badge" data-tone="neutral">—</span>
+          <button type="button" class="circadian-modal__close" aria-label="Schließen" data-close="true">×</button>
         </div>
       </header>
       <div class="modal-body circadian-modal__body">
