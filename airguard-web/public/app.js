@@ -1172,6 +1172,20 @@ const METRIC_TO_CHART_KEY = {
     ui.toast = document.querySelector('.toast');
     ui.toastText = ui.toast?.querySelector('.toast-text') || null;
     ui.toastClose = ui.toast?.querySelector('.toast-close') || null;
+    if (ui.toast) {
+      ui.toast.tabIndex = -1;
+      ui.toast.addEventListener('click', (event) => {
+        const isDirectToastClick = event.target === ui.toast || event.target === ui.toastText;
+        if (isDirectToastClick) {
+          hideToast();
+        }
+      });
+      ui.toast.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+          hideToast();
+        }
+      });
+    }
 
     if (ui.circadianCard) {
       ui.circadianCard.tabIndex = 0;
@@ -4239,6 +4253,7 @@ const METRIC_TO_CHART_KEY = {
     if (!ui.toast || !ui.toastText) return;
     ui.toastText.textContent = message;
     ui.toast.hidden = false;
+    ui.toast.focus({ preventScroll: true });
     window.clearTimeout(ui.toast._timer);
     ui.toast._timer = window.setTimeout(() => {
       ui.toast.hidden = true;
@@ -4255,10 +4270,6 @@ const METRIC_TO_CHART_KEY = {
     if (!('serviceWorker' in navigator)) return;
     if (!window.isSecureContext) {
       console.info('Service Worker übersprungen (unsicherer Kontext)');
-      if (ui.pwaStatusBadge) {
-        ui.pwaStatusBadge.textContent = 'Offline-Cache deaktiviert (unsicherer Kontext)';
-        ui.pwaStatusBadge.hidden = false;
-      }
       return;
     }
 
@@ -4272,10 +4283,6 @@ const METRIC_TO_CHART_KEY = {
       })
       .catch((error) => {
         console.info('Service Worker Registrierung fehlgeschlagen', error?.message || 'Unbekannter Fehler');
-        if (ui.pwaStatusBadge) {
-          ui.pwaStatusBadge.textContent = 'Offline-Cache deaktiviert (Registrierung fehlgeschlagen)';
-          ui.pwaStatusBadge.hidden = false;
-        }
       });
   }
 
