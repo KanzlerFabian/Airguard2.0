@@ -1213,6 +1213,7 @@ a {
   justify-content: space-between;
   gap: var(--space-md);
   padding: 0.1rem 0.25rem;
+  flex-wrap: wrap;
 }
 
 .modal-header__titles {
@@ -1226,14 +1227,24 @@ a {
   gap: 0.65rem;
   justify-content: flex-end;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .chart-modal__header {
   padding: 0;
   position: sticky;
   top: calc(env(safe-area-inset-top) + 4px);
-  background: linear-gradient(var(--bg-surface) 75%, rgba(248, 250, 252, 0));
+  background: linear-gradient(var(--bg-surface) 78%, rgba(248, 250, 252, 0));
   z-index: 4;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: flex-start;
+  gap: var(--space-sm) var(--space-md);
+}
+
+.chart-modal__header .modal-header__titles,
+.chart-modal__header .modal-header__meta {
+  align-self: flex-start;
 }
 
 .chart-modal__title-group {
@@ -1315,24 +1326,24 @@ a {
 .modal-body {
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
-  padding: var(--space-xs) var(--space-xs) calc(var(--space-lg) + env(safe-area-inset-bottom));
+  gap: clamp(0.9rem, 2vw, 1.2rem);
+  padding: var(--space-sm) var(--space-xs) calc(var(--space-lg) + env(safe-area-inset-bottom));
   min-height: 0;
   flex: 1 1 auto;
 }
 
 .modal-range-tabs {
   display: flex;
-  gap: 6px;
-  justify-content: flex-start;
+  gap: 10px;
+  justify-content: center;
   flex-wrap: wrap;
   overflow-x: auto;
   overscroll-behavior: contain;
   scroll-snap-type: x proximity;
   scrollbar-width: none;
   touch-action: pan-x;
-  padding: 6px 0;
-  margin: 0.2rem 0 0.35rem;
+  padding: 8px 6px;
+  margin: 0;
   --tab-tone-bg: rgba(14, 165, 233, 0.16);
   --tab-tone-color: #0ea5e9;
 }
@@ -1342,8 +1353,8 @@ a {
 }
 
 .modal-tab {
-  flex: 1 1 auto;
-  min-width: 0;
+  flex: 0 0 auto;
+  min-width: 96px;
   border: 1px solid rgba(148, 163, 184, 0.4);
   background: rgba(148, 163, 184, 0.1);
   border-radius: 999px;
@@ -1375,8 +1386,8 @@ a {
 .chart-modal__canvas {
   position: relative;
   width: 100%;
-  height: clamp(320px, 55vh, 420px);
-  padding: var(--space-sm) var(--space-sm) calc(var(--space-sm) + 2px);
+  height: clamp(360px, 58vh, 520px);
+  padding: 18px 16px 18px;
 }
 
 .modal-chart-container {
@@ -1454,6 +1465,7 @@ a {
   background: rgba(148, 163, 184, 0.08);
   border-radius: var(--radius-md);
   padding: var(--space-md);
+  margin-top: 0;
 }
 
 .chart-modal__insight {
@@ -1509,13 +1521,15 @@ a {
   background: rgba(148, 163, 184, 0.08);
   padding: var(--space-md);
   border-radius: var(--radius-md);
-  min-height: 110px;
+  min-height: 140px;
 }
 
 .chart-scale {
   display: block;
   width: 100%;
-  height: 140px;
+  max-width: 100%;
+  height: 160px;
+  margin: 0 auto;
 }
 
 .chart-scale__track {
@@ -1556,6 +1570,25 @@ a {
   font-size: 4.6px;
   font-weight: 600;
   fill: #64748b;
+}
+
+@media (min-width: 640px) and (max-width: 1100px) {
+  .chart-modal__content {
+    width: min(900px, 94vw);
+  }
+
+  .modal-range-tabs {
+    justify-content: center;
+  }
+
+  .chart-modal__canvas {
+    height: clamp(400px, 62vh, 540px);
+    padding: 20px 18px 20px;
+  }
+
+  .chart-modal__scale {
+    padding: 1.15rem;
+  }
 }
 
 .chart-scale__tick {
@@ -1678,7 +1711,8 @@ a {
   }
 
   .chart-modal__canvas {
-    height: clamp(260px, 52vh, 360px);
+    height: clamp(320px, 58vh, 460px);
+    padding: 18px 14px 18px;
   }
 
   .chart-modal__info {

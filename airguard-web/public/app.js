@@ -3926,11 +3926,20 @@ const METRIC_TO_CHART_KEY = {
 
   function buildModalChartOptions(definition, timeUnit, guides, tooltipEnabled, tooltipLabel) {
     const safeGuides = Array.isArray(guides) ? guides.map((guide) => ({ ...guide })) : [];
+    const isMobile = window.innerWidth < 640;
+    const isTablet = window.innerWidth >= 640 && window.innerWidth < 1100;
+    const xTickLimit = isMobile ? 4 : isTablet ? 6 : 8;
+    const yTickLimit = isMobile ? 4 : 5;
+    const layoutPadding = isMobile
+      ? { top: 14, right: 12, bottom: 14, left: 10 }
+      : isTablet
+        ? { top: 18, right: 16, bottom: 18, left: 12 }
+        : { top: 20, right: 18, bottom: 20, left: 14 };
     return {
       responsive: true,
       maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
-      layout: { padding: { top: 4, right: 10, bottom: 10, left: 8 } },
+      layout: { padding: layoutPadding },
       plugins: {
         legend: { labels: { color: '#475569', boxWidth: 12, boxHeight: 12, padding: 12 } },
         tooltip: {
@@ -3950,9 +3959,9 @@ const METRIC_TO_CHART_KEY = {
             maxRotation: 0,
             autoSkip: true,
             autoSkipPadding: 12,
-            maxTicksLimit: window.innerWidth < 640 ? 4 : 7,
+            maxTicksLimit: xTickLimit,
             color: '#94a3b8',
-            font: { size: window.innerWidth < 640 ? 10 : 11 }
+            font: { size: isMobile ? 10 : 11 }
           },
           grid: { display: false, drawBorder: false },
           border: { display: false }
@@ -3961,8 +3970,8 @@ const METRIC_TO_CHART_KEY = {
           title: { display: true, text: definition.yTitle, color: '#9ca3af' },
           ticks: {
             color: '#94a3b8',
-            maxTicksLimit: window.innerWidth < 640 ? 4 : 5,
-            font: { size: window.innerWidth < 640 ? 10 : 11 },
+            maxTicksLimit: yTickLimit,
+            font: { size: isMobile ? 10 : 11 },
             callback(value) {
               return formatScaleTick(value, definition.yTitle);
             }
