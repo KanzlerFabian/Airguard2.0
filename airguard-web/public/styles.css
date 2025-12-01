@@ -1231,15 +1231,14 @@ a {
 }
 
 .chart-modal__header {
-  padding: 0;
-  position: sticky;
-  top: calc(env(safe-area-inset-top) + 4px);
-  background: linear-gradient(var(--bg-surface) 78%, rgba(248, 250, 252, 0));
-  z-index: 4;
-  display: grid;
-  grid-template-columns: 1fr auto;
+  padding: 0 0 var(--space-sm);
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
   align-items: flex-start;
   gap: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
 }
 
 .chart-modal__header .modal-header__titles,
@@ -1330,6 +1329,7 @@ a {
   padding: var(--space-sm) var(--space-xs) calc(var(--space-lg) + env(safe-area-inset-bottom));
   min-height: 0;
   flex: 1 1 auto;
+  align-items: stretch;
 }
 
 .modal-range-tabs {
@@ -1337,13 +1337,13 @@ a {
   gap: 10px;
   justify-content: center;
   flex-wrap: wrap;
-  overflow-x: auto;
-  overscroll-behavior: contain;
-  scroll-snap-type: x proximity;
-  scrollbar-width: none;
-  touch-action: pan-x;
-  padding: 8px 6px;
+  width: 100%;
+  padding: 10px 4px 4px;
   margin: 0;
+  overflow: visible;
+  max-width: 880px;
+  margin-left: auto;
+  margin-right: auto;
   --tab-tone-bg: rgba(14, 165, 233, 0.16);
   --tab-tone-color: #0ea5e9;
 }
@@ -1386,8 +1386,10 @@ a {
 .chart-modal__canvas {
   position: relative;
   width: 100%;
-  height: clamp(360px, 58vh, 520px);
+  height: clamp(340px, 55vh, 520px);
   padding: 18px 16px 18px;
+  max-width: 880px;
+  margin: 0 auto;
 }
 
 .modal-chart-container {
@@ -1466,6 +1468,9 @@ a {
   border-radius: var(--radius-md);
   padding: var(--space-md);
   margin-top: 0;
+  max-width: 880px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .chart-modal__insight {
@@ -1516,19 +1521,24 @@ a {
 }
 
 .chart-modal__scale {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: var(--space-md);
   background: rgba(148, 163, 184, 0.08);
   padding: var(--space-md);
   border-radius: var(--radius-md);
   min-height: 140px;
+  width: 100%;
+  max-width: 880px;
+  margin: 0 auto;
 }
 
 .chart-scale {
   display: block;
   width: 100%;
   max-width: 100%;
-  height: 160px;
+  height: 150px;
   margin: 0 auto;
 }
 
@@ -1560,14 +1570,14 @@ a {
 }
 
 .chart-scale__segment-label {
-  font-size: 6px;
+  font-size: 7px;
   font-weight: 700;
   fill: #334155;
   text-anchor: middle;
 }
 
 .chart-scale__segment-sub {
-  font-size: 4.6px;
+  font-size: 5.2px;
   font-weight: 600;
   fill: #64748b;
 }
