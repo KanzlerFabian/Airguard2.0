@@ -2111,6 +2111,37 @@ a {
   gap: 0.45rem;
 }
 
+.insight-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.insight-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  color: #0f172a;
+  background: #e2e8f0;
+  border: 1px solid var(--border-soft);
+}
+
+.insight-badge[data-severity='warning'] {
+  background: #fef3c7;
+  color: #854d0e;
+  border-color: #facc15;
+}
+
+.insight-badge[data-severity='critical'] {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #ef4444;
+}
+
 .insight-card h3 {
   font-size: 1rem;
   color: var(--text-strong);

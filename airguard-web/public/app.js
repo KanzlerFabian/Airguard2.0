@@ -1113,6 +1113,8 @@ const METRIC_TO_CHART_KEY = {
     circadianModalCctValue: null,
     circadianLuxCanvas: null,
     circadianCctCanvas: null,
+    insightsSection: null,
+    insightsGrid: null,
     circadianScaleSegments: new Map(),
     circadianScaleLabels: new Map(),
     circadianScaleMarkers: new Map(),
@@ -1164,6 +1166,8 @@ const METRIC_TO_CHART_KEY = {
     ui.luxTarget = document.getElementById('lux-target');
     ui.luxEval = document.getElementById('lux-eval');
     ui.barLux = document.querySelector('.bar-track[data-kind="lux"]');
+    ui.insightsSection = document.querySelector('.insights-section');
+    ui.insightsGrid = document.querySelector('#insights-grid, [data-insights-grid]');
     ui.installBtn = document.getElementById('install-btn');
     ui.notifyBtn = document.getElementById('notify-btn');
     ui.pwaStatusBadge = document.getElementById('pwa-status-badge');
@@ -1747,6 +1751,7 @@ const METRIC_TO_CHART_KEY = {
       if (displayData['Luftdruck']) {
         refreshPressureTrend().catch((error) => console.warn('Drucktrend Fehler', error));
       }
+      refreshInsights();
     } catch (error) {
       console.error('Live-Daten konnten nicht geladen werden', error);
       throw error;
@@ -2122,7 +2127,8 @@ const METRIC_TO_CHART_KEY = {
       .map((metric) => `${metricLabel(metric)} ${statuses[metric].label}`)
       .join(' • ');
     const placeholder = 'Aktuelle Luftqualität basierend auf CO₂, TVOC, Temperatur und Luftfeuchtigkeit.';
-    ui.healthDetail.textContent = detail || placeholder;
+    const heroDetail = INSIGHT_STATE.heroSummary?.text;
+    ui.healthDetail.textContent = heroDetail || detail || placeholder;
 
     const dashoffset = CIRCUMFERENCE * (1 - score / 100);
     ui.healthProgress.setAttribute('stroke-dashoffset', dashoffset.toFixed(2));
@@ -2176,6 +2182,837 @@ const METRIC_TO_CHART_KEY = {
       }
       default:
         return 50;
+    }
+  }
+
+  const INSIGHT_METRICS = ['CO2', 'PM2.5', 'PM1.0', 'PM10', 'TVOC', 'Temperatur', 'rel. Feuchte', 'Lux', 'Farbtemperatur'];
+
+  const INSIGHT_STATE = {
+    context: null,
+    insights: [],
+    heroSummary: null
+  };
+
+  async function getSeriesForMetric(metric, rangeKey) {
+    const key = rangeKey in TIME_RANGES ? rangeKey : '24h';
+    const range = TIME_RANGES[key];
+    const chartKey = METRIC_TO_CHART_KEY[metric];
+    if (!chartKey || !range) return [];
+    const definition = CHART_DEFINITIONS[chartKey];
+    if (!definition) return [];
+    const cacheKey = `${definition.key}_${range.range}`;
+    let cached = state.chartDataCache.get(cacheKey);
+    if (!cached) {
+      try {
+        cached = await ensureSeries(definition, range, false);
+      } catch (error) {
+        console.warn('Serie konnte nicht geladen werden', metric, key, error);
+        return [];
+      }
+    }
+    const series = cached?.[metric];
+    if (!Array.isArray(series)) return [];
+    return series
+      .map((point) => ({ ts: Number(point?.x), value: Number(point?.y) }))
+      .filter((point) => Number.isFinite(point.ts) && Number.isFinite(point.value));
+  }
+
+  function buildSeriesStats(points) {
+    if (!Array.isArray(points) || points.length === 0) {
+      return {
+        count: 0,
+        min: null,
+        max: null,
+        avg: null,
+        latest: null,
+        earliest: null,
+        trendSlope: null,
+        trendDirection: 'flat',
+        durationMs: 0
+      };
+    }
+    const sorted = points.slice().sort((a, b) => a.ts - b.ts);
+    const values = sorted.map((p) => p.value).filter((v) => Number.isFinite(v));
+    if (values.length === 0) {
+      return {
+        count: 0,
+        min: null,
+        max: null,
+        avg: null,
+        latest: null,
+        earliest: null,
+        trendSlope: null,
+        trendDirection: 'flat',
+        durationMs: 0
+      };
+    }
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const sum = values.reduce((acc, v) => acc + v, 0);
+    const avg = sum / values.length;
+    const earliest = sorted[0].value;
+    const latest = sorted[sorted.length - 1].value;
+    const durationMs = Math.max(0, sorted[sorted.length - 1].ts - sorted[0].ts);
+    const trendSlope = durationMs > 0 ? (latest - earliest) / durationMs : 0;
+    const tolerance = Math.max(0.05, Math.min(0.1, Math.abs(earliest || latest) * 0.0001));
+    const relativeChange = earliest ? (latest - earliest) / Math.max(Math.abs(earliest), 1) : 0;
+    let trendDirection = 'flat';
+    if (relativeChange > tolerance) trendDirection = 'rising';
+    else if (relativeChange < -tolerance) trendDirection = 'falling';
+    return {
+      count: values.length,
+      min,
+      max,
+      avg,
+      latest,
+      earliest,
+      trendSlope,
+      trendDirection,
+      durationMs
+    };
+  }
+
+  function normalizeBands(metric) {
+    const insightScale = METRIC_INSIGHTS[metric]?.scale;
+    const preset = VALUE_SCALE_PRESETS[metric];
+    if (insightScale?.bands) return insightScale.bands;
+    if (insightScale?.stops) {
+      return insightScale.stops.map((stop, index, arr) => ({
+        label: stop.label,
+        tone: stop.tone,
+        min: index === 0 ? Number.NEGATIVE_INFINITY : arr[index - 1].value,
+        max: stop.value
+      }));
+    }
+    if (preset?.segments) return preset.segments;
+    if (preset?.stops) {
+      return preset.stops.map((stop, index, arr) => ({
+        label: stop.label,
+        tone: stop.tone,
+        min: index === 0 ? Number.NEGATIVE_INFINITY : arr[index - 1].value,
+        max: stop.value
+      }));
+    }
+    return null;
+  }
+
+  function classifyValueWithScale(metric, value) {
+    if (!Number.isFinite(value)) {
+      return { tone: 'neutral', bandLabel: null, bandIndex: -1 };
+    }
+    const bands = normalizeBands(metric);
+    if (!Array.isArray(bands)) {
+      return { tone: 'neutral', bandLabel: null, bandIndex: -1 };
+    }
+    for (let index = 0; index < bands.length; index++) {
+      const band = bands[index];
+      if (band == null) continue;
+      const min = Number.isFinite(band.min) ? band.min : Number.NEGATIVE_INFINITY;
+      const max = Number.isFinite(band.max) ? band.max : Number.POSITIVE_INFINITY;
+      const stopValue = band.value ?? max;
+      const upper = Number.isFinite(stopValue) ? stopValue : max;
+      if (value >= min && value < upper) {
+        return {
+          tone: band.tone || 'neutral',
+          bandLabel: band.label || null,
+          bandIndex: index
+        };
+      }
+    }
+    const last = bands[bands.length - 1];
+    return {
+      tone: last?.tone || 'neutral',
+      bandLabel: last?.label || null,
+      bandIndex: bands.length - 1
+    };
+  }
+
+  function computeShareOutsideGood(metric, points) {
+    if (!Array.isArray(points) || points.length < 2) return 0;
+    let totalMs = 0;
+    let outsideMs = 0;
+    for (let i = 0; i < points.length - 1; i++) {
+      const current = points[i];
+      const next = points[i + 1];
+      if (!current || !next) continue;
+      const span = Math.max(0, next.ts - current.ts);
+      totalMs += span;
+      const tone = classifyValueWithScale(metric, current.value)?.tone;
+      if (tone !== 'excellent' && tone !== 'good') {
+        outsideMs += span;
+      }
+    }
+    if (totalMs === 0) return 0;
+    return clamp(outsideMs / totalMs, 0, 1);
+  }
+
+  function computeMaxStreakOutsideGood(metric, points) {
+    if (!Array.isArray(points) || points.length < 2) return 0;
+    let longest = 0;
+    let current = 0;
+    for (let i = 0; i < points.length - 1; i++) {
+      const now = points[i];
+      const next = points[i + 1];
+      if (!now || !next) continue;
+      const span = Math.max(0, next.ts - now.ts);
+      const tone = classifyValueWithScale(metric, now.value)?.tone;
+      if (tone !== 'excellent' && tone !== 'good') {
+        current += span;
+      } else {
+        longest = Math.max(longest, current);
+        current = 0;
+      }
+    }
+    longest = Math.max(longest, current);
+    return Math.round((longest / (1000 * 60 * 60)) * 10) / 10;
+  }
+
+  function summarizeWeekly(metric, points) {
+    if (!Array.isArray(points) || points.length === 0) return null;
+    const stats = buildSeriesStats(points);
+    const daily = new Map();
+    for (const point of points) {
+      if (!point) continue;
+      const dayKey = new Date(point.ts).toISOString().slice(0, 10);
+      const bucket = daily.get(dayKey) || { sum: 0, count: 0 };
+      bucket.sum += point.value;
+      bucket.count += 1;
+      daily.set(dayKey, bucket);
+    }
+    let daysWithElevatedOrWorse = 0;
+    for (const bucket of daily.values()) {
+      if (!bucket.count) continue;
+      const avg = bucket.sum / bucket.count;
+      const tone = classifyValueWithScale(metric, avg)?.tone;
+      if (tone !== 'excellent' && tone !== 'good') {
+        daysWithElevatedOrWorse += 1;
+      }
+    }
+    return {
+      avg: stats.avg,
+      min: stats.min,
+      max: stats.max,
+      daysWithElevatedOrWorse
+    };
+  }
+
+  async function buildInsightContext() {
+    const phase = resolveCircadianPhase();
+    const metricContexts = [];
+    for (const metric of INSIGHT_METRICS) {
+      const nowValue = state.now?.[metric]?.value;
+      const nowStatus = Number.isFinite(nowValue) ? determineStatus(metric, nowValue) : null;
+      const nowClassification = classifyValueWithScale(metric, nowValue);
+      let stats24h = null;
+      let stats7d = null;
+      try {
+        const series24 = await getSeriesForMetric(metric, '24h');
+        if (Array.isArray(series24) && series24.length) {
+          const s = buildSeriesStats(series24);
+          stats24h = {
+            ...s,
+            shareOutsideGood: computeShareOutsideGood(metric, series24),
+            maxStreakOutsideGoodHours: computeMaxStreakOutsideGood(metric, series24)
+          };
+        }
+      } catch (error) {
+        console.warn('24h Statistik fehlgeschlagen', metric, error);
+      }
+      try {
+        const series7d = await getSeriesForMetric(metric, '7d');
+        if (Array.isArray(series7d) && series7d.length) {
+          stats7d = summarizeWeekly(metric, series7d);
+        }
+      } catch (error) {
+        console.warn('7d Statistik fehlgeschlagen', metric, error);
+      }
+      const entry = {
+        metric,
+        now: {
+          value: Number.isFinite(nowValue) ? nowValue : null,
+          status: nowStatus,
+          tone: nowStatus?.tone || nowStatus?.intent || nowClassification.tone,
+          bandLabel: nowClassification.bandLabel || nowStatus?.label || null
+        },
+        stats24h,
+        stats7d
+      };
+      metricContexts.push(entry);
+    }
+
+    const context = {
+      metrics: metricContexts,
+      timestamp: Date.now(),
+      phase,
+      circadian:
+        state.now && (state.now['Farbtemperatur'] || state.now.Lux)
+          ? evaluateCircadian(state.now['Farbtemperatur']?.value, state.now.Lux?.value, phase)
+          : null
+    };
+    return context;
+  }
+
+  function getMetricContext(context, metric) {
+    if (!context?.metrics) return null;
+    return context.metrics.find((entry) => entry.metric === metric) || null;
+  }
+
+  const INSIGHT_RULES = [
+    {
+      id: 'co2_persistent_high',
+      metric: 'CO2',
+      severity: 'warning',
+      group: 'co2',
+      when: (context) => {
+        const co2 = getMetricContext(context, 'CO2');
+        return (
+          co2?.stats24h?.shareOutsideGood >= 0.4 &&
+          ['elevated', 'warning', 'poor', 'critical'].includes(co2.now?.tone)
+        );
+      },
+      build: (context) => {
+        const co2 = getMetricContext(context, 'CO2');
+        if (!co2?.stats24h) return null;
+        const hours = Math.max(1, Math.round((co2.stats24h.shareOutsideGood * (co2.stats24h.durationMs / 3600000 || 24))));
+        return {
+          id: 'co2_persistent_high',
+          metric: 'CO2',
+          severity: 'warning',
+          tone: 'elevated',
+          title: 'CO₂ seit Stunden erhöht',
+          summary: `CO₂ war in den letzten 24 h über etwa ${hours} Stunden erhöht oder schlecht.`,
+          recommendation: 'Regelmäßiger Stoß- und Querlüftung planen und Lüftung länger laufen lassen.',
+          tags: ['lüften', 'co2'],
+          highlightRange: { from: 1000, to: 2000, unit: 'ppm' }
+        };
+      }
+    },
+    {
+      id: 'co2_short_peak',
+      metric: 'CO2',
+      severity: 'info',
+      group: 'co2',
+      when: (context) => {
+        const co2 = getMetricContext(context, 'CO2');
+        return (
+          co2?.stats24h &&
+          co2.stats24h.shareOutsideGood < 0.25 &&
+          Number.isFinite(co2.stats24h.max) &&
+          Number.isFinite(co2.now?.value) &&
+          co2.stats24h.max > co2.now.value * 1.2
+        );
+      },
+      build: (context) => {
+        const co2 = getMetricContext(context, 'CO2');
+        if (!co2?.stats24h) return null;
+        return {
+          id: 'co2_short_peak',
+          metric: 'CO2',
+          severity: 'info',
+          tone: 'good',
+          title: 'Kurzer CO₂-Peak',
+          summary: 'CO₂ hatte kurzzeitig einen starken Peak, aktuell aber wieder im Rahmen.',
+          recommendation: 'Solange das selten bleibt, reicht normales Lüften nach Spitzen.',
+          tags: ['lüften', 'co2']
+        };
+      }
+    },
+    {
+      id: 'co2_multi_day',
+      metric: 'CO2',
+      severity: 'warning',
+      group: 'co2',
+      when: (context) => {
+        const co2 = getMetricContext(context, 'CO2');
+        return co2?.stats7d?.daysWithElevatedOrWorse >= 3;
+      },
+      build: (context) => {
+        const co2 = getMetricContext(context, 'CO2');
+        const days = co2?.stats7d?.daysWithElevatedOrWorse || 0;
+        return {
+          id: 'co2_multi_day',
+          metric: 'CO2',
+          severity: 'warning',
+          tone: 'elevated',
+          title: 'CO₂ mehrfach erhöht',
+          summary: `An ${days} von 7 Tagen lag der mittlere CO₂-Wert zu hoch.`,
+          recommendation: 'Lüftungsroutinen anpassen oder Frischluftzufuhr dauerhaft erhöhen.',
+          tags: ['lüften', 'co2']
+        };
+      }
+    },
+    {
+      id: 'pm25_consistently_low',
+      metric: 'PM2.5',
+      severity: 'info',
+      group: 'air_quality',
+      when: (context) => {
+        const pm = getMetricContext(context, 'PM2.5');
+        return pm?.stats24h?.shareOutsideGood != null && pm.stats24h.shareOutsideGood < 0.08;
+      },
+      build: () => ({
+        id: 'pm25_consistently_low',
+        metric: 'PM2.5',
+        severity: 'info',
+        tone: 'excellent',
+        title: 'Feinstaub dauerhaft niedrig',
+        summary: 'Feinstaub blieb durchgehend im grünen Bereich.',
+        recommendation: 'Weiter so – Lüftungs- und Reinigungsroutine passt.',
+        tags: ['pm', 'sauber']
+      })
+    },
+    {
+      id: 'pm1_clean',
+      metric: 'PM1.0',
+      severity: 'info',
+      group: 'air_quality',
+      when: (context) => {
+        const pm = getMetricContext(context, 'PM1.0');
+        return pm?.stats24h?.shareOutsideGood != null && pm.stats24h.shareOutsideGood < 0.12;
+      },
+      build: () => ({
+        id: 'pm1_clean',
+        metric: 'PM1.0',
+        severity: 'info',
+        tone: 'excellent',
+        title: 'Sehr feiner Staub unauffällig',
+        summary: 'PM1.0 blieb überwiegend hervorragend.',
+        recommendation: 'Aktuelle Routine beibehalten, Quellen gering.',
+        tags: ['pm']
+      })
+    },
+    {
+      id: 'pm1_elevated',
+      metric: 'PM1.0',
+      severity: 'warning',
+      group: 'air_quality',
+      when: (context) => {
+        const pm = getMetricContext(context, 'PM1.0');
+        return pm?.stats24h?.shareOutsideGood > 0.25 && pm?.now?.tone !== 'excellent';
+      },
+      build: () => ({
+        id: 'pm1_elevated',
+        metric: 'PM1.0',
+        severity: 'warning',
+        tone: 'elevated',
+        title: 'Feinster Staub erhöht',
+        summary: 'PM1.0 war länger erhöht – sehr feine Partikel im Raum.',
+        recommendation: 'Innenquellen prüfen, lüften und ggf. Luftreiniger nutzen.',
+        tags: ['pm', 'lüften']
+      })
+    },
+    {
+      id: 'pm_peaks',
+      metric: 'PM2.5',
+      severity: 'warning',
+      group: 'air_quality',
+      when: (context) => {
+        const pm = getMetricContext(context, 'PM2.5');
+        return (
+          pm?.stats24h &&
+          pm.stats24h.shareOutsideGood > 0.15 &&
+          pm.stats24h.max > (pm.stats24h.avg || 0) * 1.8
+        );
+      },
+      build: () => ({
+        id: 'pm_peaks',
+        metric: 'PM2.5',
+        severity: 'warning',
+        tone: 'elevated',
+        title: 'Wiederkehrende Feinstaub-Peaks',
+        summary: 'Feinstaub zeigt wiederkehrende Spitzen – Innenquellen sind wahrscheinlich.',
+        recommendation: 'Abendliche Quellen wie Kochen, Kerzen oder Rauch minimieren und lüften.',
+        tags: ['pm', 'lüften']
+      })
+    },
+    {
+      id: 'pm_general_elevated',
+      metric: 'PM10',
+      severity: 'warning',
+      group: 'air_quality',
+      when: (context) => {
+        const pm = getMetricContext(context, 'PM10');
+        return pm?.stats24h?.shareOutsideGood > 0.3;
+      },
+      build: () => ({
+        id: 'pm_general_elevated',
+        metric: 'PM10',
+        severity: 'warning',
+        tone: 'elevated',
+        title: 'Feinstaub heute erhöht',
+        summary: 'Feinstaub war über den Tag hinweg häufig erhöht.',
+        recommendation: 'Lüften, Oberflächen reinigen und Staubquellen prüfen.',
+        tags: ['pm', 'lüften']
+      })
+    },
+    {
+      id: 'tvoc_persistent',
+      metric: 'TVOC',
+      severity: 'warning',
+      group: 'air_quality',
+      when: (context) => {
+        const tvoc = getMetricContext(context, 'TVOC');
+        return tvoc?.stats24h?.shareOutsideGood > 0.35;
+      },
+      build: () => ({
+        id: 'tvoc_persistent',
+        metric: 'TVOC',
+        severity: 'warning',
+        tone: 'elevated',
+        title: 'TVOC dauerhaft erhöht',
+        summary: 'Flüchtige organische Verbindungen bleiben länger erhöht.',
+        recommendation: 'Quellen prüfen (Reinigungsmittel, Möbel) und öfter lüften.',
+        tags: ['tvoc', 'lüften']
+      })
+    },
+    {
+      id: 'tvoc_peaks',
+      metric: 'TVOC',
+      severity: 'info',
+      group: 'air_quality',
+      when: (context) => {
+        const tvoc = getMetricContext(context, 'TVOC');
+        return (
+          tvoc?.stats24h?.shareOutsideGood < 0.3 &&
+          Number.isFinite(tvoc?.stats24h?.max) &&
+          Number.isFinite(tvoc?.stats24h?.avg) &&
+          tvoc.stats24h.max > tvoc.stats24h.avg * 2
+        );
+      },
+      build: () => ({
+        id: 'tvoc_peaks',
+        metric: 'TVOC',
+        severity: 'info',
+        tone: 'good',
+        title: 'TVOC schwankt stark',
+        summary: 'Einzelne starke TVOC-Peaks deuten auf kurzzeitige Quellen.',
+        recommendation: 'Bei Peaks Lüften und Quellen wie Reiniger oder Sprays reduzieren.',
+        tags: ['tvoc', 'lüften']
+      })
+    },
+    {
+      id: 'humidity_too_dry',
+      metric: 'rel. Feuchte',
+      severity: 'warning',
+      group: 'humidity',
+      when: (context) => {
+        const h = getMetricContext(context, 'rel. Feuchte');
+        return h?.stats24h?.shareOutsideGood > 0.35 && Number.isFinite(h?.now?.value) && h.now.value < 40;
+      },
+      build: () => ({
+        id: 'humidity_too_dry',
+        metric: 'rel. Feuchte',
+        severity: 'warning',
+        tone: 'elevated',
+        title: 'Luft zu trocken',
+        summary: 'Über längere Zeit lag die Luftfeuchte unter dem Wohlfühlbereich.',
+        recommendation: 'Luftbefeuchter nutzen, Pflanzen aufstellen oder Lüften reduzieren.',
+        tags: ['feuchte']
+      })
+    },
+    {
+      id: 'humidity_too_humid',
+      metric: 'rel. Feuchte',
+      severity: 'critical',
+      group: 'humidity',
+      when: (context) => {
+        const h = getMetricContext(context, 'rel. Feuchte');
+        return h?.stats24h?.shareOutsideGood > 0.35 && Number.isFinite(h?.now?.value) && h.now.value > 65;
+      },
+      build: () => ({
+        id: 'humidity_too_humid',
+        metric: 'rel. Feuchte',
+        severity: 'critical',
+        tone: 'poor',
+        title: 'Sehr feuchte Luft',
+        summary: 'Hohe Luftfeuchte über viele Stunden – Schimmelgefahr.',
+        recommendation: 'Intensiv lüften oder Entfeuchter nutzen, nasse Stellen trocknen.',
+        tags: ['feuchte', 'lüften']
+      })
+    },
+    {
+      id: 'temperature_comfort',
+      metric: 'Temperatur',
+      severity: 'info',
+      group: 'temperature',
+      when: (context) => {
+        const t = getMetricContext(context, 'Temperatur');
+        return t?.stats24h?.shareOutsideGood < 0.15 && t?.now?.tone === 'excellent';
+      },
+      build: () => ({
+        id: 'temperature_comfort',
+        metric: 'Temperatur',
+        severity: 'info',
+        tone: 'excellent',
+        title: 'Komfortable Temperatur',
+        summary: 'Temperatur liegt stabil im Wohlfühlbereich.',
+        recommendation: 'Aktuelle Einstellungen beibehalten.',
+        tags: ['komfort']
+      })
+    },
+    {
+      id: 'temperature_too_warm',
+      metric: 'Temperatur',
+      severity: 'warning',
+      group: 'temperature',
+      when: (context) => {
+        const t = getMetricContext(context, 'Temperatur');
+        return t?.stats24h?.shareOutsideGood > 0.3 && Number.isFinite(t?.now?.value) && t.now.value > 24;
+      },
+      build: () => ({
+        id: 'temperature_too_warm',
+        metric: 'Temperatur',
+        severity: 'warning',
+        tone: 'elevated',
+        title: 'Temperatur eher hoch',
+        summary: 'Die Raumtemperatur lag oft über dem Komfortbereich.',
+        recommendation: 'Beschatten, kurz lüften oder Heizung reduzieren.',
+        tags: ['komfort']
+      })
+    },
+    {
+      id: 'circadian_low_daylight',
+      metric: 'Lux',
+      severity: 'info',
+      group: 'circadian',
+      when: (context) => {
+        const phase = context?.phase;
+        const isDay = phase?.key === 'day' || phase?.key === 'mid-morning';
+        const evals = context?.circadian;
+        return isDay && evals && (evals.luxTone === 'elevated' || evals.luxTone === 'poor');
+      },
+      build: () => ({
+        id: 'circadian_low_daylight',
+        metric: 'Lux',
+        severity: 'info',
+        tone: 'elevated',
+        title: 'Arbeitslicht zu schwach',
+        summary: 'Tagsüber liegt die Beleuchtung unter dem Zielbereich.',
+        recommendation: 'Helleres Arbeitslicht oder mehr Tageslicht einplanen.',
+        tags: ['licht', 'circadian']
+      })
+    },
+    {
+      id: 'circadian_evening_bright',
+      metric: 'Farbtemperatur',
+      severity: 'warning',
+      group: 'circadian',
+      when: (context) => {
+        const phase = context?.phase;
+        const isEvening = phase?.key === 'evening' || phase?.key === 'late_evening';
+        const evals = context?.circadian;
+        return isEvening && evals && (evals.cctTone === 'poor' || evals.luxTone === 'poor');
+      },
+      build: () => ({
+        id: 'circadian_evening_bright',
+        metric: 'Farbtemperatur',
+        severity: 'warning',
+        tone: 'elevated',
+        title: 'Abendlicht zu hell oder kühl',
+        summary: 'Abends ist das Licht zu hell/kühl – kann den Schlaf stören.',
+        recommendation: 'Licht dimmen und auf warme Farbtemperatur wechseln.',
+        tags: ['licht', 'circadian']
+      })
+    },
+    {
+      id: 'combined_co2_humidity',
+      metric: null,
+      severity: 'critical',
+      group: 'combined',
+      when: (context) => {
+        const co2 = getMetricContext(context, 'CO2');
+        const hum = getMetricContext(context, 'rel. Feuchte');
+        return (
+          co2?.stats24h?.shareOutsideGood > 0.35 &&
+          hum?.stats24h?.shareOutsideGood > 0.35 &&
+          Number.isFinite(hum?.now?.value) &&
+          hum.now.value > 60
+        );
+      },
+      build: () => ({
+        id: 'combined_co2_humidity',
+        metric: null,
+        severity: 'critical',
+        tone: 'poor',
+        title: 'Schlecht gelüfteter Raum',
+        summary: 'CO₂ und Luftfeuchte sind länger erhöht – Frischluft fehlt.',
+        recommendation: 'Länger stoßlüften, Türen öffnen oder Lüftung verstärken.',
+        tags: ['lüften', 'co2', 'feuchte']
+      })
+    },
+    {
+      id: 'combined_pm_tvoc',
+      metric: null,
+      severity: 'warning',
+      group: 'combined',
+      when: (context) => {
+        const pm = getMetricContext(context, 'PM2.5');
+        const voc = getMetricContext(context, 'TVOC');
+        return (
+          pm?.stats24h?.shareOutsideGood > 0.25 &&
+          voc?.stats24h?.shareOutsideGood > 0.25 &&
+          (pm?.now?.tone === 'elevated' || pm?.now?.tone === 'poor' || voc?.now?.tone === 'elevated' || voc?.now?.tone === 'poor')
+        );
+      },
+      build: () => ({
+        id: 'combined_pm_tvoc',
+        metric: null,
+        severity: 'warning',
+        tone: 'elevated',
+        title: 'Innenquellen wahrscheinlich',
+        summary: 'Feinstaub und TVOC sind gleichzeitig erhöht – Quellen im Raum sind wahrscheinlich.',
+        recommendation: 'Kochen, Kerzen oder Rauch reduzieren und gründlich lüften.',
+        tags: ['pm', 'tvoc', 'lüften']
+      })
+    },
+    {
+      id: 'combined_co2_only',
+      metric: null,
+      severity: 'info',
+      group: 'combined',
+      when: (context) => {
+        const co2 = getMetricContext(context, 'CO2');
+        const pm = getMetricContext(context, 'PM2.5');
+        const voc = getMetricContext(context, 'TVOC');
+        return (
+          co2?.now?.tone && ['elevated', 'poor', 'warning'].includes(co2.now.tone) &&
+          (!pm || pm.now?.tone === 'excellent' || pm.now?.tone === 'good') &&
+          (!voc || voc.now?.tone === 'excellent' || voc.now?.tone === 'good')
+        );
+      },
+      build: () => ({
+        id: 'combined_co2_only',
+        metric: null,
+        severity: 'info',
+        tone: 'elevated',
+        title: 'Viel Atemluft, wenig Partikel',
+        summary: 'CO₂ ist erhöht, Feinstaub und TVOC sind normal – eher Lüftungsmangel.',
+        recommendation: 'Mehr Frischluft einplanen, besonders bei vielen Personen.',
+        tags: ['co2', 'lüften']
+      })
+    }
+  ];
+
+  function sortInsights(list) {
+    const severityRank = { critical: 3, warning: 2, info: 1 };
+    return (list || []).slice().sort((a, b) => {
+      const aRank = severityRank[a?.severity] || 0;
+      const bRank = severityRank[b?.severity] || 0;
+      if (aRank !== bRank) return bRank - aRank;
+      if (a.metric && b.metric && a.metric !== b.metric) return a.metric.localeCompare(b.metric);
+      return (a.id || '').localeCompare(b.id || '');
+    });
+  }
+
+  function evaluateInsightRules(context) {
+    if (!context) return [];
+    const results = [];
+    for (const rule of INSIGHT_RULES) {
+      try {
+        if (rule.when(context)) {
+          const insight = rule.build(context);
+          if (insight) {
+            results.push(insight);
+          }
+        }
+      } catch (error) {
+        console.error('Insight rule failed', rule?.id, error);
+      }
+    }
+    return sortInsights(results);
+  }
+
+  function buildHeroSummary(context, insights, statuses, score) {
+    const sortedInsights = sortInsights(insights);
+    const top = sortedInsights[0];
+    const tone = top?.tone || (score >= 80 ? 'excellent' : score >= 60 ? 'good' : score >= 40 ? 'elevated' : 'poor');
+    const concernMetrics = Object.entries(statuses || {})
+      .filter(([, status]) => status && ['elevated', 'warning', 'poor', 'critical'].includes(status.tone))
+      .map(([metric]) => metricLabel(metric));
+
+    let text;
+    if (top) {
+      const intro = score >= 80 ? 'Innenraumluft überwiegend gut' : score >= 60 ? 'Belastungen moderat' : 'Luftqualität belastet';
+      text = `${intro} – ${top.summary}`;
+    } else if (concernMetrics.length === 0) {
+      text = 'Luftqualität hervorragend – alle Kernwerte im grünen Bereich.';
+    } else {
+      const focus = concernMetrics.slice(0, 2).join(', ');
+      text = `Belastungen sichtbar: ${focus}.`;
+      const co2 = getMetricContext(context, 'CO2');
+      if (co2?.stats24h?.shareOutsideGood >= 0.3) {
+        text = 'CO₂ seit Stunden erhöht, übrige Werte nur moderat belastet.';
+      }
+    }
+
+    return { text, tone };
+  }
+
+  function buildCurrentStatuses() {
+    const result = {};
+    for (const metric of INSIGHT_METRICS) {
+      const value = state.now?.[metric]?.value;
+      if (!Number.isFinite(value)) continue;
+      result[metric] = determineStatus(metric, value);
+    }
+    return result;
+  }
+
+  function getInsightForMetric(metric) {
+    if (!metric || !Array.isArray(INSIGHT_STATE.insights)) return null;
+    return INSIGHT_STATE.insights.find((entry) => entry.metric === metric) || null;
+  }
+
+  function renderInsights() {
+    if (!ui.insightsSection || !ui.insightsGrid) return;
+    const list = sortInsights(INSIGHT_STATE.insights).slice(0, 4);
+    ui.insightsGrid.innerHTML = '';
+    if (!list.length) {
+      ui.insightsSection.hidden = true;
+      return;
+    }
+    ui.insightsSection.hidden = false;
+    list.forEach((insight) => {
+      const card = document.createElement('article');
+      card.className = 'insight-card';
+      card.dataset.severity = insight.severity || 'info';
+      const meta = document.createElement('div');
+      meta.className = 'insight-meta';
+      const title = document.createElement('h3');
+      title.textContent = insight.title || metricLabel(insight.metric || 'Insight');
+      const badge = document.createElement('span');
+      badge.className = 'insight-badge';
+      badge.dataset.severity = insight.severity || 'info';
+      badge.textContent = insight.severity === 'critical' ? 'Kritisch' : insight.severity === 'warning' ? 'Hinweis' : 'Info';
+      meta.appendChild(title);
+      meta.appendChild(badge);
+      const summary = document.createElement('p');
+      summary.textContent = insight.summary || '';
+      const recommendation = document.createElement('p');
+      recommendation.textContent = insight.recommendation || '';
+      recommendation.className = 'status-tip';
+      card.appendChild(meta);
+      card.appendChild(summary);
+      if (insight.recommendation) {
+        card.appendChild(recommendation);
+      }
+      ui.insightsGrid.appendChild(card);
+    });
+  }
+
+  async function refreshInsights() {
+    try {
+      const context = await buildInsightContext();
+      const insights = evaluateInsightRules(context);
+      const statuses = buildCurrentStatuses();
+      const heroSummary = buildHeroSummary(context, insights, statuses, computeHealthScore());
+      INSIGHT_STATE.context = context;
+      INSIGHT_STATE.insights = insights;
+      INSIGHT_STATE.heroSummary = heroSummary;
+      renderInsights();
+      updateHealthCard(statuses);
+    } catch (error) {
+      console.error('Insight engine failed', error);
     }
   }
 
@@ -2297,9 +3134,12 @@ const METRIC_TO_CHART_KEY = {
         if (trendEl) trendEl.textContent = '—';
       } else {
         const status = determineStatus(metric, sample.value);
+        const insight = getInsightForMetric(metric);
         if (valueEl) valueEl.textContent = formatNumber(sample.value, config.decimals);
-        if (noteEl) noteEl.textContent = status.note;
-        if (tipEl) tipEl.textContent = status.tip;
+        const noteText = insight?.summary || status.note;
+        const tipText = insight?.recommendation || status.tip;
+        if (noteEl) noteEl.textContent = noteText;
+        if (tipEl) tipEl.textContent = tipText;
         if (badge) {
           badge.dataset.tone = status.tone || 'neutral';
           badge.textContent = status.label;
@@ -3041,6 +3881,7 @@ const METRIC_TO_CHART_KEY = {
     if (state.now) {
       updateStatusCards(state.now);
     }
+    await refreshInsights();
   }
 
   async function ensureSeries(definition, range, force, options = {}) {
