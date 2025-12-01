@@ -3587,23 +3587,16 @@ const METRIC_TO_CHART_KEY = {
       svg.append(highlightRect);
     }
 
-    const segments = Array.isArray(config.segments) ? config.segments.slice().sort((a, b) => {
-      const aVal = Number.isFinite(a.from) ? a.from : Number.isFinite(a.to) ? a.to : min;
-      const bVal = Number.isFinite(b.from) ? b.from : Number.isFinite(b.to) ? b.to : min;
-      return aVal - bVal;
-    }) : [];
+    const segments = buildStandardSegments(min, max, span, config.segments);
+    const segmentWidth = (trackEnd - trackStart) / segments.length;
 
-    segments.forEach((segment) => {
-      const from = Number.isFinite(segment.from) ? segment.from : min;
-      const to = Number.isFinite(segment.to) ? segment.to : max;
-      const startX = mapValue(Math.min(Math.max(from, min), max));
-      const endX = mapValue(Math.max(Math.min(to, max), min));
-      const width = Math.max(endX - startX, 1);
+    segments.forEach((segment, index) => {
+      const startX = trackStart + index * segmentWidth;
       const rect = createSvgElement('rect', {
         class: `chart-scale__segment chart-scale__segment--${segment.tone || 'neutral'}`,
         x: startX,
         y: trackY - trackHeight / 2,
-        width,
+        width: segmentWidth,
         height: trackHeight,
         rx: trackHeight / 2,
         ry: trackHeight / 2
@@ -3614,7 +3607,7 @@ const METRIC_TO_CHART_KEY = {
       if (labelText || detailText) {
         const text = createSvgElement('text', {
           class: 'chart-scale__segment-label',
-          x: startX + width / 2,
+          x: startX + segmentWidth / 2,
           y: labelY
         });
         if (labelText) {
@@ -3623,7 +3616,7 @@ const METRIC_TO_CHART_KEY = {
         if (detailText) {
           const detail = createSvgElement('tspan', {
             class: 'chart-scale__segment-sub',
-            x: startX + width / 2,
+            x: startX + segmentWidth / 2,
             dy: labelText ? 4.5 : 0
           });
           detail.textContent = detailText;
@@ -3683,6 +3676,56 @@ const METRIC_TO_CHART_KEY = {
       return label;
     }
     return formatScaleTick(fallbackValue, unit);
+  }
+
+  function buildStandardSegments(min, max, span, configSegments = []) {
+    const labels = ['Hervorragend', 'Gut', 'Erhöht', 'Schlecht'];
+    const tones = ['excellent', 'good', 'elevated', 'poor'];
+    const step = span / labels.length;
+    const merged = labels.map((label, index) => ({
+      label,
+      tone: tones[index] || 'neutral',
+      from: Infinity,
+      to: -Infinity
+    }));
+
+    if (Array.isArray(configSegments)) {
+      configSegments.forEach((segment) => {
+        const tone = segment?.tone || 'neutral';
+        const toneIndex = tones.indexOf(tone);
+        if (toneIndex === -1) return;
+        const start = Number.isFinite(segment.from)
+          ? segment.from
+          : Number.isFinite(segment.to)
+            ? segment.to
+            : min;
+        const end = Number.isFinite(segment.to)
+          ? segment.to
+          : Number.isFinite(segment.from)
+            ? segment.from
+            : max;
+        merged[toneIndex].from = Math.min(merged[toneIndex].from, Math.min(start, end));
+        merged[toneIndex].to = Math.max(merged[toneIndex].to, Math.max(start, end));
+      });
+    }
+
+    return merged.map((segment, index) => {
+      const fallbackFrom = min + step * index;
+      const fallbackTo = min + step * (index + 1);
+      const resolvedFrom = Number.isFinite(segment.from) && segment.from !== Infinity
+        ? clamp(segment.from, min, max)
+        : fallbackFrom;
+      const resolvedTo = Number.isFinite(segment.to) && segment.to !== -Infinity
+        ? clamp(segment.to, min, max)
+        : fallbackTo;
+      const from = Math.min(resolvedFrom, resolvedTo);
+      const to = Math.max(resolvedTo, resolvedFrom === resolvedTo ? resolvedFrom + step : resolvedTo);
+      return {
+        ...segment,
+        from: clamp(from, min, max),
+        to: clamp(to, min, max)
+      };
+    });
   }
 
   function determineSegmentTone(segments, value) {
