@@ -2187,6 +2187,15 @@ const METRIC_TO_CHART_KEY = {
 
   const INSIGHT_METRICS = ['CO2', 'PM2.5', 'PM1.0', 'PM10', 'TVOC', 'Temperatur', 'rel. Feuchte', 'Lux', 'Farbtemperatur'];
 
+  const SHORT_TERM_WINDOW_MIN_MS = 60 * 60 * 1000;
+  const SHORT_TERM_WINDOW_MAX_MS = 120 * 60 * 1000;
+  const TIME_OF_DAY_WINDOWS = [
+    { key: 'morning', label: 'Morgen', from: 6, to: 11 },
+    { key: 'midday', label: 'Tag', from: 11, to: 17 },
+    { key: 'evening', label: 'Abend', from: 17, to: 22 },
+    { key: 'late_evening', label: 'Später Abend', from: 22, to: 1 }
+  ];
+
   const INSIGHT_STATE = {
     context: null,
     insights: [],
@@ -2367,6 +2376,201 @@ const METRIC_TO_CHART_KEY = {
     return Math.round((longest / (1000 * 60 * 60)) * 10) / 10;
   }
 
+  function computeShortTermTrend(metric, points) {
+    if (!Array.isArray(points) || points.length < 2) return null;
+    const sorted = points.slice().sort((a, b) => a.ts - b.ts);
+    const latest = sorted[sorted.length - 1];
+    if (!latest) return null;
+    const targetTs = latest.ts - (SHORT_TERM_WINDOW_MIN_MS + SHORT_TERM_WINDOW_MAX_MS) / 2;
+    let reference = null;
+    for (let index = sorted.length - 2; index >= 0; index--) {
+      const candidate = sorted[index];
+      if (!candidate) continue;
+      const deltaMs = latest.ts - candidate.ts;
+      if (deltaMs >= SHORT_TERM_WINDOW_MIN_MS && deltaMs <= SHORT_TERM_WINDOW_MAX_MS) {
+        if (!reference || Math.abs(candidate.ts - targetTs) < Math.abs(reference.ts - targetTs)) {
+          reference = candidate;
+        }
+      } else if (deltaMs > SHORT_TERM_WINDOW_MAX_MS && reference) {
+        break;
+      }
+    }
+    if (!reference) return null;
+    const delta = latest.value - reference.value;
+    const hours = Math.max((latest.ts - reference.ts) / 3600000, 0.5);
+    const rate = delta / hours;
+    const thresholds = {
+      CO2: { slow: 30, fast: 100 },
+      'PM2.5': { slow: 2, fast: 6 },
+      PM10: { slow: 4, fast: 10 },
+      TVOC: { slow: 40, fast: 140 },
+      Temperatur: { slow: 0.3, fast: 0.9 },
+      'rel. Feuchte': { slow: 1.5, fast: 4 },
+      Lux: { slow: 50, fast: 180 },
+      Farbtemperatur: { slow: 80, fast: 220 }
+    };
+    const { slow, fast } = thresholds[metric] || { slow: 0.5, fast: 1.5 };
+    let classification = 'stable';
+    if (rate > fast) classification = 'rising_fast';
+    else if (rate > slow) classification = 'rising_slow';
+    else if (rate < -fast) classification = 'falling_fast';
+    else if (rate < -slow) classification = 'falling_slow';
+    return {
+      delta,
+      ratePerHour: rate,
+      sinceMinutes: Math.round((latest.ts - reference.ts) / 60000),
+      classification
+    };
+  }
+
+  function computeVolatility(metric, points) {
+    if (!Array.isArray(points) || points.length < 2) return null;
+    const values = points.map((p) => p?.value).filter((v) => Number.isFinite(v));
+    if (values.length < 2) return null;
+    const avg = values.reduce((acc, v) => acc + v, 0) / values.length;
+    const variance = values.reduce((acc, v) => acc + Math.pow(v - avg, 2), 0) / values.length;
+    const std = Math.sqrt(variance);
+    const variabilityIndex = avg ? std / Math.max(Math.abs(avg), 1) : std;
+    const thresholds = {
+      CO2: { low: 0.08, high: 0.25 },
+      'PM2.5': { low: 0.2, high: 0.6 },
+      PM10: { low: 0.2, high: 0.6 },
+      TVOC: { low: 0.15, high: 0.45 },
+      Temperatur: { low: 0.015, high: 0.05 },
+      'rel. Feuchte': { low: 0.04, high: 0.12 },
+      Lux: { low: 0.25, high: 0.8 },
+      Farbtemperatur: { low: 0.05, high: 0.12 }
+    };
+    const { low, high } = thresholds[metric] || { low: 0.1, high: 0.3 };
+    const level = variabilityIndex < low ? 'low' : variabilityIndex < high ? 'medium' : 'high';
+    return { std, variabilityIndex, level, avg };
+  }
+
+  function determineElevationType(metric, points, tone) {
+    if (!Array.isArray(points) || points.length < 2) return 'normal';
+    if (!['elevated', 'warning', 'poor', 'critical'].includes(tone)) return 'normal';
+    const sorted = points.slice().sort((a, b) => a.ts - b.ts);
+    const latest = sorted[sorted.length - 1];
+    if (!latest) return 'normal';
+    const recentFrom = latest.ts - 2 * 3600000;
+    const earlierFrom = latest.ts - 6 * 3600000;
+    const recent = sorted.filter((p) => p.ts >= recentFrom);
+    const earlier = sorted.filter((p) => p.ts >= earlierFrom && p.ts < recentFrom);
+    const recentShare = computeShareOutsideGood(metric, recent);
+    const earlierShare = computeShareOutsideGood(metric, earlier);
+    if (recentShare > 0.6 && earlierShare > 0.35) return 'plateau';
+    if (recentShare > 0.35 && earlierShare < 0.25) return 'spike';
+    if (recentShare > 0.5) return 'plateau';
+    return 'spike';
+  }
+
+  function summarizeMonthly(metric, points) {
+    if (!Array.isArray(points) || points.length === 0) return null;
+    const stats = buildSeriesStats(points);
+    const shareOutsideGood = computeShareOutsideGood(metric, points);
+    const daily = new Map();
+    for (const point of points) {
+      if (!point) continue;
+      const dayKey = new Date(point.ts).toISOString().slice(0, 10);
+      const bucket = daily.get(dayKey) || { sum: 0, count: 0 };
+      bucket.sum += point.value;
+      bucket.count += 1;
+      daily.set(dayKey, bucket);
+    }
+    let daysWithElevatedOrWorse = 0;
+    for (const bucket of daily.values()) {
+      if (!bucket.count) continue;
+      const avg = bucket.sum / bucket.count;
+      const tone = classifyValueWithScale(metric, avg)?.tone;
+      if (tone !== 'excellent' && tone !== 'good') {
+        daysWithElevatedOrWorse += 1;
+      }
+    }
+    return {
+      avg: stats.avg,
+      min: stats.min,
+      max: stats.max,
+      shareOutsideGood,
+      shareGood: clamp(1 - shareOutsideGood, 0, 1),
+      daysWithElevatedOrWorse
+    };
+  }
+
+  function deriveRoomProfile(metric, monthly) {
+    if (!monthly) return null;
+    const share = monthly.shareOutsideGood ?? 0;
+    const avg = monthly.avg ?? 0;
+    const daysElevated = monthly.daysWithElevatedOrWorse ?? 0;
+    switch (metric) {
+      case 'CO2':
+        if (share > 0.45 || daysElevated >= 15) return 'frequently_high';
+        if (share > 0.25 || daysElevated >= 8) return 'often_elevated';
+        return 'usually_good';
+      case 'rel. Feuchte':
+        if (avg <= 38) return 'tends_dry';
+        if (avg >= 63) return 'tends_humid';
+        return 'balanced';
+      case 'PM2.5':
+      case 'PM10':
+      case 'PM1.0':
+        if (share > 0.35 || daysElevated >= 10) return 'frequently_dusty';
+        if (share > 0.18 || daysElevated >= 6) return 'occasionally_dusty';
+        return 'usually_clean';
+      case 'TVOC':
+        if (share > 0.4 || daysElevated >= 10) return 'persistent_emissions';
+        if (share > 0.2 || daysElevated >= 6) return 'moderate_emissions';
+        return 'low_emissions';
+      default:
+        return null;
+    }
+  }
+
+  function computeTimeOfDayPatterns(metric, points) {
+    if (!Array.isArray(points) || points.length < 8) return null;
+    const windows = TIME_OF_DAY_WINDOWS.map((window) => ({ ...window, sum: 0, count: 0, outside: 0 }));
+    for (const point of points) {
+      if (!point) continue;
+      const hour = new Date(point.ts).getHours();
+      for (const window of windows) {
+        const inRange = window.from <= window.to ? hour >= window.from && hour < window.to : hour >= window.from || hour < window.to;
+        if (inRange) {
+          window.sum += point.value;
+          window.count += 1;
+          const tone = classifyValueWithScale(metric, point.value)?.tone;
+          if (tone !== 'excellent' && tone !== 'good') {
+            window.outside += 1;
+          }
+          break;
+        }
+      }
+    }
+    const stats = {};
+    for (const window of windows) {
+      const avg = window.count ? window.sum / window.count : null;
+      const outsideShare = window.count ? window.outside / window.count : 0;
+      stats[window.key] = {
+        key: window.key,
+        label: window.label,
+        avg,
+        outsideShare,
+        count: window.count,
+        from: window.from,
+        to: window.to
+      };
+    }
+    const sortedByOutside = Object.values(stats)
+      .filter((entry) => entry.count >= 2)
+      .sort((a, b) => b.outsideShare - a.outsideShare);
+    const dominant = sortedByOutside[0];
+    const second = sortedByOutside[1];
+    const hasDominant = dominant && dominant.outsideShare >= 0.18 && (!second || dominant.outsideShare - second.outsideShare >= 0.05);
+    return {
+      windows: stats,
+      dominantWindow: hasDominant ? dominant.key : null,
+      dominantOutsideShare: hasDominant ? dominant.outsideShare : null
+    };
+  }
+
   function summarizeWeekly(metric, points) {
     if (!Array.isArray(points) || points.length === 0) return null;
     const stats = buildSeriesStats(points);
@@ -2399,12 +2603,18 @@ const METRIC_TO_CHART_KEY = {
   async function buildInsightContext() {
     const phase = resolveCircadianPhase();
     const metricContexts = [];
+    const roomProfile = {};
+    const timeOfDayPatterns = {};
     for (const metric of INSIGHT_METRICS) {
       const nowValue = state.now?.[metric]?.value;
       const nowStatus = Number.isFinite(nowValue) ? determineStatus(metric, nowValue) : null;
       const nowClassification = classifyValueWithScale(metric, nowValue);
       let stats24h = null;
       let stats7d = null;
+      let stats30d = null;
+      let shortTermTrend = null;
+      let volatility = null;
+      let elevationType = 'normal';
       try {
         const series24 = await getSeriesForMetric(metric, '24h');
         if (Array.isArray(series24) && series24.length) {
@@ -2414,6 +2624,9 @@ const METRIC_TO_CHART_KEY = {
             shareOutsideGood: computeShareOutsideGood(metric, series24),
             maxStreakOutsideGoodHours: computeMaxStreakOutsideGood(metric, series24)
           };
+          shortTermTrend = computeShortTermTrend(metric, series24);
+          volatility = computeVolatility(metric, series24);
+          elevationType = determineElevationType(metric, series24, nowClassification.tone);
         }
       } catch (error) {
         console.warn('24h Statistik fehlgeschlagen', metric, error);
@@ -2422,9 +2635,23 @@ const METRIC_TO_CHART_KEY = {
         const series7d = await getSeriesForMetric(metric, '7d');
         if (Array.isArray(series7d) && series7d.length) {
           stats7d = summarizeWeekly(metric, series7d);
+          timeOfDayPatterns[metric] = computeTimeOfDayPatterns(metric, series7d);
         }
       } catch (error) {
         console.warn('7d Statistik fehlgeschlagen', metric, error);
+      }
+      try {
+        const series30d = await getSeriesForMetric(metric, '30d');
+        if (Array.isArray(series30d) && series30d.length) {
+          stats30d = summarizeMonthly(metric, series30d);
+          timeOfDayPatterns[metric] = timeOfDayPatterns[metric] || computeTimeOfDayPatterns(metric, series30d);
+          const profile = deriveRoomProfile(metric, stats30d);
+          if (profile) {
+            roomProfile[metric] = profile;
+          }
+        }
+      } catch (error) {
+        console.warn('30d Statistik fehlgeschlagen', metric, error);
       }
       const entry = {
         metric,
@@ -2435,7 +2662,11 @@ const METRIC_TO_CHART_KEY = {
           bandLabel: nowClassification.bandLabel || nowStatus?.label || null
         },
         stats24h,
-        stats7d
+        stats7d,
+        stats30d,
+        shortTermTrend,
+        volatility,
+        elevationType
       };
       metricContexts.push(entry);
     }
@@ -2444,6 +2675,8 @@ const METRIC_TO_CHART_KEY = {
       metrics: metricContexts,
       timestamp: Date.now(),
       phase,
+      roomProfile,
+      patterns: timeOfDayPatterns,
       circadian:
         state.now && (state.now['Farbtemperatur'] || state.now.Lux)
           ? evaluateCircadian(state.now['Farbtemperatur']?.value, state.now.Lux?.value, phase)
@@ -2462,7 +2695,7 @@ const METRIC_TO_CHART_KEY = {
       id: 'co2_persistent_high',
       metric: 'CO2',
       severity: 'warning',
-      group: 'co2',
+      group: 'profile',
       when: (context) => {
         const co2 = getMetricContext(context, 'CO2');
         return (
@@ -2512,7 +2745,59 @@ const METRIC_TO_CHART_KEY = {
           tone: 'good',
           title: 'Kurzer CO₂-Peak',
           summary: 'CO₂ hatte kurzzeitig einen starken Peak, aktuell aber wieder im Rahmen.',
-          recommendation: 'Solange das selten bleibt, reicht normales Lüften nach Spitzen.',
+        recommendation: 'Solange das selten bleibt, reicht normales Lüften nach Spitzen.',
+        tags: ['lüften', 'co2']
+      };
+    }
+    },
+    {
+      id: 'co2_rising_now',
+      metric: 'CO2',
+      severity: 'warning',
+      group: 'co2',
+      when: (context) => {
+        const co2 = getMetricContext(context, 'CO2');
+        return (
+          co2?.shortTermTrend?.classification?.startsWith('rising') &&
+          ['elevated', 'warning', 'poor', 'critical'].includes(co2?.now?.tone)
+        );
+      },
+      build: (context) => {
+        const co2 = getMetricContext(context, 'CO2');
+        const direction = co2?.shortTermTrend?.classification === 'rising_fast' ? 'schnell' : 'merklich';
+        return {
+          id: 'co2_rising_now',
+          metric: 'CO2',
+          severity: 'warning',
+          tone: 'elevated',
+          title: 'CO₂ steigt gerade',
+          summary: `CO₂ ist erhöht und steigt ${direction} weiter an.`,
+          recommendation: 'Jetzt lüften oder Türen öffnen, bevor es stärker ansteigt.',
+          tags: ['lüften', 'co2']
+        };
+      }
+    },
+    {
+      id: 'co2_falling_after_peak',
+      metric: 'CO2',
+      severity: 'info',
+      group: 'co2',
+      when: (context) => {
+        const co2 = getMetricContext(context, 'CO2');
+        return (
+          co2?.shortTermTrend?.classification?.startsWith('falling') &&
+          ['elevated', 'warning', 'poor', 'critical'].includes(co2?.now?.tone)
+        );
+      },
+      build: (context) => {
+        return {
+          id: 'co2_falling_after_peak',
+          metric: 'CO2',
+          severity: 'info',
+          tone: 'good',
+          title: 'CO₂ fällt wieder',
+          summary: 'Nach einer Spitze sinkt der CO₂-Wert bereits – Lüften zeigt Wirkung.',
+          recommendation: 'Kurz weiterlüften, bis der Wert wieder im grünen Bereich liegt.',
           tags: ['lüften', 'co2']
         };
       }
@@ -2538,6 +2823,56 @@ const METRIC_TO_CHART_KEY = {
           summary: `An ${days} von 7 Tagen lag der mittlere CO₂-Wert zu hoch.`,
           recommendation: 'Lüftungsroutinen anpassen oder Frischluftzufuhr dauerhaft erhöhen.',
           tags: ['lüften', 'co2']
+        };
+      }
+    },
+    {
+      id: 'co2_room_profile',
+      metric: 'CO2',
+      severity: 'warning',
+      group: 'profile',
+      when: (context) => {
+        const profile = context?.roomProfile?.CO2;
+        return profile === 'often_elevated' || profile === 'frequently_high';
+      },
+      build: () => {
+        return {
+          id: 'co2_room_profile',
+          metric: 'CO2',
+          severity: 'warning',
+          tone: 'elevated',
+          title: 'CO₂ im Raum häufig erhöht',
+          summary: 'In den letzten Wochen lag der mittlere CO₂-Wert häufig oberhalb des optimalen Bereichs.',
+          recommendation:
+            'Lüftungskonzept anpassen (z.B. häufiger Stoßlüften, Türspalt offen lassen, ggf. Lüfter länger laufen lassen).',
+          tags: ['lüften', 'co2'],
+          group: 'profile'
+        };
+      }
+    },
+    {
+      id: 'co2_evening_pattern',
+      metric: 'CO2',
+      severity: 'info',
+      group: 'pattern',
+      when: (context) => {
+        const pattern = context?.patterns?.CO2;
+        const evening = pattern?.windows?.evening;
+        if (!evening || evening.count < 3) return false;
+        const otherWindows = Object.values(pattern.windows || {}).filter((w) => w.key !== 'evening' && w.count >= 2);
+        const maxOther = otherWindows.length ? Math.max(...otherWindows.map((w) => w.outsideShare)) : 0;
+        return evening.outsideShare >= 0.22 && evening.outsideShare - maxOther >= 0.06;
+      },
+      build: () => {
+        return {
+          id: 'co2_evening_pattern',
+          metric: 'CO2',
+          severity: 'info',
+          tone: 'elevated',
+          title: 'Abendliche CO₂-Last',
+          summary: 'CO₂ steigt vor allem abends an – typischerweise zwischen 17 und 22 Uhr.',
+          recommendation: 'Vor oder nach dem Abendessen gezielt stoßlüften, Türen offen lassen, ggf. Lüfter nutzen.',
+          tags: ['lüften', 'co2', 'pattern']
         };
       }
     },
@@ -2646,6 +2981,26 @@ const METRIC_TO_CHART_KEY = {
       })
     },
     {
+      id: 'pm_recent_spike',
+      metric: 'PM2.5',
+      severity: 'info',
+      group: 'air_quality',
+      when: (context) => {
+        const pm = getMetricContext(context, 'PM2.5');
+        return pm?.elevationType === 'spike' && ['elevated', 'warning', 'poor'].includes(pm?.now?.tone);
+      },
+      build: () => ({
+        id: 'pm_recent_spike',
+        metric: 'PM2.5',
+        severity: 'info',
+        tone: 'elevated',
+        title: 'Feinstaub-Peak erkannt',
+        summary: 'Aktuell erhöhter Feinstaub deutet auf einen kurzen Peak hin (z.B. Kochen oder Reinigen).',
+        recommendation: 'Kurz durchlüften oder Abzug nutzen, danach sollte der Wert zügig sinken.',
+        tags: ['pm', 'lüften']
+      })
+    },
+    {
       id: 'tvoc_persistent',
       metric: 'TVOC',
       severity: 'warning',
@@ -2691,6 +3046,113 @@ const METRIC_TO_CHART_KEY = {
       })
     },
     {
+      id: 'tvoc_short_spike',
+      metric: 'TVOC',
+      severity: 'info',
+      group: 'air_quality',
+      when: (context) => {
+        const tvoc = getMetricContext(context, 'TVOC');
+        return tvoc?.elevationType === 'spike' && ['elevated', 'warning', 'poor'].includes(tvoc?.now?.tone);
+      },
+      build: () => ({
+        id: 'tvoc_short_spike',
+        metric: 'TVOC',
+        severity: 'info',
+        tone: 'elevated',
+        title: 'TVOC-Spitze, kurzzeitig',
+        summary: 'Die aktuelle TVOC-Erhöhung sieht nach einem kurzen Peak aus (z.B. Reiniger oder Kochen).',
+        recommendation: 'Kurz lüften und die Quelle beenden, danach sinkt der Wert meist schnell.',
+        tags: ['tvoc', 'lüften']
+      })
+    },
+    {
+      id: 'tvoc_plateau',
+      metric: 'TVOC',
+      severity: 'warning',
+      group: 'air_quality',
+      when: (context) => {
+        const tvoc = getMetricContext(context, 'TVOC');
+        return tvoc?.elevationType === 'plateau' && ['elevated', 'warning', 'poor'].includes(tvoc?.now?.tone);
+      },
+      build: () => ({
+        id: 'tvoc_plateau',
+        metric: 'TVOC',
+        severity: 'warning',
+        tone: 'elevated',
+        title: 'TVOC länger erhöht',
+        summary: 'VOC bleiben seit Stunden erhöht – eher ein Plateau als ein kurzer Peak.',
+        recommendation: 'Konstant lüften, Quellen prüfen (z.B. neue Möbel, Reiniger) und Raum durchlüften.',
+        tags: ['tvoc', 'lüften']
+      })
+    },
+    {
+      id: 'evening_cooking_pattern',
+      metric: 'TVOC',
+      severity: 'info',
+      group: 'pattern',
+      when: (context) => {
+        const pmPattern = context?.patterns?.['PM2.5'];
+        const vocPattern = context?.patterns?.TVOC;
+        const eveningPm = pmPattern?.windows?.evening;
+        const eveningVoc = vocPattern?.windows?.evening;
+        if (!eveningPm || !eveningVoc) return false;
+        const pmFlag = eveningPm.outsideShare >= 0.18 && eveningPm.count >= 3;
+        const vocFlag = eveningVoc.outsideShare >= 0.18 && eveningVoc.count >= 3;
+        return pmFlag && vocFlag;
+      },
+      build: () => ({
+        id: 'evening_cooking_pattern',
+        metric: 'TVOC',
+        severity: 'info',
+        tone: 'elevated',
+        title: 'Abendliche Peaks durch Aktivitäten',
+        summary: 'Feinstaub und VOC steigen vor allem am Abend kurzzeitig an – wahrscheinlich durch Kochen, Kerzen oder Reiniger.',
+        recommendation: 'Beim Kochen und Reinigen lüften, Abzug nutzen und Duftquellen begrenzen.',
+        tags: ['pattern', 'pm', 'tvoc']
+      })
+    },
+    {
+      id: 'localized_pattern_issue',
+      metric: null,
+      severity: 'info',
+      group: 'pattern',
+      when: (context) => {
+        const metrics = ['CO2', 'PM2.5', 'TVOC'];
+        return metrics.some((metric) => {
+          const pattern = context?.patterns?.[metric];
+          if (!pattern?.dominantWindow) return false;
+          const stats = getMetricContext(context, metric)?.stats24h;
+          return stats?.shareOutsideGood != null && stats.shareOutsideGood < 0.2;
+        });
+      },
+      build: (context) => {
+        const metrics = ['CO2', 'PM2.5', 'TVOC'];
+        const found = metrics
+          .map((metric) => {
+            const pattern = context?.patterns?.[metric];
+            if (!pattern?.dominantWindow) return null;
+            const stats = getMetricContext(context, metric)?.stats24h;
+            if (!stats || stats.shareOutsideGood >= 0.2) return null;
+            const window = TIME_OF_DAY_WINDOWS.find((w) => w.key === pattern.dominantWindow);
+            return {
+              metric,
+              label: window?.label || 'einem Zeitfenster'
+            };
+          })
+          .find(Boolean);
+        return {
+          id: 'localized_pattern_issue',
+          metric: found?.metric || 'Muster',
+          severity: 'info',
+          tone: 'elevated',
+          title: 'Belastung nur zu bestimmten Zeiten',
+          summary: `Die Luft ist tagsüber meist gut, Problemzeiten konzentrieren sich auf ${found?.label || 'ein Fenster'}.`,
+          recommendation: 'Zu den typischen Spitzen gezielt lüften oder Quellen vermeiden.',
+          tags: ['pattern']
+        };
+      }
+    },
+    {
       id: 'humidity_too_dry',
       metric: 'rel. Feuchte',
       severity: 'warning',
@@ -2729,6 +3191,34 @@ const METRIC_TO_CHART_KEY = {
         recommendation: 'Intensiv lüften oder Entfeuchter nutzen, nasse Stellen trocknen.',
         tags: ['feuchte', 'lüften']
       })
+    },
+    {
+      id: 'humidity_room_profile',
+      metric: 'rel. Feuchte',
+      severity: 'info',
+      group: 'profile',
+      when: (context) => {
+        const profile = context?.roomProfile?.['rel. Feuchte'];
+        return profile === 'tends_dry' || profile === 'tends_humid';
+      },
+      build: (context) => {
+        const profile = context?.roomProfile?.['rel. Feuchte'];
+        const isDry = profile === 'tends_dry';
+        return {
+          id: 'humidity_room_profile',
+          metric: 'rel. Feuchte',
+          severity: 'info',
+          tone: isDry ? 'elevated' : 'warning',
+          title: isDry ? 'Raum eher trocken' : 'Raum eher feucht',
+          summary: isDry
+            ? 'Die Luft war im letzten Monat überwiegend trocken.'
+            : 'Die Luft war im letzten Monat eher auf der feuchten Seite.',
+          recommendation: isDry
+            ? 'Befeuchtung leicht erhöhen, Lüftung anpassen und trockene Phasen ausgleichen.'
+            : 'Befeuchtung reduzieren, häufiger lüften und Feuchtequellen prüfen.',
+          tags: ['feuchte', 'profil']
+        };
+      }
     },
     {
       id: 'temperature_comfort',
@@ -2789,6 +3279,105 @@ const METRIC_TO_CHART_KEY = {
         title: 'Arbeitslicht zu schwach',
         summary: 'Tagsüber liegt die Beleuchtung unter dem Zielbereich.',
         recommendation: 'Helleres Arbeitslicht oder mehr Tageslicht einplanen.',
+        tags: ['licht', 'circadian']
+      })
+    },
+    {
+      id: 'circadian_daytime_weak',
+      metric: 'Lux',
+      severity: 'info',
+      group: 'circadian',
+      when: (context) => {
+        const luxMid = context?.patterns?.Lux?.windows?.midday;
+        const cctMid = context?.patterns?.['Farbtemperatur']?.windows?.midday;
+        return luxMid?.count >= 3 && luxMid.avg != null && luxMid.avg < 350 && (cctMid?.avg ?? 0) < 4200;
+      },
+      build: () => ({
+        id: 'circadian_daytime_weak',
+        metric: 'Lux',
+        severity: 'info',
+        tone: 'elevated',
+        title: 'Arbeits-/Tageslicht eher schwach',
+        summary: 'Zwischen 11 und 17 Uhr ist es oft zu dunkel oder zu warmes Licht für aktives Arbeiten.',
+        recommendation: 'Tagsüber helleres und eher neutral/kühles Licht nutzen, um wacher zu bleiben.',
+        tags: ['licht', 'circadian']
+      })
+    },
+    {
+      id: 'circadian_evening_relax',
+      metric: 'Farbtemperatur',
+      severity: 'info',
+      group: 'circadian',
+      when: (context) => {
+        const luxEvening = context?.patterns?.Lux?.windows?.evening;
+        const cctEvening = context?.patterns?.['Farbtemperatur']?.windows?.evening;
+        if (!luxEvening || !cctEvening) return false;
+        const tooBright = luxEvening.avg != null && luxEvening.avg > 280;
+        const tooCool = cctEvening.avg != null && cctEvening.avg > 4200;
+        const withinRelax =
+          luxEvening.avg != null &&
+          luxEvening.avg >= 50 &&
+          luxEvening.avg <= 250 &&
+          cctEvening.avg != null &&
+          cctEvening.avg >= 2600 &&
+          cctEvening.avg <= 3800;
+        return tooBright || tooCool || withinRelax;
+      },
+      build: (context) => {
+        const luxEvening = context?.patterns?.Lux?.windows?.evening;
+        const cctEvening = context?.patterns?.['Farbtemperatur']?.windows?.evening;
+        const tooBright = luxEvening?.avg != null && luxEvening.avg > 280;
+        const tooCool = cctEvening?.avg != null && cctEvening.avg > 4200;
+        const withinRelax =
+          luxEvening?.avg != null &&
+          luxEvening.avg >= 50 &&
+          luxEvening.avg <= 250 &&
+          cctEvening?.avg != null &&
+          cctEvening.avg >= 2600 &&
+          cctEvening.avg <= 3800;
+        if (withinRelax && !tooBright && !tooCool) {
+          return {
+            id: 'circadian_evening_relax',
+            metric: 'Farbtemperatur',
+            severity: 'info',
+            tone: 'excellent',
+            title: 'Abendlicht passt',
+            summary: 'Abendlicht liegt meist im entspannten Bereich – guter Feierabend-Modus.',
+            recommendation: 'Aktuellen Abend-Lichtmodus beibehalten.',
+            tags: ['licht', 'circadian']
+          };
+        }
+        return {
+          id: 'circadian_evening_relax',
+          metric: 'Farbtemperatur',
+          severity: 'warning',
+          tone: 'elevated',
+          title: 'Abendlicht wenig entspannend',
+          summary: 'Abends ist das Licht eher hell oder kühl – wenig "Feierabend-Modus".',
+          recommendation: 'Abends Licht dimmen und wärmer einstellen (gelblicher), indirekte Beleuchtung nutzen.',
+          tags: ['licht', 'circadian']
+        };
+      }
+    },
+    {
+      id: 'circadian_late_activity',
+      metric: 'Lux',
+      severity: 'info',
+      group: 'circadian',
+      when: (context) => {
+        const luxLate = context?.patterns?.Lux?.windows?.late_evening;
+        const cctLate = context?.patterns?.['Farbtemperatur']?.windows?.late_evening;
+        if (!luxLate || !cctLate) return false;
+        return (luxLate.avg ?? 0) > 150 || (cctLate.avg ?? 0) > 4200;
+      },
+      build: () => ({
+        id: 'circadian_late_activity',
+        metric: 'Lux',
+        severity: 'info',
+        tone: 'elevated',
+        title: 'Später Abend noch sehr hell',
+        summary: 'Zwischen 22 und 1 Uhr ist es oft noch recht hell oder kühl beleuchtet – Hinweis auf späte Aktivität.',
+        recommendation: 'Wenn möglich Licht später stärker dimmen oder wärmer stellen, um zur Ruhe zu kommen.',
         tags: ['licht', 'circadian']
       })
     },
@@ -2925,27 +3514,49 @@ const METRIC_TO_CHART_KEY = {
   function buildHeroSummary(context, insights, statuses, score) {
     const sortedInsights = sortInsights(insights);
     const top = sortedInsights[0];
-    const tone = top?.tone || (score >= 80 ? 'excellent' : score >= 60 ? 'good' : score >= 40 ? 'elevated' : 'poor');
-    const concernMetrics = Object.entries(statuses || {})
-      .filter(([, status]) => status && ['elevated', 'warning', 'poor', 'critical'].includes(status.tone))
-      .map(([metric]) => metricLabel(metric));
+    const baseTone = top?.tone || (score >= 80 ? 'excellent' : score >= 60 ? 'good' : score >= 40 ? 'elevated' : 'poor');
+    const co2 = getMetricContext(context, 'CO2');
+    const pm = getMetricContext(context, 'PM2.5');
+    const tvoc = getMetricContext(context, 'TVOC');
 
-    let text;
-    if (top) {
-      const intro = score >= 80 ? 'Innenraumluft überwiegend gut' : score >= 60 ? 'Belastungen moderat' : 'Luftqualität belastet';
-      text = `${intro} – ${top.summary}`;
-    } else if (concernMetrics.length === 0) {
-      text = 'Luftqualität hervorragend – alle Kernwerte im grünen Bereich.';
-    } else {
-      const focus = concernMetrics.slice(0, 2).join(', ');
-      text = `Belastungen sichtbar: ${focus}.`;
-      const co2 = getMetricContext(context, 'CO2');
-      if (co2?.stats24h?.shareOutsideGood >= 0.3) {
-        text = 'CO₂ seit Stunden erhöht, übrige Werte nur moderat belastet.';
-      }
+    const highlights = [];
+    if (co2?.shortTermTrend?.classification?.startsWith('rising') && co2?.now?.tone !== 'excellent') {
+      highlights.push('CO₂ erhöht und steigt gerade');
+    } else if (co2?.elevationType === 'plateau' && co2?.now?.tone !== 'excellent') {
+      highlights.push('CO₂ seit Stunden auf erhöhtem Niveau');
     }
 
-    return { text, tone };
+    if (context?.roomProfile?.CO2 === 'frequently_high') {
+      highlights.push('CO₂ über Wochen häufig erhöht');
+    }
+    const humidityProfile = context?.roomProfile?.['rel. Feuchte'];
+    if (humidityProfile === 'tends_dry') highlights.push('Luft eher trocken');
+    if (humidityProfile === 'tends_humid') highlights.push('Luft eher feucht');
+
+    const patternWindow = context?.patterns?.CO2?.dominantWindow;
+    if (patternWindow === 'evening') {
+      highlights.push('abends höhere CO₂-Last');
+    }
+
+    const pmVolatile = pm?.volatility?.level === 'high' || tvoc?.volatility?.level === 'high';
+    if (pmVolatile) {
+      highlights.push('Luftschadstoffe schwanken stark');
+    }
+
+    if (!highlights.length && top?.summary) {
+      highlights.push(top.summary.replace(/\.$/, ''));
+    }
+
+    const base =
+      score >= 80
+        ? 'Innenraumluft insgesamt gut'
+        : score >= 60
+          ? 'Luftqualität aktuell mittel'
+          : 'Luftqualität derzeit belastet';
+    const detail = highlights.slice(0, 2).join(' – ');
+    const text = detail ? `${base} – ${detail}.` : `${base}.`;
+
+    return { text, tone: baseTone };
   }
 
   function buildCurrentStatuses() {
