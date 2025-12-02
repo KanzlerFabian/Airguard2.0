@@ -1842,6 +1842,20 @@ a {
   gap: var(--space-3);
 }
 
+.circadian-charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+@media (max-width: 768px) {
+  .circadian-charts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .circadian-modal__chart {
   background: rgba(148, 163, 184, 0.08);
   border-radius: var(--radius-md);
