@@ -1520,66 +1520,81 @@ a {
   color: var(--text-strong);
 }
 
+
 .chart-modal__scale {
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: var(--space-md);
-  background: rgba(148, 163, 184, 0.08);
-  padding: var(--space-md);
-  border-radius: var(--radius-md);
-  min-height: 140px;
   width: 100%;
-  max-width: 880px;
+  max-width: 720px;
   margin: 0 auto;
 }
 
-.chart-scale {
-  display: block;
+.metric-scale__bar {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   width: 100%;
-  max-width: 100%;
-  height: 150px;
-  margin: 0 auto;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(148, 163, 184, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.18);
 }
 
-.chart-scale__track {
-  fill: rgba(148, 163, 184, 0.32);
-}
-
-.chart-scale__segment {
-  opacity: 0.9;
-}
-
-.chart-scale__segment--excellent,
-.chart-scale__segment--optimal {
-  fill: rgba(22, 163, 74, 0.26);
-}
-
-.chart-scale__segment--good {
-  fill: rgba(14, 165, 233, 0.24);
-}
-
-.chart-scale__segment--elevated,
-.chart-scale__segment--warning {
-  fill: rgba(250, 204, 21, 0.32);
-}
-
-.chart-scale__segment--poor,
-.chart-scale__segment--critical {
-  fill: rgba(239, 68, 68, 0.3);
-}
-
-.chart-scale__segment-label {
-  font-size: 7px;
+.metric-scale__segment {
+  padding: 12px 6px;
+  text-align: center;
   font-weight: 700;
-  fill: #334155;
-  text-anchor: middle;
+  font-size: 0.9rem;
+  line-height: 1.2;
+  color: #0f172a;
 }
 
-.chart-scale__segment-sub {
-  font-size: 5.2px;
-  font-weight: 600;
-  fill: #64748b;
+.metric-scale__segment--excellent {
+  background: #d5f5e3;
+}
+
+.metric-scale__segment--good {
+  background: #e5f3ff;
+}
+
+.metric-scale__segment--elevated {
+  background: #fff4d0;
+}
+
+.metric-scale__segment--poor {
+  background: #ffd6d6;
+}
+
+.metric-scale__marker {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #fff;
+  border: 3px solid var(--marker-color, #0ea5e9);
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.14);
+  transform: translate(-50%, -50%);
+  transition: left 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+  pointer-events: none;
+}
+
+.metric-scale__marker[data-tone="excellent"] {
+  --marker-color: #16a34a;
+}
+
+.metric-scale__marker[data-tone="good"] {
+  --marker-color: #0ea5e9;
+}
+
+.metric-scale__marker[data-tone="elevated"] {
+  --marker-color: #f59e0b;
+}
+
+.metric-scale__marker[data-tone="poor"] {
+  --marker-color: #ef4444;
 }
 
 @media (min-width: 640px) and (max-width: 1100px) {
@@ -1599,73 +1614,6 @@ a {
   .chart-modal__scale {
     padding: 1.15rem;
   }
-}
-
-.chart-scale__tick {
-  stroke: rgba(148, 163, 184, 0.6);
-  stroke-width: 0.8;
-}
-
-.chart-scale__tick-label {
-  font-size: 5px;
-  fill: #64748b;
-  text-anchor: middle;
-}
-
-.chart-scale__highlight {
-  fill: rgba(14, 165, 233, 0.18);
-}
-
-.chart-scale__marker {
-  color: rgba(14, 165, 233, 0.6);
-}
-
-.chart-scale__marker--excellent,
-.chart-scale__marker--optimal {
-  color: #16a34a;
-}
-
-.chart-scale__marker--good {
-  color: #0ea5e9;
-}
-
-.chart-scale__marker--elevated,
-.chart-scale__marker--warning {
-  color: #facc15;
-}
-
-.chart-scale__marker--poor,
-.chart-scale__marker--critical {
-  color: #ef4444;
-}
-
-.chart-scale__marker-line {
-  stroke: currentColor;
-  stroke-width: 0.9;
-}
-
-.chart-scale__marker-dot {
-  fill: currentColor;
-  stroke: #fff;
-  stroke-width: 1.2;
-}
-
-.chart-scale__marker-label {
-  pointer-events: none;
-}
-
-.chart-scale__marker-label-bg {
-  fill: rgba(15, 23, 42, 0.88);
-  rx: 4;
-  ry: 4;
-}
-
-.chart-scale__marker-value {
-  fill: #fff;
-  font-size: 4.6px;
-  font-weight: 700;
-  text-anchor: middle;
-  dominant-baseline: middle;
 }
 
 .chart-modal__scale-caption {
@@ -1748,24 +1696,6 @@ a {
 
   .chart-modal__scale {
     gap: 0.75rem;
-  }
-
-  .chart-modal__scale-labels,
-  .chart-modal__scale-values {
-    font-size: 0.9rem;
-  }
-
-  .chart-modal__scale-track {
-    height: 24px;
-  }
-
-  .chart-modal__scale-marker-dot {
-    width: 20px;
-    height: 20px;
-  }
-
-  .chart-modal__scale-marker-value {
-    font-size: 0.9rem;
   }
 
   .circadian-modal__content {
