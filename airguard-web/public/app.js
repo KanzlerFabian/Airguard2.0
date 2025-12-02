@@ -1100,7 +1100,8 @@ const METRIC_TO_CHART_KEY = {
     modalCurrentLabel: null,
     modalInsight: null,
     modalScale: null,
-    modalScaleSvg: null,
+    modalScaleBar: null,
+    modalScaleMarker: null,
     modalScaleCaption: null,
     modalState: null,
     modalStateText: null,
@@ -1214,7 +1215,8 @@ const METRIC_TO_CHART_KEY = {
     ui.modalCurrentLabel = document.getElementById('chart-modal-current-label');
     ui.modalInsight = document.getElementById('chart-modal-insight');
     ui.modalScale = document.getElementById('chart-modal-scale');
-    ui.modalScaleSvg = document.getElementById('chart-modal-scale-svg');
+    ui.modalScaleBar = document.getElementById('chart-modal-scale-bar');
+    ui.modalScaleMarker = document.getElementById('chart-modal-scale-marker');
     ui.modalScaleCaption = document.getElementById('chart-modal-scale-caption');
     ui.modalState = document.getElementById('chart-modal-state');
     ui.modalStateText = document.getElementById('chart-modal-state-text');
@@ -4348,6 +4350,14 @@ const METRIC_TO_CHART_KEY = {
     return unit ? `${number}${NARROW_SPACE}${unit}` : number;
   }
 
+  function formatScaleTick(value, unit) {
+    if (!Number.isFinite(value)) {
+      return formatWithUnit(null, unit, 0);
+    }
+    const decimals = Math.abs(value) < 10 && unit !== 'ppm' ? 1 : 0;
+    return formatWithUnit(value, unit, decimals);
+  }
+
   function delay(ms, signal) {
     if (!Number.isFinite(ms) || ms <= 0) {
       return Promise.resolve();
@@ -4859,7 +4869,7 @@ const METRIC_TO_CHART_KEY = {
   }
 
   function updateModalScale(metric) {
-    if (!ui.modalScale || !ui.modalScaleSvg) return;
+    if (!ui.modalScale || !ui.modalScaleBar || !ui.modalScaleMarker) return;
     const normalized = normalizeScaleConfig(metric);
     if (!normalized) {
       ui.modalScale.hidden = true;
@@ -4875,29 +4885,28 @@ const METRIC_TO_CHART_KEY = {
     const value = sample && isFinite(sample.value) ? sample.value : null;
     const decimals = config?.decimals ?? 0;
     let caption = normalized.caption || '';
-    let highlight = null;
+
     if (metric === 'Lux' || metric === 'Farbtemperatur') {
       const phase = resolveCircadianPhase();
       const range = metric === 'Lux' ? phase.luxRange : phase.cctRange;
       if (Array.isArray(range) && range.length >= 2) {
-        highlight = { from: range[0], to: range[1] };
         const formattedRange = `${formatNumber(range[0], 0)}–${formatNumber(range[1], 0)}${NARROW_SPACE}${normalized.unit}`;
         caption = `${phase.title}: Ziel ${formattedRange}`;
       }
     }
-    const scaleConfig = {
-      ...normalized,
-      segments: Array.isArray(normalized.segments)
-        ? normalized.segments.map((segment) => ({ ...segment }))
-        : [],
-      ticks: Array.isArray(normalized.ticks) ? normalized.ticks.map((tick) => ({ ...tick })) : []
-    };
 
-    renderScaleGraphic(ui.modalScaleSvg, scaleConfig, value, {
-      unit: scaleConfig.unit,
-      decimals,
-      highlight
+    const standardSegments = buildStandardSegments(
+      normalized.min,
+      normalized.max,
+      Math.max(normalized.max - normalized.min, 1),
+      normalized.segments
+    );
+
+    renderMetricScale(ui.modalScaleBar, ui.modalScaleMarker, standardSegments, value, {
+      unit: normalized.unit,
+      decimals
     });
+
     if (ui.modalScaleCaption) {
       ui.modalScaleCaption.textContent = caption;
     }
@@ -4916,10 +4925,7 @@ const METRIC_TO_CHART_KEY = {
     const segments = preset?.segments
       ? preset.segments.map((segment) => ({ ...segment }))
       : buildSegmentsFromScale(base, min, max);
-    const ticks = preset?.ticks
-      ? preset.ticks.map((tick) => ({ ...tick }))
-      : buildTicksFromScale(base, min, max);
-    return { unit, min, max, caption, segments, ticks };
+    return { unit, min, max, caption, segments };
   }
 
   function buildSegmentsFromScale(scale, min, max) {
@@ -4955,179 +4961,6 @@ const METRIC_TO_CHART_KEY = {
       return segments;
     }
     return [{ from: min, to: max, label: '', tone: 'neutral' }];
-  }
-
-  function buildTicksFromScale(scale, min, max) {
-    const values = new Set();
-    values.add(min);
-    if (Array.isArray(scale?.bands)) {
-      scale.bands.forEach((band) => {
-        if (Number.isFinite(band.min)) values.add(band.min);
-        if (Number.isFinite(band.max)) values.add(band.max);
-      });
-    }
-    if (Array.isArray(scale?.stops)) {
-      scale.stops.forEach((stop) => {
-        if (Number.isFinite(stop.value)) values.add(stop.value);
-      });
-    }
-    values.add(max);
-    return Array.from(values)
-      .filter((value) => Number.isFinite(value))
-      .sort((a, b) => a - b)
-      .map((at) => ({ at }));
-  }
-
-  function renderScaleGraphic(svg, config, value, options = {}) {
-    if (!svg) return;
-    const unit = options.unit || config.unit || '';
-    const decimals = options.decimals ?? 0;
-    const highlight = options.highlight;
-    const min = Number.isFinite(config.min) ? config.min : 0;
-    const rawMax = Number.isFinite(config.max) ? config.max : min + 1;
-    const max = rawMax > min ? rawMax : min + 1;
-    const span = Math.max(max - min, 1);
-    const viewBoxWidth = 320;
-    const viewBoxHeight = 118;
-    const trackPadding = 10;
-    const markerPadding = 12;
-    const trackStart = trackPadding;
-    const trackEnd = viewBoxWidth - trackPadding;
-    const trackHeight = 30;
-    const trackY = 68;
-    const labelY = trackY - trackHeight / 2 - 12;
-    const tickBaseY = trackY + trackHeight / 2;
-    const tickLabelY = tickBaseY + 18;
-
-    svg.setAttribute('viewBox', `0 0 ${viewBoxWidth} ${viewBoxHeight}`);
-    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-    while (svg.firstChild) {
-      svg.removeChild(svg.firstChild);
-    }
-
-    const mapValue = (val) => {
-      const ratio = clamp((Number(val) - min) / span, 0, 1);
-      return trackStart + ratio * (trackEnd - trackStart);
-    };
-
-    const track = createSvgElement('rect', {
-      class: 'chart-scale__track',
-      x: trackStart,
-      y: trackY - trackHeight / 2,
-      width: trackEnd - trackStart,
-      height: trackHeight,
-      rx: trackHeight / 2,
-      ry: trackHeight / 2
-    });
-    svg.append(track);
-
-    if (highlight && Number.isFinite(highlight.from) && Number.isFinite(highlight.to)) {
-      const from = Math.min(highlight.from, highlight.to);
-      const to = Math.max(highlight.from, highlight.to);
-      const startX = mapValue(from);
-      const endX = mapValue(to);
-      const width = Math.max(endX - startX, 1);
-      const highlightRect = createSvgElement('rect', {
-        class: 'chart-scale__highlight',
-        x: startX,
-        y: trackY - trackHeight / 2,
-        width,
-        height: trackHeight,
-        rx: trackHeight / 2,
-        ry: trackHeight / 2
-      });
-      svg.append(highlightRect);
-    }
-
-    const segments = buildStandardSegments(min, max, span, config.segments);
-    const segmentWidth = (trackEnd - trackStart) / segments.length;
-
-    segments.forEach((segment, index) => {
-      const startX = trackStart + index * segmentWidth;
-      const rect = createSvgElement('rect', {
-        class: `chart-scale__segment chart-scale__segment--${segment.tone || 'neutral'}`,
-        x: startX,
-        y: trackY - trackHeight / 2,
-        width: segmentWidth,
-        height: trackHeight,
-        rx: trackHeight / 2,
-        ry: trackHeight / 2
-      });
-      svg.append(rect);
-      const labelText = segment.label || '';
-      const detailText = segment.detail || '';
-      if (labelText || detailText) {
-        const text = createSvgElement('text', {
-          class: 'chart-scale__segment-label',
-          x: startX + segmentWidth / 2,
-          y: labelY
-        });
-        if (labelText) {
-          text.textContent = labelText;
-        }
-        if (detailText) {
-          const detail = createSvgElement('tspan', {
-            class: 'chart-scale__segment-sub',
-            x: startX + segmentWidth / 2,
-            dy: labelText ? 4.5 : 0
-          });
-          detail.textContent = detailText;
-          text.append(detail);
-        }
-        svg.append(text);
-      }
-    });
-
-    const tickGroup = createSvgElement('g');
-    const seenTicks = new Set();
-    (Array.isArray(config.ticks) ? config.ticks : []).forEach((tick) => {
-      if (!Number.isFinite(tick.at) || seenTicks.has(tick.at)) return;
-      seenTicks.add(tick.at);
-      const x = mapValue(tick.at);
-      const line = createSvgElement('line', {
-        class: 'chart-scale__tick',
-        x1: x,
-        y1: tickBaseY,
-        x2: x,
-        y2: tickBaseY + 8
-      });
-      tickGroup.append(line);
-      const label = createSvgElement('text', {
-        class: 'chart-scale__tick-label',
-        x,
-        y: tickLabelY
-      });
-      label.textContent = formatScaleTickLabel(tick.label, tick.at, unit);
-      tickGroup.append(label);
-    });
-    svg.append(tickGroup);
-
-    const hasValue = Number.isFinite(value);
-    const clampedValue = hasValue ? clamp(value, min, max) : min;
-    const mapped = mapValue(clampedValue);
-    const markerX = clamp(mapped, trackStart + markerPadding, trackEnd - markerPadding);
-    const markerTone = determineSegmentTone(segments, hasValue ? value : null);
-    const markerGroup = createSvgElement('g', {
-      class: `chart-scale__marker chart-scale__marker--${markerTone}`,
-      transform: `translate(${markerX} ${trackY})`
-    });
-    const markerLine = createSvgElement('line', { class: 'chart-scale__marker-line', x1: 0, y1: 0, x2: 0, y2: -18 });
-    const markerDot = createSvgElement('circle', { class: 'chart-scale__marker-dot', cx: 0, cy: 0, r: 4.2 });
-    const labelGroup = createSvgElement('g', { class: 'chart-scale__marker-label', transform: 'translate(0,-20)' });
-    const labelBg = createSvgElement('rect', { class: 'chart-scale__marker-label-bg', x: -24, y: -9, width: 48, height: 18 });
-    const labelText = createSvgElement('text', { class: 'chart-scale__marker-value', x: 0, y: 0 });
-    labelText.textContent = formatWithUnit(hasValue ? value : null, unit, decimals);
-    labelGroup.append(labelBg, labelText);
-    markerGroup.append(markerLine, markerDot, labelGroup);
-    svg.append(markerGroup);
-    adjustMarkerLabel(labelGroup, markerX, viewBoxWidth, trackPadding);
-  }
-
-  function formatScaleTickLabel(label, fallbackValue, unit) {
-    if (typeof label === 'string' && label.trim().length) {
-      return label;
-    }
-    return formatScaleTick(fallbackValue, unit);
   }
 
   function buildStandardSegments(min, max, span, configSegments = []) {
@@ -5180,6 +5013,55 @@ const METRIC_TO_CHART_KEY = {
     });
   }
 
+  function renderMetricScale(bar, marker, segments, value, options = {}) {
+    if (!bar || !marker || !Array.isArray(segments)) return;
+    const toneOrder = ['excellent', 'good', 'elevated', 'poor'];
+    const segmentElements = Array.from(bar.querySelectorAll('.metric-scale__segment'));
+
+    segmentElements.forEach((element, index) => {
+      const segment = segments[index] || {};
+      const tone = toneOrder[index] || segment.tone || 'neutral';
+      const label = segment.label || ['Hervorragend', 'Gut', 'Erhöht', 'Schlecht'][index] || '';
+      element.textContent = label;
+      element.className = `metric-scale__segment metric-scale__segment--${tone}`;
+    });
+
+    const percent = computeScaleMarkerPercent(value, segments);
+    marker.style.left = `${percent}%`;
+    marker.dataset.tone = determineSegmentTone(segments, value);
+    marker.setAttribute('aria-label', formatWithUnit(value, options.unit, options.decimals ?? 0));
+  }
+
+  function computeScaleMarkerPercent(value, segments) {
+    if (!Array.isArray(segments) || segments.length === 0) {
+      return 50;
+    }
+    const sorted = segments.slice().sort((a, b) => (a.from ?? 0) - (b.from ?? 0));
+    const start = Number.isFinite(sorted[0]?.from) ? sorted[0].from : 0;
+    const end = Number.isFinite(sorted[sorted.length - 1]?.to) ? sorted[sorted.length - 1].to : start + sorted.length;
+    const span = end - start;
+    if (!Number.isFinite(value) || span <= 0) {
+      return 50;
+    }
+    const clampedValue = clamp(value, start, end);
+    const segmentWidth = 100 / sorted.length;
+
+    const index = sorted.findIndex((segment) => {
+      const from = Number.isFinite(segment.from) ? segment.from : start;
+      const to = Number.isFinite(segment.to) ? segment.to : end;
+      return clampedValue >= from && clampedValue <= to;
+    });
+    const resolvedIndex = index === -1 ? (clampedValue < start ? 0 : sorted.length - 1) : index;
+    const segment = sorted[resolvedIndex];
+    const fallbackFrom = start + resolvedIndex * (span / sorted.length);
+    const from = Number.isFinite(segment.from) ? segment.from : fallbackFrom;
+    const to = Number.isFinite(segment.to) ? segment.to : from;
+    const segmentSpan = Math.max(to - from, 0.0001);
+    const offset = clamp((clampedValue - from) / segmentSpan, 0, 1);
+
+    return resolvedIndex * segmentWidth + offset * segmentWidth;
+  }
+
   function determineSegmentTone(segments, value) {
     if (!Number.isFinite(value)) {
       return 'neutral';
@@ -5195,48 +5077,6 @@ const METRIC_TO_CHART_KEY = {
       return 'neutral';
     }
     return value < (segments[0].from ?? value) ? segments[0].tone || 'neutral' : segments[segments.length - 1].tone || 'neutral';
-  }
-
-  function createSvgElement(tag, attributes = {}) {
-    const element = document.createElementNS('http://www.w3.org/2000/svg', tag);
-    Object.entries(attributes).forEach(([key, value]) => {
-      if (value == null) return;
-      element.setAttribute(key, String(value));
-    });
-    return element;
-  }
-
-  function adjustMarkerLabel(group, markerX, viewBoxWidth, padding) {
-    if (!group) return;
-    const rect = group.querySelector('rect');
-    const text = group.querySelector('text');
-    if (!rect || !text) return;
-    const box = text.getBBox();
-    const paddingX = 6;
-    const paddingY = 3;
-    const width = box.width + paddingX * 2;
-    const height = box.height + paddingY * 2;
-    rect.setAttribute('x', (-width / 2).toFixed(2));
-    rect.setAttribute('y', (box.y - paddingY).toFixed(2));
-    rect.setAttribute('width', width.toFixed(2));
-    rect.setAttribute('height', height.toFixed(2));
-    const leftEdge = markerX - width / 2;
-    const rightEdge = markerX + width / 2;
-    let shift = 0;
-    if (leftEdge < padding) {
-      shift = padding - leftEdge;
-    } else if (rightEdge > viewBoxWidth - padding) {
-      shift = (viewBoxWidth - padding) - rightEdge;
-    }
-    group.setAttribute('transform', `translate(${shift.toFixed(2)},-20)`);
-  }
-
-  function formatScaleTick(value, unit) {
-    if (!Number.isFinite(value)) {
-      return formatWithUnit(null, unit, 0);
-    }
-    const decimals = Math.abs(value) < 10 && unit !== 'ppm' ? 1 : 0;
-    return formatWithUnit(value, unit, decimals);
   }
 
   function getDefinitionForMetric(metric) {

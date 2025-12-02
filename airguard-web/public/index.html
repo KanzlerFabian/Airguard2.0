@@ -390,7 +390,13 @@
           </div>
         </div>
         <div class="chart-modal__scale metric-scale" id="chart-modal-scale">
-          <svg id="chart-modal-scale-svg" class="chart-scale" viewBox="0 0 320 118" role="presentation" aria-hidden="true"></svg>
+          <div class="metric-scale__bar" id="chart-modal-scale-bar">
+            <div class="metric-scale__segment metric-scale__segment--excellent">Hervorragend</div>
+            <div class="metric-scale__segment metric-scale__segment--good">Gut</div>
+            <div class="metric-scale__segment metric-scale__segment--elevated">Erhöht</div>
+            <div class="metric-scale__segment metric-scale__segment--poor">Schlecht</div>
+            <div class="metric-scale__marker" id="chart-modal-scale-marker" aria-hidden="true"></div>
+          </div>
           <p id="chart-modal-scale-caption" class="chart-modal__scale-caption">—</p>
         </div>
         <div class="chart-modal__info">
