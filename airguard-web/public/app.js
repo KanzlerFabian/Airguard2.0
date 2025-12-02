@@ -5163,13 +5163,14 @@ const METRIC_TO_CHART_KEY = {
     }
     scaleRoot.hidden = false;
 
-    const bar = scaleRoot.querySelector('.metric-scale__bar');
-    if (!bar) return;
+    const bar = scaleRoot.querySelector('.metric-scale-bar');
+    const labelRow = scaleRoot.querySelector('.metric-scale-label-row');
+    if (!bar || !labelRow) return;
 
-    let marker = bar.querySelector('.metric-scale__marker') || null;
+    let marker = bar.querySelector('.metric-scale-marker') || null;
     if (!marker) {
       marker = document.createElement('div');
-      marker.className = 'metric-scale__marker';
+      marker.className = 'metric-scale-marker';
       marker.setAttribute('aria-hidden', 'true');
     }
 
@@ -5177,21 +5178,30 @@ const METRIC_TO_CHART_KEY = {
       bar.appendChild(marker);
     }
 
-    bar.querySelectorAll('.metric-scale__segment').forEach((segment) => segment.remove());
+    bar.querySelectorAll('.metric-scale-segment').forEach((segment) => segment.remove());
+    labelRow.innerHTML = '';
 
     const fallbackWidth = computeFallbackSpan(bands);
+    const columnSpans = [];
     bands.forEach((band) => {
+      const span = computeBandSpan(band, fallbackWidth);
       const segment = document.createElement('div');
-      segment.className = `metric-scale__segment metric-scale__segment--tone-${band.tone || 'neutral'}`;
-      segment.style.flexGrow = computeBandSpan(band, fallbackWidth);
+      segment.className = `metric-scale-segment metric-scale-segment--tone-${band.tone || 'neutral'}`;
+      segment.style.flexGrow = span;
 
-      const labelEl = document.createElement('div');
-      labelEl.className = 'metric-scale__segment-label';
+      const labelEl = document.createElement('span');
       labelEl.textContent = band.label || STATUS_LABELS[band.tone] || STATUS_LABELS.neutral || '';
 
-      segment.append(labelEl);
+      columnSpans.push(span);
+      labelRow.append(labelEl);
       bar.insertBefore(segment, marker);
     });
+
+    if (columnSpans.length) {
+      labelRow.style.gridTemplateColumns = columnSpans.map((span) => `${span}fr`).join(' ');
+    } else {
+      labelRow.style.gridTemplateColumns = '';
+    }
 
     const percent = computeMarkerPercent(bands, value);
     const tone = determineBandTone(bands, value);

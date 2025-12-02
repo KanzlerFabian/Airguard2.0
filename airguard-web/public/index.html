@@ -56,39 +56,41 @@
   </svg>
   <div class="app-shell">
     <header class="hero" aria-labelledby="hero-title">
-      <div class="hero-heading">
-        <div>
-          <h1 id="hero-title">AirGuard Innenraum-Qualität</h1>
-          <p class="hero-sub">Heute · Überblick deiner Innenraumluft</p>
-        </div>
-        <p class="hero-update">Letzte Aktualisierung: <time id="last-updated">—</time></p>
-      </div>
+      <div class="hero-cards-grid">
+        <section class="hero-card hero-score-card" aria-labelledby="hero-title">
+          <div class="hero-card__header">
+            <div>
+              <h1 id="hero-title">AirGuard Innenraum-Qualität</h1>
+              <p class="hero-sub">Heute · Überblick deiner Innenraumluft</p>
+            </div>
+            <p class="hero-update">Letzte Aktualisierung: <time id="last-updated">—</time></p>
+          </div>
 
-      <div class="hero-grid">
-        <div class="health-card" role="status" aria-live="polite">
-          <div class="health-ring" aria-hidden="true">
-            <svg viewBox="0 0 120 120">
-              <defs>
-                <linearGradient id="health-gradient" x1="0" y1="1" x2="1" y2="0">
-                  <stop offset="0%" stop-color="#06b6d4" />
-                  <stop offset="100%" stop-color="#10b981" />
-                </linearGradient>
-              </defs>
-              <circle class="health-bg" cx="60" cy="60" r="54"></circle>
-              <circle class="health-progress" cx="60" cy="60" r="54" stroke-dasharray="339.292" stroke-dashoffset="339.292"></circle>
-            </svg>
-          <div class="health-value">
-            <span id="health-score" class="health-score">—</span>
-            <span id="health-label" class="health-label">Nicht verfügbar</span>
+          <div class="health-card" role="status" aria-live="polite">
+            <div class="health-ring" aria-hidden="true">
+              <svg viewBox="0 0 120 120">
+                <defs>
+                  <linearGradient id="health-gradient" x1="0" y1="1" x2="1" y2="0">
+                    <stop offset="0%" stop-color="#06b6d4" />
+                    <stop offset="100%" stop-color="#10b981" />
+                  </linearGradient>
+                </defs>
+                <circle class="health-bg" cx="60" cy="60" r="54"></circle>
+                <circle class="health-progress" cx="60" cy="60" r="54" stroke-dasharray="339.292" stroke-dashoffset="339.292"></circle>
+              </svg>
+              <div class="health-value">
+                <span id="health-score" class="health-score">—</span>
+                <span id="health-label" class="health-label">Nicht verfügbar</span>
+              </div>
+            </div>
+            <div class="hero-mini-meta">
+              <p id="health-detail" class="health-detail">Aktuelle Luftqualität basierend auf CO₂, TVOC, Temperatur und Luftfeuchtigkeit.</p>
+              <span class="trend-pill" id="hero-score-trend" aria-live="polite">→ Stabil</span>
+            </div>
           </div>
-          </div>
-          <div class="hero-mini-meta">
-            <p id="health-detail" class="health-detail">Aktuelle Luftqualität basierend auf CO₂, TVOC, Temperatur und Luftfeuchtigkeit.</p>
-            <span class="trend-pill" id="hero-score-trend" aria-live="polite">→ Stabil</span>
-          </div>
-        </div>
+        </section>
 
-        <div class="hero-summary-card" aria-labelledby="hero-summary-title">
+        <section class="hero-card hero-summary-card" aria-labelledby="hero-summary-title">
           <div class="hero-summary__head">
             <div>
               <p class="eyebrow">Überblick</p>
@@ -106,82 +108,82 @@
               <span id="pwa-status-badge" class="settings-badge" hidden>Offline-Cache deaktiviert (kein gültiges Zertifikat)</span>
             </div>
           </div>
-        </div>
-      </div>
+        </section>
 
-      <div class="core-panel" aria-labelledby="hero-metrics-title">
-        <div class="core-panel__head">
-          <div>
-            <p class="eyebrow">Kernmetriken</p>
-            <h2 id="hero-metrics-title">Luft & Komfort im Blick</h2>
+        <section class="hero-card hero-key-card" aria-labelledby="hero-metrics-title">
+          <div class="hero-card__header">
+            <div>
+              <p class="eyebrow">Kernmetriken</p>
+              <h2 id="hero-metrics-title">Luft & Komfort im Blick</h2>
+            </div>
           </div>
-        </div>
-        <div class="core-panel__metrics">
-          <article class="core-card core-metric-card skeleton" data-metric="CO2">
-            <div class="core-label">
-              <span class="pill-icon" aria-hidden="true"><svg><use href="#icon-cloud" /></svg></span>
-              <div class="core-text">
-                <span class="core-name">CO₂</span>
-                <span class="core-unit">ppm</span>
+          <div class="hero-key-metrics">
+            <article class="core-card core-metric-card core-card--compact skeleton" data-metric="CO2">
+              <div class="core-label">
+                <span class="pill-icon" aria-hidden="true"><svg><use href="#icon-cloud" /></svg></span>
+                <div class="core-text">
+                  <span class="core-name">CO₂</span>
+                  <span class="core-unit">ppm</span>
+                </div>
               </div>
-            </div>
-            <div class="core-value">
-              <span class="core-number">—</span>
-              <span class="core-badge" data-tone="neutral">—</span>
-            </div>
-            <div class="core-spark" aria-hidden="true">
-              <canvas></canvas>
-            </div>
-          </article>
-          <article class="core-card core-metric-card skeleton" data-metric="TVOC">
-            <div class="core-label">
-              <span class="pill-icon" aria-hidden="true"><svg><use href="#icon-flask" /></svg></span>
-              <div class="core-text">
-                <span class="core-name">TVOC</span>
-                <span class="core-unit">ppb</span>
+              <div class="core-value">
+                <span class="core-number">—</span>
+                <span class="core-badge" data-tone="neutral">—</span>
               </div>
-            </div>
-            <div class="core-value">
-              <span class="core-number">—</span>
-              <span class="core-badge" data-tone="neutral">—</span>
-            </div>
-            <div class="core-spark" aria-hidden="true">
-              <canvas></canvas>
-            </div>
-          </article>
-          <article class="core-card core-metric-card skeleton" data-metric="Temperatur">
-            <div class="core-label">
-              <span class="pill-icon" aria-hidden="true"><svg><use href="#icon-thermometer" /></svg></span>
-              <div class="core-text">
-                <span class="core-name">Temperatur</span>
-                <span class="core-unit">°C</span>
+              <div class="core-spark" aria-hidden="true">
+                <canvas></canvas>
               </div>
-            </div>
-            <div class="core-value">
-              <span class="core-number">—</span>
-              <span class="core-badge" data-tone="neutral">—</span>
-            </div>
-            <div class="core-spark" aria-hidden="true">
-              <canvas></canvas>
-            </div>
-          </article>
-          <article class="core-card core-metric-card skeleton" data-metric="rel. Feuchte">
-            <div class="core-label">
-              <span class="pill-icon" aria-hidden="true"><svg><use href="#icon-droplet" /></svg></span>
-              <div class="core-text">
-                <span class="core-name">rel. Feuchte</span>
-                <span class="core-unit">%</span>
+            </article>
+            <article class="core-card core-metric-card core-card--compact skeleton" data-metric="TVOC">
+              <div class="core-label">
+                <span class="pill-icon" aria-hidden="true"><svg><use href="#icon-flask" /></svg></span>
+                <div class="core-text">
+                  <span class="core-name">TVOC</span>
+                  <span class="core-unit">ppb</span>
+                </div>
               </div>
-            </div>
-            <div class="core-value">
-              <span class="core-number">—</span>
-              <span class="core-badge" data-tone="neutral">—</span>
-            </div>
-            <div class="core-spark" aria-hidden="true">
-              <canvas></canvas>
-            </div>
-          </article>
-        </div>
+              <div class="core-value">
+                <span class="core-number">—</span>
+                <span class="core-badge" data-tone="neutral">—</span>
+              </div>
+              <div class="core-spark" aria-hidden="true">
+                <canvas></canvas>
+              </div>
+            </article>
+            <article class="core-card core-metric-card core-card--compact skeleton" data-metric="Temperatur">
+              <div class="core-label">
+                <span class="pill-icon" aria-hidden="true"><svg><use href="#icon-thermometer" /></svg></span>
+                <div class="core-text">
+                  <span class="core-name">Temperatur</span>
+                  <span class="core-unit">°C</span>
+                </div>
+              </div>
+              <div class="core-value">
+                <span class="core-number">—</span>
+                <span class="core-badge" data-tone="neutral">—</span>
+              </div>
+              <div class="core-spark" aria-hidden="true">
+                <canvas></canvas>
+              </div>
+            </article>
+            <article class="core-card core-metric-card core-card--compact skeleton" data-metric="rel. Feuchte">
+              <div class="core-label">
+                <span class="pill-icon" aria-hidden="true"><svg><use href="#icon-droplet" /></svg></span>
+                <div class="core-text">
+                  <span class="core-name">rel. Feuchte</span>
+                  <span class="core-unit">%</span>
+                </div>
+              </div>
+              <div class="core-value">
+                <span class="core-number">—</span>
+                <span class="core-badge" data-tone="neutral">—</span>
+              </div>
+              <div class="core-spark" aria-hidden="true">
+                <canvas></canvas>
+              </div>
+            </article>
+          </div>
+        </section>
       </div>
     </header>
 
@@ -467,9 +469,10 @@
           </div>
         </div>
         <div class="chart-modal__scale metric-scale" id="chart-modal-scale">
-          <div class="metric-scale__bar" id="chart-modal-scale-bar">
-            <div class="metric-scale__marker" id="chart-modal-scale-marker" aria-hidden="true"></div>
+          <div class="metric-scale-bar" id="chart-modal-scale-bar">
+            <div class="metric-scale-marker" id="chart-modal-scale-marker" aria-hidden="true"></div>
           </div>
+          <div class="metric-scale-label-row" id="chart-modal-scale-labels"></div>
           <p id="chart-modal-scale-caption" class="chart-modal__scale-caption">—</p>
         </div>
         <div class="chart-modal__info">
@@ -543,9 +546,10 @@
               <span id="circadian-scale-lux-value" class="circadian-scale__current">—</span>
             </div>
             <div class="metric-scale metric-scale--compact" id="circadian-scale-lux">
-              <div class="metric-scale__bar">
-                <div class="metric-scale__marker" aria-hidden="true"></div>
+              <div class="metric-scale-bar">
+                <div class="metric-scale-marker" aria-hidden="true"></div>
               </div>
+              <div class="metric-scale-label-row"></div>
               <p id="circadian-scale-lux-caption" class="metric-scale__caption">—</p>
             </div>
           </div>
@@ -555,9 +559,10 @@
               <span id="circadian-scale-cct-value" class="circadian-scale__current">—</span>
             </div>
             <div class="metric-scale metric-scale--compact" id="circadian-scale-cct">
-              <div class="metric-scale__bar">
-                <div class="metric-scale__marker" aria-hidden="true"></div>
+              <div class="metric-scale-bar">
+                <div class="metric-scale-marker" aria-hidden="true"></div>
               </div>
+              <div class="metric-scale-label-row"></div>
               <p id="circadian-scale-cct-caption" class="metric-scale__caption">—</p>
             </div>
           </div>
