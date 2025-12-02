@@ -2104,7 +2104,7 @@ const METRIC_TO_CHART_KEY = {
           return buildStatus('elevated', 'Kühl.', 'Sanft aufheizen bis in den Komfortbereich.', 'Kühl');
         }
         if (value <= 23) {
-          return buildStatus('excellent', 'Im Wohlfühlbereich.', 'Temperatur beibehalten.', 'Wohlfühlbereich');
+          return buildStatus('excellent', 'Im Wohlfühlbereich.', 'Temperatur beibehalten.', 'Ideal');
         }
         if (value <= 25) {
           return buildStatus('good', 'Leicht warm.', 'Kurz lüften oder beschatten.', 'Warm');
@@ -2119,7 +2119,7 @@ const METRIC_TO_CHART_KEY = {
           return buildStatus('elevated', 'Trockene Luft.', 'Sanft befeuchten oder kürzer lüften.', 'Trocken');
         }
         if (value <= 60) {
-          return buildStatus('excellent', 'Wohlfühlbereich.', 'Aktuelles Verhalten passt.', 'Wohlfühlbereich');
+          return buildStatus('excellent', 'Wohlfühlbereich.', 'Aktuelles Verhalten passt.', 'Ideal');
         }
         if (value <= 70) {
           return buildStatus('elevated', 'Etwas feuchte Luft.', 'Regelmäßig stoßlüften und trocknen.', 'Feucht');
