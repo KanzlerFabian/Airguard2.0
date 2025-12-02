@@ -1136,6 +1136,11 @@ const METRIC_TO_CHART_KEY = {
     healthScore: null,
     healthLabel: null,
     healthDetail: null,
+    heroSummaryText: null,
+    heroHighlights: null,
+    heroTrend: null,
+    heroSummaryLabel: null,
+    heroScoreTrend: null,
     healthProgress: null,
     offlineIndicator: null,
     circadianCard: null,
@@ -1223,6 +1228,11 @@ const METRIC_TO_CHART_KEY = {
     ui.healthScore = document.getElementById('health-score');
     ui.healthLabel = document.getElementById('health-label');
     ui.healthDetail = document.getElementById('health-detail');
+    ui.heroSummaryText = document.getElementById('hero-summary-text');
+    ui.heroHighlights = document.getElementById('hero-highlights');
+    ui.heroTrend = document.getElementById('hero-trend');
+    ui.heroSummaryLabel = document.getElementById('hero-summary-label');
+    ui.heroScoreTrend = document.getElementById('hero-score-trend');
     ui.healthProgress = document.querySelector('.health-progress');
     ui.offlineIndicator = document.getElementById('offline-indicator');
     ui.circadianCard = document.querySelector('.circadian-card');
@@ -1242,6 +1252,7 @@ const METRIC_TO_CHART_KEY = {
     ui.barLux = document.querySelector('.bar-track[data-kind="lux"]');
     ui.insightsSection = document.querySelector('.insights-section');
     ui.insightsGrid = document.querySelector('#insights-grid, [data-insights-grid]');
+    ui.insightsToggle = document.getElementById('insights-toggle');
     ui.installBtn = document.getElementById('install-btn');
     ui.notifyBtn = document.getElementById('notify-btn');
     ui.pwaStatusBadge = document.getElementById('pwa-status-badge');
@@ -1255,6 +1266,13 @@ const METRIC_TO_CHART_KEY = {
           event.preventDefault();
           openCircadianModal();
         }
+      });
+    }
+
+    if (ui.insightsToggle) {
+      ui.insightsToggle.addEventListener('click', () => {
+        INSIGHT_STATE.expanded = !INSIGHT_STATE.expanded;
+        renderInsights();
       });
     }
 
@@ -2183,6 +2201,44 @@ const METRIC_TO_CHART_KEY = {
     ui.healthProgress.style.stroke = tone === 'excellent' ? 'url(#health-gradient)' : toneToColor(tone);
   }
 
+  function updateHeroOverview(statuses) {
+    const summary = INSIGHT_STATE.heroSummary;
+    const tone = summary?.tone || 'neutral';
+    const highlights = buildHeroHighlights(statuses, INSIGHT_STATE.insights);
+    const summaryText = summary?.text || ui.healthDetail?.textContent || '';
+    if (ui.heroSummaryText) {
+      ui.heroSummaryText.textContent = summaryText || 'Aktuelle Einschätzung folgt, sobald Daten da sind.';
+    }
+    if (ui.heroSummaryLabel) {
+      ui.heroSummaryLabel.textContent = STATUS_LABELS[tone] || 'Aktuell';
+      ui.heroSummaryLabel.dataset.tone = tone;
+    }
+    const trend = computeTrend('CO2');
+    const trendText = `${trend?.symbol || '→'} ${trendLabelFromSymbol(trend?.symbol)}`.trim();
+    if (ui.heroTrend) ui.heroTrend.textContent = trendText;
+    if (ui.heroScoreTrend) ui.heroScoreTrend.textContent = trendText;
+    if (ui.heroHighlights) {
+      ui.heroHighlights.innerHTML = '';
+      const list = highlights.length ? highlights : ['Insights folgen, sobald Daten eintreffen.'];
+      list.forEach((item) => {
+        const li = document.createElement('li');
+        li.textContent = item;
+        ui.heroHighlights.appendChild(li);
+      });
+    }
+  }
+
+  function trendLabelFromSymbol(symbol) {
+    switch (symbol) {
+      case '↑':
+        return 'steigend';
+      case '↓':
+        return 'fallend';
+      default:
+        return 'stabil';
+    }
+  }
+
   function metricLabel(metric) {
     return METRIC_CONFIG[metric]?.label || metric;
   }
@@ -2247,7 +2303,8 @@ const METRIC_TO_CHART_KEY = {
   const INSIGHT_STATE = {
     context: null,
     insights: [],
-    heroSummary: null
+    heroSummary: null,
+    expanded: false
   };
 
   async function getSeriesForMetric(metric, rangeKey) {
@@ -3607,6 +3664,34 @@ const METRIC_TO_CHART_KEY = {
     return { text, tone: baseTone };
   }
 
+  function buildHeroHighlights(statuses, insights) {
+    const highlights = [];
+    const sortedInsights = sortInsights(insights);
+    sortedInsights.slice(0, 3).forEach((insight) => {
+      const text = insight?.summary || insight?.title;
+      if (text) {
+        highlights.push(text);
+      }
+    });
+
+    const severityRank = { critical: 5, poor: 4, elevated: 3, warning: 3, good: 2, excellent: 1, neutral: 0 };
+    const statusEntries = Object.entries(statuses || {}).sort((a, b) => {
+      const aScore = severityRank[a?.[1]?.tone] || 0;
+      const bScore = severityRank[b?.[1]?.tone] || 0;
+      return bScore - aScore;
+    });
+
+    for (const [metric, status] of statusEntries) {
+      if (highlights.length >= 3) break;
+      const text = status?.note || `${metricLabel(metric)} ${status?.label || ''}`.trim();
+      if (text) {
+        highlights.push(text);
+      }
+    }
+
+    return highlights.map((entry) => (entry.length > 120 ? `${entry.slice(0, 117)}…` : entry));
+  }
+
   function buildCurrentStatuses() {
     const result = {};
     for (const metric of INSIGHT_METRICS) {
@@ -3624,13 +3709,20 @@ const METRIC_TO_CHART_KEY = {
 
   function renderInsights() {
     if (!ui.insightsSection || !ui.insightsGrid) return;
-    const list = sortInsights(INSIGHT_STATE.insights).slice(0, 4);
+    const sorted = sortInsights(INSIGHT_STATE.insights);
+    const visibleCount = INSIGHT_STATE.expanded ? sorted.length : Math.min(4, sorted.length);
+    const list = sorted.slice(0, visibleCount);
     ui.insightsGrid.innerHTML = '';
     if (!list.length) {
       ui.insightsSection.hidden = true;
+      if (ui.insightsToggle) ui.insightsToggle.hidden = true;
       return;
     }
     ui.insightsSection.hidden = false;
+    if (ui.insightsToggle) {
+      ui.insightsToggle.hidden = sorted.length <= 4;
+      ui.insightsToggle.textContent = INSIGHT_STATE.expanded ? 'Weniger anzeigen' : 'Mehr Insights';
+    }
     list.forEach((insight) => {
       const card = document.createElement('article');
       card.className = 'insight-card';
@@ -3650,8 +3742,16 @@ const METRIC_TO_CHART_KEY = {
       const recommendation = document.createElement('p');
       recommendation.textContent = insight.recommendation || '';
       recommendation.className = 'status-tip';
+      const micro = document.createElement('div');
+      micro.className = 'insight-meter';
+      for (let index = 0; index < 6; index++) {
+        const bar = document.createElement('span');
+        bar.dataset.severity = insight.severity || 'info';
+        micro.appendChild(bar);
+      }
       card.appendChild(meta);
       card.appendChild(summary);
+      card.appendChild(micro);
       if (insight.recommendation) {
         card.appendChild(recommendation);
       }
@@ -3669,6 +3769,7 @@ const METRIC_TO_CHART_KEY = {
       INSIGHT_STATE.insights = insights;
       INSIGHT_STATE.heroSummary = heroSummary;
       renderInsights();
+      updateHeroOverview(statuses);
       updateHealthCard(statuses);
     } catch (error) {
       console.error('Insight engine failed', error);
@@ -3771,7 +3872,7 @@ const METRIC_TO_CHART_KEY = {
       }
       const sample = data[metric];
       const valueEl = card.querySelector('.status-value .value');
-      const unitEl = card.querySelector('.unit');
+      const unitEls = card.querySelectorAll('.unit');
       const noteEl = card.querySelector('.status-note');
       const tipEl = card.querySelector('.status-tip');
       const badge = card.querySelector('.badge');
@@ -3779,7 +3880,9 @@ const METRIC_TO_CHART_KEY = {
       const config = METRIC_CONFIG[metric];
 
       if (!config) return;
-      unitEl.textContent = config.unit;
+      unitEls.forEach((unit) => {
+        unit.textContent = config.unit;
+      });
 
       if (!sample || !isFinite(sample.value)) {
         if (valueEl) valueEl.textContent = '—';
@@ -3806,7 +3909,7 @@ const METRIC_TO_CHART_KEY = {
         card.dataset.intent = status.intent || status.tone || 'neutral';
         const trend = computeTrend(metric);
         if (trendEl) {
-          trendEl.textContent = trend?.text || trend?.symbol || '→';
+          trendEl.textContent = trend ? `${trend.symbol} ${trendLabelFromSymbol(trend.symbol)}` : '→ stabil';
         }
       }
       card.classList.add('ready');
