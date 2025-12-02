@@ -674,6 +674,77 @@ const METRIC_CONFIG = {
     }
   };
 
+  const METRIC_SCALE_CONFIG = {
+    CO2: {
+      bands: [
+        { tone: 'excellent', min: 400, max: 800, label: 'Hervorragend', detail: 'Optimaler CO₂-Bereich' },
+        { tone: 'good', min: 800, max: 1000, label: 'Gut', detail: 'Unauffällige Werte' },
+        { tone: 'elevated', min: 1000, max: 1400, label: 'Erhöht', detail: 'Lüften empfohlen' },
+        { tone: 'poor', min: 1400, max: 2000, label: 'Schlecht', detail: 'Dringend lüften' }
+      ]
+    },
+    'PM2.5': {
+      bands: [
+        { tone: 'excellent', min: 0, max: 5, label: 'Sehr niedrig', detail: 'Hervorragend' },
+        { tone: 'good', min: 5, max: 12, label: 'Niedrig', detail: 'Gut' },
+        { tone: 'elevated', min: 12, max: 25, label: 'Erhöht', detail: 'Belastung steigt' },
+        { tone: 'poor', min: 25, max: 60, label: 'Stark erhöht', detail: 'Gesundheitlich ungünstig' }
+      ]
+    },
+    'PM1.0': {
+      bands: [
+        { tone: 'excellent', min: 0, max: 5, label: 'Sehr niedrig', detail: 'Hervorragend' },
+        { tone: 'good', min: 5, max: 12, label: 'Niedrig', detail: 'Gut' },
+        { tone: 'elevated', min: 12, max: 35, label: 'Erhöht', detail: 'Belastung steigt' },
+        { tone: 'poor', min: 35, max: 60, label: 'Stark erhöht', detail: 'Gesundheitlich ungünstig' }
+      ]
+    },
+    PM10: {
+      bands: [
+        { tone: 'excellent', min: 0, max: 20, label: 'Sehr niedrig', detail: 'Hervorragend' },
+        { tone: 'good', min: 20, max: 40, label: 'Niedrig', detail: 'Gut' },
+        { tone: 'elevated', min: 40, max: 60, label: 'Erhöht', detail: 'Belastung steigt' },
+        { tone: 'poor', min: 60, max: 120, label: 'Stark erhöht', detail: 'Gesundheitlich ungünstig' }
+      ]
+    },
+    TVOC: {
+      bands: [
+        { tone: 'excellent', min: 0, max: 150, label: 'Sehr niedrig', detail: 'Kaum Ausdünstungen' },
+        { tone: 'good', min: 150, max: 300, label: 'Niedrig', detail: 'Unauffällig' },
+        { tone: 'elevated', min: 300, max: 600, label: 'Erhöht', detail: 'Quellen prüfen' },
+        { tone: 'poor', min: 600, max: 1200, label: 'Stark erhöht', detail: 'Lüften & Quellen meiden' }
+      ]
+    },
+    Temperatur: {
+      bands: [
+        { tone: 'poor', min: 16, max: 18, label: 'Zu kalt', detail: 'Deutlich unter Komfortbereich' },
+        { tone: 'elevated', min: 18, max: 20, label: 'Kühl', detail: 'Leicht kühl' },
+        { tone: 'excellent', min: 20, max: 24, label: 'Wohlfühlbereich', detail: 'Komfortzone' },
+        { tone: 'elevated', min: 24, max: 30, label: 'Warm', detail: 'Eher warm' }
+      ]
+    },
+    'rel. Feuchte': {
+      bands: [
+        { tone: 'poor', min: 20, max: 30, label: 'Sehr trocken', detail: 'Deutlich unter Komfortbereich' },
+        { tone: 'elevated', min: 30, max: 40, label: 'Trocken', detail: 'Unter Komfortbereich' },
+        { tone: 'excellent', min: 40, max: 60, label: 'Wohlfühlbereich', detail: 'Optimal' },
+        { tone: 'elevated', min: 60, max: 80, label: 'Feucht', detail: 'Schimmelrisiko steigt' }
+      ]
+    }
+  };
+
+  const METRIC_SCALE_ALIASES = {
+    pm1: 'PM1.0',
+    'pm1.0': 'PM1.0',
+    pm25: 'PM2.5',
+    'pm2.5': 'PM2.5',
+    pm10: 'PM10',
+    temperature: 'Temperatur',
+    temp: 'Temperatur',
+    humidity: 'rel. Feuchte',
+    feuchte: 'rel. Feuchte'
+  };
+
   const METRIC_INSIGHTS = {
     CO2: {
       sections: [
@@ -4871,19 +4942,9 @@ const METRIC_TO_CHART_KEY = {
   function updateModalScale(metric) {
     if (!ui.modalScale || !ui.modalScaleBar) return;
     const normalized = normalizeScaleConfig(metric);
-    if (!normalized) {
-      ui.modalScale.hidden = true;
-      if (ui.modalScaleCaption) {
-        ui.modalScaleCaption.textContent = '';
-      }
-      queueModalLayoutSync();
-      return;
-    }
-    ui.modalScale.hidden = false;
     const sample = state.now?.[metric];
     const config = METRIC_CONFIG[metric];
     const value = sample && isFinite(sample.value) ? sample.value : null;
-    const decimals = config?.decimals ?? 0;
     let caption = normalized.caption || '';
 
     if (metric === 'Lux' || metric === 'Farbtemperatur') {
@@ -4895,21 +4956,22 @@ const METRIC_TO_CHART_KEY = {
       }
     }
 
-    const standardSegments = buildStandardSegments(
-      normalized.min,
-      normalized.max,
-      Math.max(normalized.max - normalized.min, 1),
-      normalized.segments
-    );
-
-    const markerEl = renderMetricScale(ui.modalScaleBar, ui.modalScaleMarker, standardSegments, value, {
-      unit: normalized.unit,
-      decimals
-    });
-
-    if (markerEl) {
-      ui.modalScaleMarker = markerEl;
+    const bands = resolveScaleBands(metric, normalized);
+    if (!bands.length) {
+      ui.modalScale.hidden = true;
+      if (ui.modalScaleCaption) {
+        ui.modalScaleCaption.textContent = '';
+      }
+      queueModalLayoutSync();
+      return;
     }
+
+    ui.modalScale.hidden = false;
+    renderMetricScale(ui.modalScale, metric, value, {
+      bands,
+      unit: normalized.unit,
+      decimals: config?.decimals ?? 0
+    });
 
     if (ui.modalScaleCaption) {
       ui.modalScaleCaption.textContent = caption;
@@ -5017,109 +5079,160 @@ const METRIC_TO_CHART_KEY = {
     });
   }
 
-  function renderMetricScale(bar, marker, segments, value, options = {}) {
-    if (!bar || !Array.isArray(segments)) return null;
-    const toneOrder = ['excellent', 'good', 'elevated', 'poor'];
-    const labelOrder = ['Hervorragend', 'Gut', 'Erhöht', 'Schlecht'];
-    const { marker: markerEl, segments: segmentElements } = ensureMetricScaleStructure(bar, marker);
-    if (!markerEl || !segmentElements.length) return null;
+  function resolveScaleBands(metric, normalized = null) {
+    const configured = getMetricScaleBands(metric);
+    if (configured?.length) {
+      return configured.map((band) => ({ ...band }));
+    }
+    const scale = normalized || normalizeScaleConfig(metric);
+    const segments = buildStandardSegments(
+      scale.min,
+      scale.max,
+      Math.max(scale.max - scale.min, 1),
+      scale.segments
+    );
+    return segments.map((segment) => ({
+      tone: segment.tone || 'neutral',
+      min: segment.from,
+      max: segment.to,
+      label: segment.label || STATUS_LABELS[segment.tone] || ''
+    }));
+  }
 
-    segmentElements.forEach((element, index) => {
-      const segment = segments[index] || {};
-      const tone = toneOrder[index] || segment.tone || 'neutral';
-      const label = segment.label || labelOrder[index] || '';
-      element.textContent = label;
-      element.className = `metric-scale__segment metric-scale__segment--${tone}`;
+  function renderMetricScale(modalElement, metricKey, value, options = {}) {
+    const scaleRoot = modalElement?.classList?.contains('metric-scale')
+      ? modalElement
+      : modalElement?.querySelector('.metric-scale');
+    if (!scaleRoot) return;
+    const bands = Array.isArray(options.bands) && options.bands.length
+      ? options.bands
+      : resolveScaleBands(metricKey);
+    if (!bands || bands.length === 0) {
+      scaleRoot.hidden = true;
+      return;
+    }
+    scaleRoot.hidden = false;
+
+    const bar = scaleRoot.querySelector('.metric-scale__bar');
+    if (!bar) return;
+
+    let marker = bar.querySelector('.metric-scale__marker') || null;
+    if (!marker) {
+      marker = document.createElement('div');
+      marker.className = 'metric-scale__marker';
+      marker.setAttribute('aria-hidden', 'true');
+    }
+
+    if (!bar.contains(marker)) {
+      bar.appendChild(marker);
+    }
+
+    bar.querySelectorAll('.metric-scale__segment').forEach((segment) => segment.remove());
+
+    const fallbackWidth = computeFallbackSpan(bands);
+    bands.forEach((band) => {
+      const segment = document.createElement('div');
+      segment.className = `metric-scale__segment metric-scale__segment--tone-${band.tone || 'neutral'}`;
+      segment.style.flexGrow = computeBandSpan(band, fallbackWidth);
+
+      const toneEl = document.createElement('div');
+      toneEl.className = 'metric-scale__segment-tone';
+      toneEl.textContent = STATUS_LABELS[band.tone] || STATUS_LABELS.neutral || '';
+
+      const labelEl = document.createElement('div');
+      labelEl.className = 'metric-scale__segment-label';
+      labelEl.textContent = band.label || toneEl.textContent;
+
+      segment.append(toneEl, labelEl);
+      bar.insertBefore(segment, marker);
     });
 
-    const percent = computeScaleMarkerPercent(value, segments);
-    const tone = determineSegmentTone(segments, value);
-    markerEl.hidden = !Number.isFinite(value);
-    markerEl.style.left = `${percent}%`;
-    markerEl.dataset.tone = tone;
+    const percent = computeMarkerPercent(bands, value);
+    const tone = determineBandTone(bands, value);
+    marker.hidden = !Number.isFinite(value);
+    marker.style.left = `${percent}%`;
+    marker.dataset.tone = tone;
     if (Number.isFinite(value)) {
-      markerEl.setAttribute('aria-label', formatWithUnit(value, options.unit, options.decimals ?? 0));
+      marker.setAttribute('aria-label', formatWithUnit(value, options.unit || '', options.decimals ?? 0));
     } else {
-      markerEl.removeAttribute('aria-label');
+      marker.removeAttribute('aria-label');
     }
-
-    return markerEl;
   }
 
-  function computeScaleMarkerPercent(value, segments) {
-    if (!Array.isArray(segments) || segments.length === 0) {
-      return 50;
-    }
-    const sorted = segments.slice().sort((a, b) => (a.from ?? 0) - (b.from ?? 0));
-    const start = Number.isFinite(sorted[0]?.from) ? sorted[0].from : 0;
-    const end = Number.isFinite(sorted[sorted.length - 1]?.to) ? sorted[sorted.length - 1].to : start + sorted.length;
-    const span = end - start;
-    if (!Number.isFinite(value) || span <= 0) {
-      return 50;
-    }
-    const clampedValue = clamp(value, start, end);
-    const segmentWidth = 100 / sorted.length;
-
-    const index = sorted.findIndex((segment) => {
-      const from = Number.isFinite(segment.from) ? segment.from : start;
-      const to = Number.isFinite(segment.to) ? segment.to : end;
-      return clampedValue >= from && clampedValue <= to;
-    });
-    const resolvedIndex = index === -1 ? (clampedValue < start ? 0 : sorted.length - 1) : index;
-    const segment = sorted[resolvedIndex];
-    const fallbackFrom = start + resolvedIndex * (span / sorted.length);
-    const from = Number.isFinite(segment.from) ? segment.from : fallbackFrom;
-    const to = Number.isFinite(segment.to) ? segment.to : from;
-    const segmentSpan = Math.max(to - from, 0.0001);
-    const offset = clamp((clampedValue - from) / segmentSpan, 0, 1);
-
-    const percent = resolvedIndex * segmentWidth + offset * segmentWidth;
-    return clamp(percent, 2, 98);
+  function computeFallbackSpan(bands) {
+    const finite = bands
+      .map((band) => [Number(band.min), Number(band.max)])
+      .filter(([minValue, maxValue]) => Number.isFinite(minValue) && Number.isFinite(maxValue) && maxValue > minValue);
+    if (!finite.length) return 1;
+    const min = Math.min(...finite.map(([minValue]) => minValue));
+    const max = Math.max(...finite.map(([, maxValue]) => maxValue));
+    return Math.max(max - min, 1);
   }
 
-  function ensureMetricScaleStructure(bar, marker) {
-    const toneOrder = ['excellent', 'good', 'elevated', 'poor'];
-    const labelOrder = ['Hervorragend', 'Gut', 'Erhöht', 'Schlecht'];
-    const segments = Array.from(bar.querySelectorAll('.metric-scale__segment'));
-    let markerEl = marker || bar.querySelector('.metric-scale__marker');
-
-    if (segments.length !== 4) {
-      bar.innerHTML = '';
-      for (let index = 0; index < 4; index += 1) {
-        const segment = document.createElement('div');
-        segment.className = `metric-scale__segment metric-scale__segment--${toneOrder[index]}`;
-        segment.textContent = labelOrder[index];
-        bar.appendChild(segment);
-      }
+  function computeBandSpan(band, fallbackSpan) {
+    const min = Number(band.min);
+    const max = Number(band.max);
+    if (Number.isFinite(min) && Number.isFinite(max) && max > min) {
+      return max - min;
     }
-
-    const resolvedSegments = Array.from(bar.querySelectorAll('.metric-scale__segment'));
-    markerEl = markerEl || document.createElement('div');
-    markerEl.className = 'metric-scale__marker';
-    markerEl.setAttribute('aria-hidden', 'true');
-
-    if (!bar.contains(markerEl)) {
-      bar.appendChild(markerEl);
-    }
-
-    return { marker: markerEl, segments: resolvedSegments.slice(0, 4) };
+    return fallbackSpan / 4;
   }
 
-  function determineSegmentTone(segments, value) {
-    if (!Number.isFinite(value)) {
+  function determineBandTone(bands, value) {
+    if (!Array.isArray(bands) || !Number.isFinite(value)) {
       return 'neutral';
     }
-    for (const segment of segments) {
-      const from = Number.isFinite(segment.from) ? segment.from : -Infinity;
-      const to = Number.isFinite(segment.to) ? segment.to : Infinity;
-      if (value >= from && value <= to) {
-        return segment.tone || 'neutral';
+    for (const band of bands) {
+      const min = Number.isFinite(band.min) ? band.min : -Infinity;
+      const max = Number.isFinite(band.max) ? band.max : Infinity;
+      if (value >= min && value <= max) {
+        return band.tone || 'neutral';
       }
     }
-    if (segments.length === 0) {
+    if (!bands.length) {
       return 'neutral';
     }
-    return value < (segments[0].from ?? value) ? segments[0].tone || 'neutral' : segments[segments.length - 1].tone || 'neutral';
+    return value < (bands[0].min ?? value) ? bands[0].tone || 'neutral' : bands[bands.length - 1].tone || 'neutral';
+  }
+
+  function computeMarkerPercent(bands, value) {
+    if (!Array.isArray(bands) || bands.length === 0) {
+      return 50;
+    }
+    const finite = bands
+      .map((band) => [Number(band.min), Number(band.max)])
+      .filter(([minValue, maxValue]) => Number.isFinite(minValue) && Number.isFinite(maxValue));
+    if (!finite.length) {
+      return 50;
+    }
+    const min = Math.min(...finite.map(([minValue]) => minValue));
+    const max = Math.max(...finite.map(([, maxValue]) => maxValue));
+    const span = Math.max(max - min, 1);
+    const target = Number.isFinite(value) ? clamp(value, min, max) : min + span / 2;
+    return clamp(((target - min) / span) * 100, 0, 100);
+  }
+
+  function resolveScaleKey(metricKey) {
+    if (!metricKey) return null;
+    const key = String(metricKey).trim();
+    if (METRIC_SCALE_CONFIG[key]) return key;
+    const lower = key.toLowerCase();
+    if (METRIC_SCALE_CONFIG[lower]) return lower;
+    const alias = METRIC_SCALE_ALIASES[key] || METRIC_SCALE_ALIASES[lower];
+    if (alias && METRIC_SCALE_CONFIG[alias]) return alias;
+    return null;
+  }
+
+  function getMetricScaleBands(metricKey) {
+    const resolved = resolveScaleKey(metricKey);
+    if (!resolved) return null;
+    const bands = METRIC_SCALE_CONFIG[resolved]?.bands;
+    return Array.isArray(bands) ? bands.map((band) => ({ ...band })) : null;
+  }
+
+  function getMetricScaleMarkerLeft(metricKey, value) {
+    const bands = getMetricScaleBands(metricKey);
+    return computeMarkerPercent(bands || [], value);
   }
 
   function getDefinitionForMetric(metric) {
