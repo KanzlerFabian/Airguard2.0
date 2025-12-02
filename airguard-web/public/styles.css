@@ -1536,7 +1536,7 @@ a {
   position: relative;
   display: flex;
   width: 100%;
-  min-height: 68px;
+  min-height: 58px;
   align-items: stretch;
   border-radius: 999px;
   overflow: hidden;
@@ -1548,24 +1548,15 @@ a {
 .metric-scale__segment {
   position: relative;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
   flex: 1 1 0;
-  padding: 12px 10px;
-  gap: 4px;
+  padding: 10px 10px;
+  gap: 2px;
   text-align: center;
   color: #0f172a;
   white-space: normal;
   word-break: break-word;
-}
-
-.metric-scale__segment-tone {
-  font-size: 0.78rem;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  color: #0f172a;
-  opacity: 0.75;
 }
 
 .metric-scale__segment-label {
@@ -1644,6 +1635,24 @@ a {
   text-align: center;
   margin: 0;
   padding: 0 4px;
+}
+
+.metric-scale__caption {
+  font-size: 0.86rem;
+  color: var(--text-soft);
+  text-align: center;
+  margin: 6px 0 0;
+  padding: 0 4px;
+}
+
+.metric-scale--compact {
+  --metric-scale-max-width: 100%;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.metric-scale--compact .metric-scale__bar {
+  min-height: 54px;
 }
 
 @media (max-width: 768px) {

@@ -1187,10 +1187,12 @@ const METRIC_TO_CHART_KEY = {
     circadianCctCanvas: null,
     insightsSection: null,
     insightsGrid: null,
-    circadianScaleSegments: new Map(),
-    circadianScaleLabels: new Map(),
-    circadianScaleMarkers: new Map(),
-    circadianScaleValues: new Map(),
+    circadianScaleLux: null,
+    circadianScaleCct: null,
+    circadianScaleLuxCaption: null,
+    circadianScaleCctCaption: null,
+    circadianScaleLuxValue: null,
+    circadianScaleCctValue: null,
     circadianModalCloseButtons: []
   };
 
@@ -1338,39 +1340,12 @@ const METRIC_TO_CHART_KEY = {
     ui.circadianModalCctValue = document.getElementById('circadian-modal-cct-value');
     ui.circadianLuxCanvas = document.getElementById('circadian-modal-lux-canvas');
     ui.circadianCctCanvas = document.getElementById('circadian-modal-cct-canvas');
-    ui.circadianScaleSegments.clear();
-    ui.circadianScaleLabels.clear();
-    ui.circadianScaleMarkers.clear();
-
-    document.querySelectorAll('.circadian-scale__segments').forEach((element) => {
-      const kind = element.getAttribute('data-kind');
-      if (kind) {
-        ui.circadianScaleSegments.set(kind, element);
-      }
-    });
-    document.querySelectorAll('.circadian-scale__labels').forEach((element) => {
-      const kind = element.getAttribute('data-kind');
-      if (kind) {
-        ui.circadianScaleLabels.set(kind, element);
-      }
-    });
-    ui.circadianScaleValues.clear();
-    const scaleLuxValue = document.getElementById('circadian-scale-lux-value');
-    if (scaleLuxValue) {
-      ui.circadianScaleValues.set('lux', scaleLuxValue);
-    }
-    const scaleCctValue = document.getElementById('circadian-scale-cct-value');
-    if (scaleCctValue) {
-      ui.circadianScaleValues.set('cct', scaleCctValue);
-    }
-    const luxMarker = document.getElementById('circadian-scale-lux-marker');
-    if (luxMarker) {
-      ui.circadianScaleMarkers.set('lux', luxMarker);
-    }
-    const cctMarker = document.getElementById('circadian-scale-cct-marker');
-    if (cctMarker) {
-      ui.circadianScaleMarkers.set('cct', cctMarker);
-    }
+    ui.circadianScaleLux = document.getElementById('circadian-scale-lux');
+    ui.circadianScaleCct = document.getElementById('circadian-scale-cct');
+    ui.circadianScaleLuxCaption = document.getElementById('circadian-scale-lux-caption');
+    ui.circadianScaleCctCaption = document.getElementById('circadian-scale-cct-caption');
+    ui.circadianScaleLuxValue = document.getElementById('circadian-scale-lux-value');
+    ui.circadianScaleCctValue = document.getElementById('circadian-scale-cct-value');
     ui.circadianModalCloseButtons = Array.from(
       ui.circadianModal?.querySelectorAll('[data-close="true"]') || []
     );
@@ -4093,8 +4068,8 @@ const METRIC_TO_CHART_KEY = {
   }
 
   function updateCircadianModalScales(phase, luxValue, cctValue) {
-    renderCircadianScale('lux', luxValue);
-    renderCircadianScale('cct', cctValue);
+    renderCircadianMetricScale('lux', luxValue, phase);
+    renderCircadianMetricScale('cct', cctValue, phase);
   }
 
   function updateCircadianModalChart(kind, data, targetRange) {
@@ -4182,55 +4157,27 @@ const METRIC_TO_CHART_KEY = {
     return chart;
   }
 
-  function renderCircadianScale(kind, value) {
+  function renderCircadianMetricScale(kind, value, phase) {
+    const isLux = kind === 'lux';
+    const scaleRoot = isLux ? ui.circadianScaleLux : ui.circadianScaleCct;
+    if (!scaleRoot) return;
+    const unit = isLux ? 'lx' : 'K';
     const bands = CIRCADIAN_SCALE_BANDS[kind] || [];
-    const limits = CIRCADIAN_SCALE_LIMITS[kind];
-    const scale = { min: limits.min, max: limits.max, unit: kind === 'lux' ? 'lx' : 'K' };
-    const segmentsEl = ui.circadianScaleSegments.get(kind);
-    const labelsEl = ui.circadianScaleLabels.get(kind);
-    const markerEl = ui.circadianScaleMarkers.get(kind);
-    const currentEl = ui.circadianScaleValues.get(kind);
+    renderMetricScale(scaleRoot, isLux ? 'Lux' : 'Farbtemperatur', value, {
+      bands,
+      unit,
+      decimals: 0
+    });
+
+    const captionEl = isLux ? ui.circadianScaleLuxCaption : ui.circadianScaleCctCaption;
+    const range = isLux ? phase.luxRange : phase.cctRange;
+    if (captionEl && Array.isArray(range)) {
+      captionEl.textContent = `Ziel ${formatRangeLabel(range, unit)}`;
+    }
+
+    const currentEl = isLux ? ui.circadianScaleLuxValue : ui.circadianScaleCctValue;
     if (currentEl) {
-      currentEl.textContent = formatWithUnit(value, scale.unit, 0);
-    }
-    if (segmentsEl) {
-      segmentsEl.textContent = '';
-      bands.forEach((band) => {
-        const start = computeScalePosition(band.min ?? scale.min, scale);
-        const end = computeScalePosition(band.max ?? scale.max, scale);
-        const color = colorWithAlpha(SCALE_TONES[band.tone] || '#0ea5e9', 0.28);
-        const segment = document.createElement('span');
-        segment.className = 'circadian-scale__segment';
-        segment.style.setProperty('--start', `${start}%`);
-        segment.style.setProperty('--end', `${end}%`);
-        segment.style.setProperty('--segment-color', color);
-        segmentsEl.appendChild(segment);
-      });
-    }
-    if (labelsEl) {
-      if (bands.length) {
-        labelsEl.style.setProperty('--segment-template', buildSegmentTemplate(bands, scale));
-        labelsEl.innerHTML = bands
-          .map((band) => {
-            const display = buildBandDisplay(band, scale.unit);
-            return `<span>${band.label}${display ? `<small>${display}</small>` : ''}</span>`;
-          })
-          .join('');
-      } else {
-        labelsEl.style.removeProperty('--segment-template');
-        labelsEl.innerHTML = '';
-      }
-    }
-    if (markerEl) {
-      const percent = computeMarkerPosition(value, scale);
-      markerEl.style.setProperty('--pos', `${percent}%`);
-      const toneStops = bands.map((band) => ({ value: band.max, tone: band.tone }));
-      markerEl.dataset.tone = value == null ? 'neutral' : resolveScaleTone(value, toneStops);
-      const labelEl = markerEl.querySelector('.circadian-scale__marker-label');
-      if (labelEl) {
-        labelEl.textContent = formatWithUnit(value, scale.unit, 0);
-      }
-      clampMarkerToTrack(markerEl, markerEl.parentElement, percent, '--offset');
+      currentEl.textContent = formatWithUnit(value, unit, 0);
     }
   }
 
@@ -5135,15 +5082,11 @@ const METRIC_TO_CHART_KEY = {
       segment.className = `metric-scale__segment metric-scale__segment--tone-${band.tone || 'neutral'}`;
       segment.style.flexGrow = computeBandSpan(band, fallbackWidth);
 
-      const toneEl = document.createElement('div');
-      toneEl.className = 'metric-scale__segment-tone';
-      toneEl.textContent = STATUS_LABELS[band.tone] || STATUS_LABELS.neutral || '';
-
       const labelEl = document.createElement('div');
       labelEl.className = 'metric-scale__segment-label';
-      labelEl.textContent = band.label || toneEl.textContent;
+      labelEl.textContent = band.label || STATUS_LABELS[band.tone] || STATUS_LABELS.neutral || '';
 
-      segment.append(toneEl, labelEl);
+      segment.append(labelEl);
       bar.insertBefore(segment, marker);
     });
 
