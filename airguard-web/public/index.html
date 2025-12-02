@@ -56,113 +56,131 @@
   </svg>
   <div class="app-shell">
     <header class="hero" aria-labelledby="hero-title">
-      <div class="hero-left">
-        <div class="hero-heading">
+      <div class="hero-heading">
+        <div>
           <h1 id="hero-title">AirGuard Innenraum-Qualität</h1>
           <p class="hero-sub">Heute · Überblick deiner Innenraumluft</p>
         </div>
-        <div class="hero-body">
-          <div class="health-card" role="status" aria-live="polite">
-            <div class="health-ring" aria-hidden="true">
-              <svg viewBox="0 0 120 120">
-                <defs>
-                  <linearGradient id="health-gradient" x1="0" y1="1" x2="1" y2="0">
-                    <stop offset="0%" stop-color="#06b6d4" />
-                    <stop offset="100%" stop-color="#10b981" />
-                  </linearGradient>
-                </defs>
-                <circle class="health-bg" cx="60" cy="60" r="54"></circle>
-                <circle class="health-progress" cx="60" cy="60" r="54" stroke-dasharray="339.292" stroke-dashoffset="339.292"></circle>
-              </svg>
-            <div class="health-value">
-              <span id="health-score" class="health-score">—</span>
-              <span id="health-label" class="health-label">Nicht verfügbar</span>
-            </div>
-            </div>
-            <p id="health-detail" class="health-detail">Aktuelle Luftqualität basierend auf CO₂, TVOC, Temperatur und Luftfeuchtigkeit.</p>
+        <p class="hero-update">Letzte Aktualisierung: <time id="last-updated">—</time></p>
+      </div>
+
+      <div class="hero-grid">
+        <div class="health-card" role="status" aria-live="polite">
+          <div class="health-ring" aria-hidden="true">
+            <svg viewBox="0 0 120 120">
+              <defs>
+                <linearGradient id="health-gradient" x1="0" y1="1" x2="1" y2="0">
+                  <stop offset="0%" stop-color="#06b6d4" />
+                  <stop offset="100%" stop-color="#10b981" />
+                </linearGradient>
+              </defs>
+              <circle class="health-bg" cx="60" cy="60" r="54"></circle>
+              <circle class="health-progress" cx="60" cy="60" r="54" stroke-dasharray="339.292" stroke-dashoffset="339.292"></circle>
+            </svg>
+          <div class="health-value">
+            <span id="health-score" class="health-score">—</span>
+            <span id="health-label" class="health-label">Nicht verfügbar</span>
           </div>
-          <div class="hero-actions">
-            <button id="install-btn" type="button" class="ghost-btn" hidden>App installieren</button>
-            <button id="notify-btn" type="button" class="ghost-btn" hidden>Benachrichtigungen aktivieren</button>
-            <span id="pwa-status-badge" class="settings-badge" hidden>Offline-Cache deaktiviert (kein gültiges Zertifikat)</span>
+          </div>
+          <div class="hero-mini-meta">
+            <p id="health-detail" class="health-detail">Aktuelle Luftqualität basierend auf CO₂, TVOC, Temperatur und Luftfeuchtigkeit.</p>
+            <span class="trend-pill" id="hero-score-trend" aria-live="polite">→ Stabil</span>
+          </div>
+        </div>
+
+        <div class="hero-summary-card" aria-labelledby="hero-summary-title">
+          <div class="hero-summary__head">
+            <div>
+              <p class="eyebrow">Überblick</p>
+              <h2 id="hero-summary-title">Luft im Blick</h2>
+            </div>
+            <span class="trend-pill" id="hero-trend" aria-live="polite">→ Stabil</span>
+          </div>
+          <p id="hero-summary-text" class="hero-summary__text">Wird geladen …</p>
+          <ul id="hero-highlights" class="hero-highlights" aria-label="Wichtigste Punkte"></ul>
+          <div class="hero-summary__meta">
+            <span class="summary-label" id="hero-summary-label">—</span>
+            <div class="hero-actions">
+              <button id="install-btn" type="button" class="ghost-btn" hidden>App installieren</button>
+              <button id="notify-btn" type="button" class="ghost-btn" hidden>Benachrichtigungen aktivieren</button>
+              <span id="pwa-status-badge" class="settings-badge" hidden>Offline-Cache deaktiviert (kein gültiges Zertifikat)</span>
+            </div>
           </div>
         </div>
       </div>
-      <div class="hero-right" aria-labelledby="hero-metrics-title">
-        <div class="core-panel">
-          <div class="core-panel__head">
-            <div>
-              <p class="eyebrow">Kernmetriken</p>
-              <h2 id="hero-metrics-title">Luft & Komfort im Blick</h2>
+
+      <div class="core-panel" aria-labelledby="hero-metrics-title">
+        <div class="core-panel__head">
+          <div>
+            <p class="eyebrow">Kernmetriken</p>
+            <h2 id="hero-metrics-title">Luft & Komfort im Blick</h2>
+          </div>
+        </div>
+        <div class="core-panel__metrics">
+          <article class="core-card core-metric-card skeleton" data-metric="CO2">
+            <div class="core-label">
+              <span class="pill-icon" aria-hidden="true"><svg><use href="#icon-cloud" /></svg></span>
+              <div class="core-text">
+                <span class="core-name">CO₂</span>
+                <span class="core-unit">ppm</span>
+              </div>
             </div>
-            <p class="hero-update">Letzte Aktualisierung: <time id="last-updated">—</time></p>
-          </div>
-          <div class="core-panel__metrics">
-            <article class="core-card core-metric-card skeleton" data-metric="CO2">
-              <div class="core-label">
-                <span class="pill-icon" aria-hidden="true"><svg><use href="#icon-cloud" /></svg></span>
-                <div class="core-text">
-                  <span class="core-name">CO₂</span>
-                  <span class="core-unit">ppm</span>
-                </div>
+            <div class="core-value">
+              <span class="core-number">—</span>
+              <span class="core-badge" data-tone="neutral">—</span>
+            </div>
+            <div class="core-spark" aria-hidden="true">
+              <canvas></canvas>
+            </div>
+          </article>
+          <article class="core-card core-metric-card skeleton" data-metric="TVOC">
+            <div class="core-label">
+              <span class="pill-icon" aria-hidden="true"><svg><use href="#icon-flask" /></svg></span>
+              <div class="core-text">
+                <span class="core-name">TVOC</span>
+                <span class="core-unit">ppb</span>
               </div>
-              <div class="core-value">
-                <span class="core-number">—</span>
-                <span class="core-badge" data-tone="neutral">—</span>
+            </div>
+            <div class="core-value">
+              <span class="core-number">—</span>
+              <span class="core-badge" data-tone="neutral">—</span>
+            </div>
+            <div class="core-spark" aria-hidden="true">
+              <canvas></canvas>
+            </div>
+          </article>
+          <article class="core-card core-metric-card skeleton" data-metric="Temperatur">
+            <div class="core-label">
+              <span class="pill-icon" aria-hidden="true"><svg><use href="#icon-thermometer" /></svg></span>
+              <div class="core-text">
+                <span class="core-name">Temperatur</span>
+                <span class="core-unit">°C</span>
               </div>
-              <div class="core-spark" aria-hidden="true">
-                <canvas></canvas>
+            </div>
+            <div class="core-value">
+              <span class="core-number">—</span>
+              <span class="core-badge" data-tone="neutral">—</span>
+            </div>
+            <div class="core-spark" aria-hidden="true">
+              <canvas></canvas>
+            </div>
+          </article>
+          <article class="core-card core-metric-card skeleton" data-metric="rel. Feuchte">
+            <div class="core-label">
+              <span class="pill-icon" aria-hidden="true"><svg><use href="#icon-droplet" /></svg></span>
+              <div class="core-text">
+                <span class="core-name">rel. Feuchte</span>
+                <span class="core-unit">%</span>
               </div>
-            </article>
-            <article class="core-card core-metric-card skeleton" data-metric="TVOC">
-              <div class="core-label">
-                <span class="pill-icon" aria-hidden="true"><svg><use href="#icon-flask" /></svg></span>
-                <div class="core-text">
-                  <span class="core-name">TVOC</span>
-                  <span class="core-unit">ppb</span>
-                </div>
-              </div>
-              <div class="core-value">
-                <span class="core-number">—</span>
-                <span class="core-badge" data-tone="neutral">—</span>
-              </div>
-              <div class="core-spark" aria-hidden="true">
-                <canvas></canvas>
-              </div>
-            </article>
-            <article class="core-card core-metric-card skeleton" data-metric="Temperatur">
-              <div class="core-label">
-                <span class="pill-icon" aria-hidden="true"><svg><use href="#icon-thermometer" /></svg></span>
-                <div class="core-text">
-                  <span class="core-name">Temperatur</span>
-                  <span class="core-unit">°C</span>
-                </div>
-              </div>
-              <div class="core-value">
-                <span class="core-number">—</span>
-                <span class="core-badge" data-tone="neutral">—</span>
-              </div>
-              <div class="core-spark" aria-hidden="true">
-                <canvas></canvas>
-              </div>
-            </article>
-            <article class="core-card core-metric-card skeleton" data-metric="rel. Feuchte">
-              <div class="core-label">
-                <span class="pill-icon" aria-hidden="true"><svg><use href="#icon-droplet" /></svg></span>
-                <div class="core-text">
-                  <span class="core-name">rel. Feuchte</span>
-                  <span class="core-unit">%</span>
-                </div>
-              </div>
-              <div class="core-value">
-                <span class="core-number">—</span>
-                <span class="core-badge" data-tone="neutral">—</span>
-              </div>
-              <div class="core-spark" aria-hidden="true">
-                <canvas></canvas>
-              </div>
-            </article>
-          </div>
+            </div>
+            <div class="core-value">
+              <span class="core-number">—</span>
+              <span class="core-badge" data-tone="neutral">—</span>
+            </div>
+            <div class="core-spark" aria-hidden="true">
+              <canvas></canvas>
+            </div>
+          </article>
         </div>
       </div>
     </header>
@@ -234,108 +252,164 @@
         </div>
         <div class="status-grid">
           <article class="status-card skeleton" data-metric="CO2" data-chart-target="CO2">
-            <header>
-              <span class="metric-icon" aria-hidden="true"><svg><use href="#icon-cloud" /></svg></span>
-              <div class="metric-head">
-                <h3>CO₂</h3>
+            <div class="status-card__top">
+              <div class="metric-label">
+                <span class="metric-icon" aria-hidden="true"><svg><use href="#icon-cloud" /></svg></span>
+                <div class="metric-head">
+                  <h3>CO₂</h3>
+                  <span class="unit">ppm</span>
+                </div>
+              </div>
+              <div class="metric-meta">
+                <span class="trend" aria-live="polite">—</span>
                 <span class="badge" data-tone="neutral">Lädt …</span>
               </div>
-              <span class="trend" aria-live="polite">—</span>
-            </header>
+            </div>
             <p class="status-value"><span class="value">—</span> <span class="unit">ppm</span></p>
-            <p class="status-note">—</p>
-            <p class="status-tip">—</p>
+            <div class="status-notes">
+              <p class="status-note">—</p>
+              <p class="status-tip">—</p>
+            </div>
           </article>
           <article class="status-card skeleton" data-metric="TVOC" data-chart-target="TVOC">
-            <header>
-              <span class="metric-icon" aria-hidden="true"><svg><use href="#icon-flask" /></svg></span>
-              <div class="metric-head">
-                <h3>TVOC</h3>
+            <div class="status-card__top">
+              <div class="metric-label">
+                <span class="metric-icon" aria-hidden="true"><svg><use href="#icon-flask" /></svg></span>
+                <div class="metric-head">
+                  <h3>TVOC</h3>
+                  <span class="unit">ppb</span>
+                </div>
+              </div>
+              <div class="metric-meta">
+                <span class="trend" aria-live="polite">—</span>
                 <span class="badge" data-tone="neutral">Lädt …</span>
               </div>
-              <span class="trend" aria-live="polite">—</span>
-            </header>
+            </div>
             <p class="status-value"><span class="value">—</span> <span class="unit">ppb</span></p>
-            <p class="status-note">—</p>
-            <p class="status-tip">—</p>
+            <div class="status-notes">
+              <p class="status-note">—</p>
+              <p class="status-tip">—</p>
+            </div>
           </article>
           <article class="status-card skeleton" data-metric="PM2.5" data-chart-target="PM">
-            <header>
-              <span class="metric-icon" aria-hidden="true"><svg><use href="#icon-dots" /></svg></span>
-              <div class="metric-head">
-                <h3>PM2.5</h3>
+            <div class="status-card__top">
+              <div class="metric-label">
+                <span class="metric-icon" aria-hidden="true"><svg><use href="#icon-dots" /></svg></span>
+                <div class="metric-head">
+                  <h3>PM2.5</h3>
+                  <span class="unit">µg/m³</span>
+                </div>
+              </div>
+              <div class="metric-meta">
+                <span class="trend" aria-live="polite">—</span>
                 <span class="badge" data-tone="neutral">Lädt …</span>
               </div>
-              <span class="trend" aria-live="polite">—</span>
-            </header>
+            </div>
             <p class="status-value"><span class="value">—</span> <span class="unit">µg/m³</span></p>
-            <p class="status-note">—</p>
-            <p class="status-tip">—</p>
+            <div class="status-notes">
+              <p class="status-note">—</p>
+              <p class="status-tip">—</p>
+            </div>
           </article>
           <article class="status-card skeleton" data-metric="PM1.0" data-chart-target="PM">
-            <header>
-              <span class="metric-icon" aria-hidden="true"><svg><use href="#icon-dots" /></svg></span>
-              <div class="metric-head">
-                <h3>PM1</h3>
+            <div class="status-card__top">
+              <div class="metric-label">
+                <span class="metric-icon" aria-hidden="true"><svg><use href="#icon-dots" /></svg></span>
+                <div class="metric-head">
+                  <h3>PM1</h3>
+                  <span class="unit">µg/m³</span>
+                </div>
+              </div>
+              <div class="metric-meta">
+                <span class="trend" aria-live="polite">—</span>
                 <span class="badge" data-tone="neutral">Lädt …</span>
               </div>
-              <span class="trend" aria-live="polite">—</span>
-            </header>
+            </div>
             <p class="status-value"><span class="value">—</span> <span class="unit">µg/m³</span></p>
-            <p class="status-note">—</p>
-            <p class="status-tip">—</p>
+            <div class="status-notes">
+              <p class="status-note">—</p>
+              <p class="status-tip">—</p>
+            </div>
           </article>
           <article class="status-card skeleton" data-metric="PM10" data-chart-target="PM">
-            <header>
-              <span class="metric-icon" aria-hidden="true"><svg><use href="#icon-dots" /></svg></span>
-              <div class="metric-head">
-                <h3>PM10</h3>
+            <div class="status-card__top">
+              <div class="metric-label">
+                <span class="metric-icon" aria-hidden="true"><svg><use href="#icon-dots" /></svg></span>
+                <div class="metric-head">
+                  <h3>PM10</h3>
+                  <span class="unit">µg/m³</span>
+                </div>
+              </div>
+              <div class="metric-meta">
+                <span class="trend" aria-live="polite">—</span>
                 <span class="badge" data-tone="neutral">Lädt …</span>
               </div>
-              <span class="trend" aria-live="polite">—</span>
-            </header>
+            </div>
             <p class="status-value"><span class="value">—</span> <span class="unit">µg/m³</span></p>
-            <p class="status-note">—</p>
-            <p class="status-tip">—</p>
+            <div class="status-notes">
+              <p class="status-note">—</p>
+              <p class="status-tip">—</p>
+            </div>
           </article>
           <article class="status-card skeleton" data-metric="Temperatur" data-chart-target="Temperatur">
-            <header>
-              <span class="metric-icon" aria-hidden="true"><svg><use href="#icon-thermometer" /></svg></span>
-              <div class="metric-head">
-                <h3>Temperatur</h3>
+            <div class="status-card__top">
+              <div class="metric-label">
+                <span class="metric-icon" aria-hidden="true"><svg><use href="#icon-thermometer" /></svg></span>
+                <div class="metric-head">
+                  <h3>Temperatur</h3>
+                  <span class="unit">°C</span>
+                </div>
+              </div>
+              <div class="metric-meta">
+                <span class="trend" aria-live="polite">—</span>
                 <span class="badge" data-tone="neutral">Lädt …</span>
               </div>
-              <span class="trend" aria-live="polite">—</span>
-            </header>
+            </div>
             <p class="status-value"><span class="value">—</span> <span class="unit">°C</span></p>
-            <p class="status-note">—</p>
-            <p class="status-tip">—</p>
+            <div class="status-notes">
+              <p class="status-note">—</p>
+              <p class="status-tip">—</p>
+            </div>
           </article>
           <article class="status-card skeleton" data-metric="rel. Feuchte" data-chart-target="rel. Feuchte">
-            <header>
-              <span class="metric-icon" aria-hidden="true"><svg><use href="#icon-droplet" /></svg></span>
-              <div class="metric-head">
-                <h3>rel. Feuchte</h3>
+            <div class="status-card__top">
+              <div class="metric-label">
+                <span class="metric-icon" aria-hidden="true"><svg><use href="#icon-droplet" /></svg></span>
+                <div class="metric-head">
+                  <h3>rel. Feuchte</h3>
+                  <span class="unit">%</span>
+                </div>
+              </div>
+              <div class="metric-meta">
+                <span class="trend" aria-live="polite">—</span>
                 <span class="badge" data-tone="neutral">Lädt …</span>
               </div>
-              <span class="trend" aria-live="polite">—</span>
-            </header>
+            </div>
             <p class="status-value"><span class="value">—</span> <span class="unit">%</span></p>
-            <p class="status-note">—</p>
-            <p class="status-tip">—</p>
+            <div class="status-notes">
+              <p class="status-note">—</p>
+              <p class="status-tip">—</p>
+            </div>
           </article>
           <article class="status-card skeleton optional" data-metric="Luftdruck" data-chart-target="Luftdruck">
-            <header>
-              <span class="metric-icon" aria-hidden="true"><svg><use href="#icon-gauge" /></svg></span>
-              <div class="metric-head">
-                <h3>Luftdruck</h3>
+            <div class="status-card__top">
+              <div class="metric-label">
+                <span class="metric-icon" aria-hidden="true"><svg><use href="#icon-gauge" /></svg></span>
+                <div class="metric-head">
+                  <h3>Luftdruck</h3>
+                  <span class="unit">hPa</span>
+                </div>
+              </div>
+              <div class="metric-meta">
+                <span class="trend" aria-live="polite">Trend wird ermittelt …</span>
                 <span class="badge" data-tone="neutral">Trend</span>
               </div>
-              <span class="trend" aria-live="polite">Trend wird ermittelt …</span>
-            </header>
+            </div>
             <p class="status-value"><span class="value">—</span> <span class="unit">hPa</span></p>
+          <div class="status-notes">
           <p class="status-note">—</p>
           <p class="status-tip">—</p>
+          </div>
         </article>
         </div>
       </section>
@@ -346,6 +420,9 @@
           <p>Automatische Auswertungen deiner Raumluft.</p>
         </div>
         <div class="insights-grid" id="insights-grid" data-insights-grid></div>
+        <div class="insights-actions">
+          <button type="button" id="insights-toggle" class="ghost-btn ghost-btn--filled" hidden>Mehr anzeigen</button>
+        </div>
       </section>
 
     </main>
