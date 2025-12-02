@@ -719,7 +719,7 @@ const METRIC_CONFIG = {
       bands: [
         { tone: 'poor', min: 16, max: 18, label: 'Zu kalt', detail: 'Deutlich unter Komfortbereich' },
         { tone: 'elevated', min: 18, max: 20, label: 'Kühl', detail: 'Leicht kühl' },
-        { tone: 'excellent', min: 20, max: 24, label: 'Wohlfühlbereich', detail: 'Komfortzone' },
+        { tone: 'excellent', min: 20, max: 24, label: 'Ideal', detail: 'Komfortzone' },
         { tone: 'elevated', min: 24, max: 30, label: 'Warm', detail: 'Eher warm' }
       ]
     },
@@ -727,7 +727,7 @@ const METRIC_CONFIG = {
       bands: [
         { tone: 'poor', min: 20, max: 30, label: 'Sehr trocken', detail: 'Deutlich unter Komfortbereich' },
         { tone: 'elevated', min: 30, max: 40, label: 'Trocken', detail: 'Unter Komfortbereich' },
-        { tone: 'excellent', min: 40, max: 60, label: 'Wohlfühlbereich', detail: 'Optimal' },
+        { tone: 'excellent', min: 40, max: 60, label: 'Ideal', detail: 'Optimal' },
         { tone: 'elevated', min: 60, max: 80, label: 'Feucht', detail: 'Schimmelrisiko steigt' }
       ]
     }
@@ -1972,7 +1972,7 @@ const METRIC_TO_CHART_KEY = {
   function classifyTemperature(v) {
     if (v < 18) return { status: 'Kühl', color: 'red' };
     if (v < 20) return { status: 'Kühl', color: 'yellow' };
-    if (v <= 24) return { status: 'Wohlfühlbereich', color: 'green' };
+    if (v <= 24) return { status: 'Ideal', color: 'green' };
     if (v <= 26) return { status: 'Warm', color: 'yellow' };
     return { status: 'Heiß', color: 'red' };
   }
@@ -1980,7 +1980,7 @@ const METRIC_TO_CHART_KEY = {
   function classifyHumidity(v) {
     if (v < 35) return { status: 'Trocken', color: 'red' };
     if (v < 40) return { status: 'Trocken', color: 'yellow' };
-    if (v <= 55) return { status: 'Wohlfühlbereich', color: 'green' };
+    if (v <= 55) return { status: 'Ideal', color: 'green' };
     if (v <= 60) return { status: 'Feucht', color: 'blue' };
     if (v <= 70) return { status: 'Feucht', color: 'yellow' };
     return { status: 'Sehr feucht', color: 'red' };
