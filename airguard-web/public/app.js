@@ -4869,7 +4869,7 @@ const METRIC_TO_CHART_KEY = {
   }
 
   function updateModalScale(metric) {
-    if (!ui.modalScale || !ui.modalScaleBar || !ui.modalScaleMarker) return;
+    if (!ui.modalScale || !ui.modalScaleBar) return;
     const normalized = normalizeScaleConfig(metric);
     if (!normalized) {
       ui.modalScale.hidden = true;
@@ -4902,10 +4902,14 @@ const METRIC_TO_CHART_KEY = {
       normalized.segments
     );
 
-    renderMetricScale(ui.modalScaleBar, ui.modalScaleMarker, standardSegments, value, {
+    const markerEl = renderMetricScale(ui.modalScaleBar, ui.modalScaleMarker, standardSegments, value, {
       unit: normalized.unit,
       decimals
     });
+
+    if (markerEl) {
+      ui.modalScaleMarker = markerEl;
+    }
 
     if (ui.modalScaleCaption) {
       ui.modalScaleCaption.textContent = caption;
@@ -5014,22 +5018,32 @@ const METRIC_TO_CHART_KEY = {
   }
 
   function renderMetricScale(bar, marker, segments, value, options = {}) {
-    if (!bar || !marker || !Array.isArray(segments)) return;
+    if (!bar || !Array.isArray(segments)) return null;
     const toneOrder = ['excellent', 'good', 'elevated', 'poor'];
-    const segmentElements = Array.from(bar.querySelectorAll('.metric-scale__segment'));
+    const labelOrder = ['Hervorragend', 'Gut', 'Erhöht', 'Schlecht'];
+    const { marker: markerEl, segments: segmentElements } = ensureMetricScaleStructure(bar, marker);
+    if (!markerEl || !segmentElements.length) return null;
 
     segmentElements.forEach((element, index) => {
       const segment = segments[index] || {};
       const tone = toneOrder[index] || segment.tone || 'neutral';
-      const label = segment.label || ['Hervorragend', 'Gut', 'Erhöht', 'Schlecht'][index] || '';
+      const label = segment.label || labelOrder[index] || '';
       element.textContent = label;
       element.className = `metric-scale__segment metric-scale__segment--${tone}`;
     });
 
     const percent = computeScaleMarkerPercent(value, segments);
-    marker.style.left = `${percent}%`;
-    marker.dataset.tone = determineSegmentTone(segments, value);
-    marker.setAttribute('aria-label', formatWithUnit(value, options.unit, options.decimals ?? 0));
+    const tone = determineSegmentTone(segments, value);
+    markerEl.hidden = !Number.isFinite(value);
+    markerEl.style.left = `${percent}%`;
+    markerEl.dataset.tone = tone;
+    if (Number.isFinite(value)) {
+      markerEl.setAttribute('aria-label', formatWithUnit(value, options.unit, options.decimals ?? 0));
+    } else {
+      markerEl.removeAttribute('aria-label');
+    }
+
+    return markerEl;
   }
 
   function computeScaleMarkerPercent(value, segments) {
@@ -5059,7 +5073,36 @@ const METRIC_TO_CHART_KEY = {
     const segmentSpan = Math.max(to - from, 0.0001);
     const offset = clamp((clampedValue - from) / segmentSpan, 0, 1);
 
-    return resolvedIndex * segmentWidth + offset * segmentWidth;
+    const percent = resolvedIndex * segmentWidth + offset * segmentWidth;
+    return clamp(percent, 2, 98);
+  }
+
+  function ensureMetricScaleStructure(bar, marker) {
+    const toneOrder = ['excellent', 'good', 'elevated', 'poor'];
+    const labelOrder = ['Hervorragend', 'Gut', 'Erhöht', 'Schlecht'];
+    const segments = Array.from(bar.querySelectorAll('.metric-scale__segment'));
+    let markerEl = marker || bar.querySelector('.metric-scale__marker');
+
+    if (segments.length !== 4) {
+      bar.innerHTML = '';
+      for (let index = 0; index < 4; index += 1) {
+        const segment = document.createElement('div');
+        segment.className = `metric-scale__segment metric-scale__segment--${toneOrder[index]}`;
+        segment.textContent = labelOrder[index];
+        bar.appendChild(segment);
+      }
+    }
+
+    const resolvedSegments = Array.from(bar.querySelectorAll('.metric-scale__segment'));
+    markerEl = markerEl || document.createElement('div');
+    markerEl.className = 'metric-scale__marker';
+    markerEl.setAttribute('aria-hidden', 'true');
+
+    if (!bar.contains(markerEl)) {
+      bar.appendChild(markerEl);
+    }
+
+    return { marker: markerEl, segments: resolvedSegments.slice(0, 4) };
   }
 
   function determineSegmentTone(segments, value) {
