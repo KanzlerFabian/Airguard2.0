@@ -417,37 +417,46 @@
       </header>
       <div class="modal-body circadian-modal__body">
         <div class="circadian-modal__charts">
-          <article class="circadian-modal__chart" data-kind="lux">
-            <header>
-              <h4>Lux</h4>
-              <span id="circadian-modal-lux-value" class="circadian-modal__value">—</span>
-            </header>
-            <canvas id="circadian-modal-lux-canvas" aria-label="Lux Verlauf (24 h)"></canvas>
-          </article>
-          <article class="circadian-modal__chart" data-kind="cct">
-            <header>
-              <h4>CCT</h4>
-              <span id="circadian-modal-cct-value" class="circadian-modal__value">—</span>
-            </header>
-            <canvas id="circadian-modal-cct-canvas" aria-label="CCT Verlauf (24 h)"></canvas>
-          </article>
+          <div class="circadian-charts-grid">
+            <article class="circadian-modal__chart" data-kind="lux">
+              <header>
+                <h4>Lux</h4>
+                <span id="circadian-modal-lux-value" class="circadian-modal__value">—</span>
+              </header>
+              <canvas id="circadian-modal-lux-canvas" aria-label="Lux Verlauf (24 h)"></canvas>
+            </article>
+            <article class="circadian-modal__chart" data-kind="cct">
+              <header>
+                <h4>CCT</h4>
+                <span id="circadian-modal-cct-value" class="circadian-modal__value">—</span>
+              </header>
+              <canvas id="circadian-modal-cct-canvas" aria-label="CCT Verlauf (24 h)"></canvas>
+            </article>
+          </div>
         </div>
         <div class="circadian-modal__info">
           <section>
             <h4>Bedeutung</h4>
-            <p>Lichtstärke (Lux) und Farbtemperatur (CCT) steuern Wachheit und Entspannung – wichtig für deinen Tagesrhythmus.</p>
+            <p>Lichtstärke (Lux) und Farbtemperatur (K) beeinflussen, wie wach oder entspannt du dich im Raum fühlst. Helles, eher kühles Licht aktiviert und unterstützt Fokus; warmes, gedimmtes Licht hilft beim Runterfahren und bei der Vorbereitung auf den Abend.</p>
+            <p>Für ein Wohnzimmer ist tagsüber neutrales bis leicht kühles Licht sinnvoll, abends dagegen eher warmes, deutlich gedimmtes Licht.</p>
           </section>
           <section>
             <h4>Empfehlung (nach Tageszeit)</h4>
             <ul>
-              <li>Morgen (07–11 Uhr): 500–1 000 lx, 5 000–6 000 K</li>
-              <li>Tag (11–17 Uhr): 500–1 000 lx, 4 000–5 000 K</li>
-              <li>Abend (17–22 Uhr): 50–300 lx, 2 700–3 500 K</li>
+              <li><strong>Morgen (07–11 Uhr):</strong> 500–1 000 lx, 5 000–6 500 K<br>Zum Wachwerden und für einen konzentrierten Start in den Tag.</li>
+              <li><strong>Tag (11–17 Uhr):</strong> 500–1 000 lx, 4 000–5 500 K<br>Für Arbeiten, Haushalt und Alltag im Wohn- und Esszimmer.</li>
+              <li><strong>Abend (17–22 Uhr):</strong> 50–300 lx, 2 700–3 500 K<br>Zum Runterfahren, Essen, Fernsehen und entspannten Feierabend.</li>
+              <li><strong>Später Abend (22–24 Uhr):</strong> &lt; 100 lx, 2 400–3 000 K<br>Sehr ruhige, warme Beleuchtung, um müde zu werden.</li>
             </ul>
           </section>
           <section>
             <h4>Verbessern</h4>
-            <p>Tagsüber hell und neutral/kühl beleuchten; abends Licht dimmen und wärmer wählen. Mischlicht vermeiden; blendfrei ausrichten.</p>
+            <ul>
+              <li>Tagsüber: Deckenleuchte und ggf. Arbeitslampe nutzen, Licht neutral bis leicht kühl einstellen. Blendung vermeiden (Licht nicht direkt in Augen oder auf Bildschirm).</li>
+              <li>Abends: Indirekte Lichtquellen (Stehlampe, LED-Strips) nutzen, warmweiße Leuchtmittel wählen und Helligkeit deutlich reduzieren.</li>
+              <li>Beim Fernsehen: Leichtes Hintergrundlicht statt komplett dunklem Raum oder einzig hellem Bildschirm – angenehmer und weniger anstrengend.</li>
+              <li>Spät abends: Wenn möglich nur noch warmes, sehr gedimmtes Licht nutzen.</li>
+            </ul>
           </section>
         </div>
         <div class="circadian-modal__scales">

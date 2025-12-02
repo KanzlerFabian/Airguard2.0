@@ -477,13 +477,13 @@
 
   const CIRCADIAN_SCALE_BANDS = {
     lux: [
-      { label: 'Dunkel', min: 0, max: 100, tone: 'poor', display: `< 100${NARROW_SPACE}lx` },
-      { label: 'OK', min: 100, max: 500, tone: 'good', display: `100–500${NARROW_SPACE}lx` },
-      { label: 'Ziel', min: 500, max: 1000, tone: 'excellent', display: `500–1 000${NARROW_SPACE}lx` },
+      { label: 'Zu dunkel', min: 0, max: 100, tone: 'poor', display: `< 100${NARROW_SPACE}lx` },
+      { label: 'Gemütlich', min: 100, max: 500, tone: 'good', display: `100–500${NARROW_SPACE}lx` },
+      { label: 'Tageslicht', min: 500, max: 1000, tone: 'excellent', display: `500–1 000${NARROW_SPACE}lx` },
       { label: 'Sehr hell', min: 1500, max: 2000, tone: 'poor', display: `> 1 500${NARROW_SPACE}lx` }
     ],
     cct: [
-      { label: 'Abend', min: 2200, max: 3200, tone: 'elevated', display: `2 200–3 200${NARROW_SPACE}K` },
+      { label: 'Abendwarm', min: 2200, max: 3200, tone: 'elevated', display: `2 200–3 200${NARROW_SPACE}K` },
       { label: 'Neutral', min: 3800, max: 5200, tone: 'good', display: `3 800–5 200${NARROW_SPACE}K` },
       { label: 'Aktiv', min: 5200, max: 6000, tone: 'excellent', display: `5 200–6 000${NARROW_SPACE}K` },
       { label: 'Sehr kühl', min: 6000, max: 6500, tone: 'poor', display: `6 000–6 500${NARROW_SPACE}K` }
@@ -4172,7 +4172,7 @@ const METRIC_TO_CHART_KEY = {
     const captionEl = isLux ? ui.circadianScaleLuxCaption : ui.circadianScaleCctCaption;
     const range = isLux ? phase.luxRange : phase.cctRange;
     if (captionEl && Array.isArray(range)) {
-      captionEl.textContent = `Ziel ${formatRangeLabel(range, unit)}`;
+      captionEl.textContent = `Zielbereich für aktuellen Zeitraum: ${formatRangeLabel(range, unit)}`;
     }
 
     const currentEl = isLux ? ui.circadianScaleLuxValue : ui.circadianScaleCctValue;
