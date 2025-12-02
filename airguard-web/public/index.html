@@ -96,10 +96,7 @@
               <p class="eyebrow">Überblick</p>
               <h2 id="hero-summary-title">Luft im Blick</h2>
             </div>
-            <div class="hero-summary__actions">
-              <span class="trend-pill" id="hero-trend" aria-live="polite">→ Stabil</span>
-              <button id="insight-trigger" type="button" class="ghost-btn ghost-btn--filled">Insight</button>
-            </div>
+            <span class="trend-pill" id="hero-trend" aria-live="polite">→ Stabil</span>
           </div>
           <p id="hero-summary-text" class="hero-summary__text">Wird geladen …</p>
           <ul id="hero-highlights" class="hero-highlights" aria-label="Wichtigste Punkte"></ul>
@@ -113,90 +110,82 @@
           </div>
         </section>
 
-        <article class="hero-card core-card core-metric-card core-card--compact skeleton" data-metric="CO2">
-          <div class="core-label">
-            <span class="pill-icon" aria-hidden="true"><svg><use href="#icon-cloud" /></svg></span>
-            <div class="core-text">
-              <span class="core-name">CO₂</span>
-              <span class="core-unit">ppm</span>
+        <section class="hero-card hero-key-card" aria-labelledby="hero-metrics-title">
+          <div class="hero-card__header">
+            <div>
+              <p class="eyebrow">Kernmetriken</p>
+              <h2 id="hero-metrics-title">Luft & Komfort im Blick</h2>
             </div>
           </div>
-          <div class="core-value">
-            <span class="core-number">—</span>
-            <span class="core-badge" data-tone="neutral">—</span>
+          <div class="hero-key-metrics">
+            <article class="core-card core-metric-card core-card--compact skeleton" data-metric="CO2">
+              <div class="core-label">
+                <span class="pill-icon" aria-hidden="true"><svg><use href="#icon-cloud" /></svg></span>
+                <div class="core-text">
+                  <span class="core-name">CO₂</span>
+                  <span class="core-unit">ppm</span>
+                </div>
+              </div>
+              <div class="core-value">
+                <span class="core-number">—</span>
+                <span class="core-badge" data-tone="neutral">—</span>
+              </div>
+              <div class="core-spark" aria-hidden="true">
+                <canvas></canvas>
+              </div>
+            </article>
+            <article class="core-card core-metric-card core-card--compact skeleton" data-metric="TVOC">
+              <div class="core-label">
+                <span class="pill-icon" aria-hidden="true"><svg><use href="#icon-flask" /></svg></span>
+                <div class="core-text">
+                  <span class="core-name">TVOC</span>
+                  <span class="core-unit">ppb</span>
+                </div>
+              </div>
+              <div class="core-value">
+                <span class="core-number">—</span>
+                <span class="core-badge" data-tone="neutral">—</span>
+              </div>
+              <div class="core-spark" aria-hidden="true">
+                <canvas></canvas>
+              </div>
+            </article>
+            <article class="core-card core-metric-card core-card--compact skeleton" data-metric="Temperatur">
+              <div class="core-label">
+                <span class="pill-icon" aria-hidden="true"><svg><use href="#icon-thermometer" /></svg></span>
+                <div class="core-text">
+                  <span class="core-name">Temperatur</span>
+                  <span class="core-unit">°C</span>
+                </div>
+              </div>
+              <div class="core-value">
+                <span class="core-number">—</span>
+                <span class="core-badge" data-tone="neutral">—</span>
+              </div>
+              <div class="core-spark" aria-hidden="true">
+                <canvas></canvas>
+              </div>
+            </article>
+            <article class="core-card core-metric-card core-card--compact skeleton" data-metric="rel. Feuchte">
+              <div class="core-label">
+                <span class="pill-icon" aria-hidden="true"><svg><use href="#icon-droplet" /></svg></span>
+                <div class="core-text">
+                  <span class="core-name">rel. Feuchte</span>
+                  <span class="core-unit">%</span>
+                </div>
+              </div>
+              <div class="core-value">
+                <span class="core-number">—</span>
+                <span class="core-badge" data-tone="neutral">—</span>
+              </div>
+              <div class="core-spark" aria-hidden="true">
+                <canvas></canvas>
+              </div>
+            </article>
           </div>
-          <div class="core-spark" aria-hidden="true">
-            <canvas></canvas>
-          </div>
-        </article>
-
-        <article class="hero-card core-card core-metric-card core-card--compact skeleton" data-metric="TVOC">
-          <div class="core-label">
-            <span class="pill-icon" aria-hidden="true"><svg><use href="#icon-flask" /></svg></span>
-            <div class="core-text">
-              <span class="core-name">TVOC</span>
-              <span class="core-unit">ppb</span>
-            </div>
-          </div>
-          <div class="core-value">
-            <span class="core-number">—</span>
-            <span class="core-badge" data-tone="neutral">—</span>
-          </div>
-          <div class="core-spark" aria-hidden="true">
-            <canvas></canvas>
-          </div>
-        </article>
-
-        <article class="hero-card core-card core-metric-card core-card--compact skeleton" data-metric="Temperatur">
-          <div class="core-label">
-            <span class="pill-icon" aria-hidden="true"><svg><use href="#icon-thermometer" /></svg></span>
-            <div class="core-text">
-              <span class="core-name">Temperatur</span>
-              <span class="core-unit">°C</span>
-            </div>
-          </div>
-          <div class="core-value">
-            <span class="core-number">—</span>
-            <span class="core-badge" data-tone="neutral">—</span>
-          </div>
-          <div class="core-spark" aria-hidden="true">
-            <canvas></canvas>
-          </div>
-        </article>
-
-        <article class="hero-card core-card core-metric-card core-card--compact skeleton" data-metric="rel. Feuchte">
-          <div class="core-label">
-            <span class="pill-icon" aria-hidden="true"><svg><use href="#icon-droplet" /></svg></span>
-            <div class="core-text">
-              <span class="core-name">rel. Feuchte</span>
-              <span class="core-unit">%</span>
-            </div>
-          </div>
-          <div class="core-value">
-            <span class="core-number">—</span>
-            <span class="core-badge" data-tone="neutral">—</span>
-          </div>
-          <div class="core-spark" aria-hidden="true">
-            <canvas></canvas>
-          </div>
-        </article>
+        </section>
       </div>
     </header>
-
-    <div id="insight-modal" class="insight-modal" role="dialog" aria-modal="true" aria-labelledby="insight-modal-title" hidden>
-      <div class="insight-modal__backdrop" data-close-insight="true"></div>
-      <div class="insight-modal__dialog" role="document">
-        <header class="insight-modal__header">
-          <div>
-            <p class="eyebrow">Insight</p>
-            <h2 id="insight-modal-title">Empfehlung</h2>
-          </div>
-          <button type="button" class="ghost-btn" data-close-insight="true">Schließen</button>
-        </header>
-        <p id="insight-modal-body" class="insight-modal__body">Wird geladen …</p>
-        <ul id="insight-modal-highlights" class="insight-modal__list" aria-label="Insight Highlights"></ul>
-      </div>
-    </div>
 
     <main class="main-content">
       <section class="circadian-section" aria-labelledby="circadian-heading">

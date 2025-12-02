@@ -1141,10 +1141,6 @@ const METRIC_TO_CHART_KEY = {
     heroTrend: null,
     heroSummaryLabel: null,
     heroScoreTrend: null,
-    insightTrigger: null,
-    insightModal: null,
-    insightModalBody: null,
-    insightModalHighlights: null,
     healthProgress: null,
     offlineIndicator: null,
     circadianCard: null,
@@ -1237,10 +1233,6 @@ const METRIC_TO_CHART_KEY = {
     ui.heroTrend = document.getElementById('hero-trend');
     ui.heroSummaryLabel = document.getElementById('hero-summary-label');
     ui.heroScoreTrend = document.getElementById('hero-score-trend');
-    ui.insightTrigger = document.getElementById('insight-trigger');
-    ui.insightModal = document.getElementById('insight-modal');
-    ui.insightModalBody = document.getElementById('insight-modal-body');
-    ui.insightModalHighlights = document.getElementById('insight-modal-highlights');
     ui.healthProgress = document.querySelector('.health-progress');
     ui.offlineIndicator = document.getElementById('offline-indicator');
     ui.circadianCard = document.querySelector('.circadian-card');
@@ -1281,23 +1273,6 @@ const METRIC_TO_CHART_KEY = {
       ui.insightsToggle.addEventListener('click', () => {
         INSIGHT_STATE.expanded = !INSIGHT_STATE.expanded;
         renderInsights();
-      });
-    }
-
-    if (ui.insightTrigger) {
-      ui.insightTrigger.addEventListener('click', openInsightModal);
-    }
-
-    const insightCloseButtons = document.querySelectorAll('[data-close-insight="true"]');
-    insightCloseButtons.forEach((button) => {
-      button.addEventListener('click', closeInsightModal);
-    });
-
-    if (ui.insightModal) {
-      ui.insightModal.addEventListener('click', (event) => {
-        if (event.target?.dataset?.closeInsight === 'true') {
-          closeInsightModal();
-        }
       });
     }
 
@@ -4150,48 +4125,6 @@ const METRIC_TO_CHART_KEY = {
     }
   }
 
-  function openInsightModal() {
-    if (!ui.insightModal) return;
-    const summaryText = ui.heroSummaryText?.textContent?.trim();
-    const hasSummary = summaryText && summaryText !== 'Wird geladen …';
-    if (ui.insightModalBody) {
-      ui.insightModalBody.textContent = hasSummary ? summaryText : 'Keine Insights verfügbar.';
-    }
-
-    if (ui.insightModalHighlights) {
-      ui.insightModalHighlights.innerHTML = '';
-      const highlights = ui.heroHighlights?.querySelectorAll('li') || [];
-      if (highlights.length === 0) {
-        const fallback = document.createElement('li');
-        fallback.textContent = 'Keine Highlights vorhanden.';
-        ui.insightModalHighlights.append(fallback);
-      } else {
-        highlights.forEach((item) => {
-          const clone = item.cloneNode(true);
-          clone.classList.remove('skeleton');
-          ui.insightModalHighlights.append(clone);
-        });
-      }
-    }
-
-    if (!state.bodyScrollLock) {
-      lockBodyScroll();
-    }
-    ui.insightModal.hidden = false;
-    requestAnimationFrame(() => {
-      ui.insightModal?.classList.add('open');
-    });
-  }
-
-  function closeInsightModal() {
-    if (!ui.insightModal || ui.insightModal.hidden) return;
-    ui.insightModal.classList.remove('open');
-    ui.insightModal.hidden = true;
-    if ((!ui.modalRoot || ui.modalRoot.hidden) && (!ui.circadianModal || ui.circadianModal.hidden)) {
-      unlockBodyScroll();
-    }
-  }
-
   async function refreshCircadianModal(forceCharts = false) {
     if (!ui.circadianModal) return;
     const phase = resolveCircadianPhase();
@@ -5707,7 +5640,6 @@ const METRIC_TO_CHART_KEY = {
     if (event.key === 'Escape') {
       closeChartModal();
       closeCircadianModal();
-      closeInsightModal();
     }
   }
 
