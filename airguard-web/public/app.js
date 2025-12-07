@@ -2676,6 +2676,122 @@ const METRIC_TO_CHART_KEY = {
     };
   }
 
+  function computeOptimalHours(metric, points) {
+    if (!Array.isArray(points) || points.length < 2) return 0;
+    let insideMs = 0;
+    let lastTs = points[0].ts;
+    for (let i = 1; i < points.length; i += 1) {
+      const current = points[i];
+      const prev = points[i - 1];
+      if (!current || !prev) continue;
+      const tone = classifyValueWithScale(metric, prev.value)?.tone;
+      if (tone === 'excellent' || tone === 'good') {
+        insideMs += Math.max(0, current.ts - lastTs);
+      }
+      lastTs = current.ts;
+    }
+    return Math.max(0, insideMs / 3600000);
+  }
+
+  function computeCo2ExposureScore(points) {
+    if (!Array.isArray(points) || points.length === 0) return null;
+    const weighted = points
+      .map((point) => {
+        if (!point) return null;
+        const value = clamp(point.value, 400, 2000);
+        const penalty = Math.pow((value - 400) / 1600, 1.35);
+        return 100 - penalty * 100;
+      })
+      .filter((value) => Number.isFinite(value));
+    if (!weighted.length) return null;
+    const avg = weighted.reduce((sum, value) => sum + value, 0) / weighted.length;
+    return clamp(Math.round(avg), 0, 100);
+  }
+
+  function computePeakLoad(points, threshold = 1400) {
+    if (!Array.isArray(points) || points.length < 2) return { count: 0, totalMinutes: 0 };
+    let active = false;
+    let startTs = 0;
+    let count = 0;
+    let totalMs = 0;
+    for (let i = 0; i < points.length; i += 1) {
+      const point = points[i];
+      if (!point) continue;
+      const above = point.value >= threshold;
+      if (above && !active) {
+        active = true;
+        startTs = point.ts;
+        count += 1;
+      }
+      if ((!above || i === points.length - 1) && active) {
+        const endTs = point.ts;
+        totalMs += Math.max(0, endTs - startTs);
+        active = false;
+      }
+    }
+    return { count, totalMinutes: Math.round(totalMs / 60000) };
+  }
+
+  function computeBreathFootprint(points) {
+    if (!Array.isArray(points) || points.length < 3) return null;
+    const slopes = [];
+    for (let i = 1; i < points.length; i += 1) {
+      const prev = points[i - 1];
+      const curr = points[i];
+      if (!prev || !curr) continue;
+      const dtMin = Math.max(0.01, (curr.ts - prev.ts) / 60000);
+      const rise = curr.value - prev.value;
+      const slope = rise / dtMin;
+      if (slope > 10) {
+        slopes.push(slope);
+      }
+    }
+    if (!slopes.length) return null;
+    const median = slopes.sort((a, b) => a - b)[Math.floor(slopes.length / 2)];
+    return { ppmPerMinute: Math.round(median), label: median > 35 ? 'hohe Belegung' : 'moderate Belegung' };
+  }
+
+  function computeVentEffectiveness(points) {
+    if (!Array.isArray(points) || points.length < 4) return null;
+    let bestDrop = 0;
+    for (let i = 1; i < points.length; i += 1) {
+      const prev = points[i - 1];
+      const curr = points[i];
+      if (!prev || !curr) continue;
+      const dtMin = Math.max(0.01, (curr.ts - prev.ts) / 60000);
+      const slope = (curr.value - prev.value) / dtMin;
+      if (slope < bestDrop) {
+        bestDrop = slope;
+      }
+    }
+    if (bestDrop === 0) return null;
+    return { ppmPerMinute: Math.abs(Math.round(bestDrop)), label: bestDrop < -80 ? 'sehr effektiv' : bestDrop < -40 ? 'effektiv' : 'verhalten' };
+  }
+
+  function computeTvocSources(points) {
+    if (!Array.isArray(points) || points.length < 3) return null;
+    let rapidPeaks = 0;
+    let lingering = 0;
+    for (let i = 1; i < points.length; i += 1) {
+      const prev = points[i - 1];
+      const curr = points[i];
+      if (!prev || !curr) continue;
+      const dtMin = Math.max(0.01, (curr.ts - prev.ts) / 60000);
+      const delta = curr.value - prev.value;
+      if (delta > 120 && dtMin <= 15) {
+        rapidPeaks += 1;
+      }
+      if (delta < -30 && dtMin >= 5) {
+        lingering += 1;
+      }
+    }
+    return {
+      rapidPeaks,
+      lingering,
+      suggestion: rapidPeaks >= 2 ? 'wahrscheinlich Reinigungsmittel / Küche – Quelle prüfen' : 'langsamer Abbau, Quelle wohl inaktiv'
+    };
+  }
+
   function summarizeWeekly(metric, points) {
     if (!Array.isArray(points) || points.length === 0) return null;
     const stats = buildSeriesStats(points);
@@ -2720,6 +2836,12 @@ const METRIC_TO_CHART_KEY = {
       let shortTermTrend = null;
       let volatility = null;
       let elevationType = 'normal';
+      let optimalHours = 0;
+      let exposureScore = null;
+      let peakLoad = null;
+      let breathFootprint = null;
+      let ventEffectiveness = null;
+      let tvocSources = null;
       try {
         const series24 = await getSeriesForMetric(metric, '24h');
         if (Array.isArray(series24) && series24.length) {
@@ -2732,6 +2854,16 @@ const METRIC_TO_CHART_KEY = {
           shortTermTrend = computeShortTermTrend(metric, series24);
           volatility = computeVolatility(metric, series24);
           elevationType = determineElevationType(metric, series24, nowClassification.tone);
+          optimalHours = computeOptimalHours(metric, series24);
+          if (metric === 'CO2') {
+            exposureScore = computeCo2ExposureScore(series24);
+            peakLoad = computePeakLoad(series24);
+            breathFootprint = computeBreathFootprint(series24);
+            ventEffectiveness = computeVentEffectiveness(series24);
+          }
+          if (metric === 'TVOC') {
+            tvocSources = computeTvocSources(series24);
+          }
         }
       } catch (error) {
         console.warn('24h Statistik fehlgeschlagen', metric, error);
@@ -2771,7 +2903,13 @@ const METRIC_TO_CHART_KEY = {
         stats30d,
         shortTermTrend,
         volatility,
-        elevationType
+        elevationType,
+        optimalHours,
+        exposureScore,
+        peakLoad,
+        breathFootprint,
+        ventEffectiveness,
+        tvocSources
       };
       metricContexts.push(entry);
     }
@@ -3534,11 +3672,11 @@ const METRIC_TO_CHART_KEY = {
         tags: ['lüften', 'co2', 'feuchte']
       })
     },
-    {
-      id: 'combined_pm_tvoc',
-      metric: null,
-      severity: 'warning',
-      group: 'combined',
+      {
+        id: 'combined_pm_tvoc',
+        metric: null,
+        severity: 'warning',
+        group: 'combined',
       when: (context) => {
         const pm = getMetricContext(context, 'PM2.5');
         const voc = getMetricContext(context, 'TVOC');
@@ -3557,6 +3695,273 @@ const METRIC_TO_CHART_KEY = {
         summary: 'Feinstaub und TVOC sind gleichzeitig erhöht – Quellen im Raum sind wahrscheinlich.',
         recommendation: 'Kochen, Kerzen oder Rauch reduzieren und gründlich lüften.',
         tags: ['pm', 'tvoc', 'lüften']
+      })
+    },
+    {
+      id: 'co2_evening_load',
+      metric: 'CO2',
+      severity: 'warning',
+      group: 'pattern',
+      when: (context) => {
+        const pattern = context.patterns?.CO2;
+        if (!pattern?.windows?.evening || !pattern?.windows?.midday) return false;
+        const evening = pattern.windows.evening;
+        const midday = pattern.windows.midday;
+        return (
+          Number.isFinite(evening.avg) &&
+          Number.isFinite(midday.avg) &&
+          evening.avg > midday.avg * 1.1 &&
+          evening.outsideShare > 0.35
+        );
+      },
+      build: () => ({
+        id: 'co2_evening_load',
+        metric: 'CO2',
+        severity: 'warning',
+        tone: 'elevated',
+        title: 'Abendliche CO₂-Last',
+        summary: 'CO₂ steigt regelmäßig zwischen 19–23 Uhr – wahrscheinlich Essenszeit oder viele Personen im Raum.',
+        recommendation: 'Lüften direkt vor und nach dem Abendessen einplanen und Raumbelegung entzerren.',
+        tags: ['co2', 'abend']
+      })
+    },
+    {
+      id: 'co2_exposure_score',
+      metric: 'CO2',
+      severity: 'info',
+      group: 'profile',
+      when: (context) => {
+        const co2 = getMetricContext(context, 'CO2');
+        return Number.isFinite(co2?.exposureScore);
+      },
+      build: (context) => {
+        const co2 = getMetricContext(context, 'CO2');
+        return {
+          id: 'co2_exposure_score',
+          metric: 'CO2',
+          severity: 'info',
+          tone: co2.exposureScore >= 80 ? 'excellent' : co2.exposureScore >= 60 ? 'good' : 'elevated',
+          title: 'CO₂-Exposure Score',
+          summary: `Gewichtete Belastung (24 h): ${co2.exposureScore}/100.`,
+          recommendation: co2.exposureScore >= 70
+            ? 'Belastung ist niedrig – aktuelle Lüftungsgewohnheiten beibehalten.'
+            : 'Mehr Stoßlüften einplanen oder Querlüften, um die Belastung zu senken.',
+          tags: ['co2', 'score']
+        };
+      }
+    },
+    {
+      id: 'co2_peak_analysis',
+      metric: 'CO2',
+      severity: 'info',
+      group: 'pattern',
+      when: (context) => {
+        const co2 = getMetricContext(context, 'CO2');
+        return co2?.peakLoad?.count >= 1;
+      },
+      build: (context) => {
+        const co2 = getMetricContext(context, 'CO2');
+        return {
+          id: 'co2_peak_analysis',
+          metric: 'CO2',
+          severity: 'info',
+          tone: 'elevated',
+          title: 'Spitzenlast-Analyse',
+          summary: `${co2.peakLoad.count} Spitzen über 1400 ppm, gesamt ca. ${co2.peakLoad.totalMinutes} Minuten.`,
+          recommendation: 'Lüftung frühzeitig starten, bevor 1400 ppm überschritten werden.',
+          tags: ['co2', 'spitzen']
+        };
+      }
+    },
+    {
+      id: 'co2_breath_footprint',
+      metric: 'CO2',
+      severity: 'info',
+      group: 'profile',
+      when: (context) => {
+        const co2 = getMetricContext(context, 'CO2');
+        return Number.isFinite(co2?.breathFootprint?.ppmPerMinute);
+      },
+      build: (context) => {
+        const co2 = getMetricContext(context, 'CO2');
+        const footprint = co2?.breathFootprint;
+        return {
+          id: 'co2_breath_footprint',
+          metric: 'CO2',
+          severity: 'info',
+          tone: footprint.ppmPerMinute > 40 ? 'elevated' : 'good',
+          title: 'Atem-Footprint',
+          summary: `CO₂-Anstieg ~${footprint.ppmPerMinute} ppm/min → ${footprint.label}.`,
+          recommendation: 'Raum war stark belegt oder schlecht belüftet – Frischluft verbessern.',
+          tags: ['co2', 'belegung']
+        };
+      }
+    },
+    {
+      id: 'co2_vent_effectiveness',
+      metric: 'CO2',
+      severity: 'info',
+      group: 'pattern',
+      when: (context) => {
+        const co2 = getMetricContext(context, 'CO2');
+        return Number.isFinite(co2?.ventEffectiveness?.ppmPerMinute);
+      },
+      build: (context) => {
+        const co2 = getMetricContext(context, 'CO2');
+        const vent = co2?.ventEffectiveness;
+        return {
+          id: 'co2_vent_effectiveness',
+          metric: 'CO2',
+          severity: 'info',
+          tone: vent.ppmPerMinute >= 80 ? 'excellent' : vent.ppmPerMinute >= 40 ? 'good' : 'elevated',
+          title: 'Lüftungs-Effektivität',
+          summary: `Nach Lüften fiel CO₂ mit ca. ${vent.ppmPerMinute} ppm/min → ${vent.label}.`,
+          recommendation: vent.ppmPerMinute < 40
+            ? 'Fenster weiter öffnen oder Querlüften, um den Abfall zu beschleunigen.'
+            : 'Lüftungsroutine beibehalten – Abbau ist stark genug.',
+          tags: ['co2', 'lüften']
+        };
+      }
+    },
+    {
+      id: 'optimal_hours_summary',
+      metric: 'CO2',
+      severity: 'info',
+      group: 'profile',
+      when: (context) => {
+        const metrics = ['CO2', 'TVOC', 'Temperatur', 'rel. Feuchte'];
+        return metrics.some((metric) => getMetricContext(context, metric)?.optimalHours > 0.5);
+      },
+      build: (context) => {
+        const metrics = ['CO2', 'TVOC', 'Temperatur', 'rel. Feuchte'];
+        const parts = metrics
+          .map((metric) => {
+            const entry = getMetricContext(context, metric);
+            if (!entry?.optimalHours) return null;
+            return `${metricLabel(metric)} ${entry.optimalHours.toFixed(1)} h`;
+          })
+          .filter(Boolean);
+        return {
+          id: 'optimal_hours_summary',
+          metric: 'CO2',
+          severity: 'info',
+          tone: 'good',
+          title: 'Zeit im optimalen Bereich',
+          summary: parts.join(' · '),
+          recommendation: 'Ziel: jeweils ≥ 16 h/Tag im Komfortbereich halten.',
+          tags: ['komfort', 'zeit']
+        };
+      }
+    },
+    {
+      id: 'tvoc_source_score',
+      metric: 'TVOC',
+      severity: 'info',
+      group: 'tvoc',
+      when: (context) => {
+        const tvoc = getMetricContext(context, 'TVOC');
+        return tvoc?.tvocSources != null;
+      },
+      build: (context) => {
+        const tvoc = getMetricContext(context, 'TVOC');
+        const sources = tvoc?.tvocSources;
+        return {
+          id: 'tvoc_source_score',
+          metric: 'TVOC',
+          severity: 'info',
+          tone: sources.rapidPeaks >= 2 ? 'elevated' : 'good',
+          title: 'TVOC-Quellen-Score',
+          summary: `${sources.rapidPeaks} schnelle Peaks, ${sources.lingering} langsame Abfälle – ${sources.suggestion}.`,
+          recommendation: sources.rapidPeaks >= 2
+            ? 'Lüften nach Reinigen/Kochen verlängern und Quellen lokalisieren.'
+            : 'Lüftung beibehalten, Ausgasungen klingen bereits ab.',
+          tags: ['tvoc', 'quelle']
+        };
+      }
+    },
+    {
+      id: 'tvoc_slow_drop',
+      metric: 'TVOC',
+      severity: 'info',
+      group: 'tvoc',
+      when: (context) => {
+        const tvoc = getMetricContext(context, 'TVOC');
+        return tvoc?.shortTermTrend?.slope && tvoc.shortTermTrend.slope < 0 && Math.abs(tvoc.shortTermTrend.slope) < 5;
+      },
+      build: () => ({
+        id: 'tvoc_slow_drop',
+        metric: 'TVOC',
+        severity: 'info',
+        tone: 'good',
+        title: 'TVOC sinkt langsam',
+        summary: 'Quelle scheint inaktiv, Substanzen verflüchtigen sich nur noch.',
+        recommendation: 'Kurz lüften beschleunigt den Abbau und entfernt Restausgasungen.',
+        tags: ['tvoc', 'trend']
+      })
+    },
+    {
+      id: 'light_too_cool_evening',
+      metric: 'Farbtemperatur',
+      severity: 'info',
+      group: 'light',
+      when: (context) => {
+        const phase = context.phase?.key;
+        const now = state.now?.Farbtemperatur?.value;
+        return phase === 'evening' && Number.isFinite(now) && now > 4200;
+      },
+      build: () => ({
+        id: 'light_too_cool_evening',
+        metric: 'Farbtemperatur',
+        severity: 'info',
+        tone: 'elevated',
+        title: 'Lichtfarbe zu kühl',
+        summary: 'Ab 17 Uhr ist die Lichtfarbe oft zu kühl – Raum wirkt aktiv statt entspannend.',
+        recommendation: 'Auf 2700–3500 K und gedimmtes Licht für Wohnzimmer/Esszimmer wechseln.',
+        tags: ['licht', 'cct']
+      })
+    },
+    {
+      id: 'temperature_night_drop',
+      metric: 'Temperatur',
+      severity: 'warning',
+      group: 'temperature',
+      when: (context) => {
+        const pattern = context.patterns?.Temperatur;
+        if (!pattern?.windows?.late_evening || !pattern?.windows?.morning) return false;
+        const evening = pattern.windows.late_evening;
+        const morning = pattern.windows.morning;
+        if (!Number.isFinite(evening?.avg) || !Number.isFinite(morning?.avg)) return false;
+        return evening.avg - morning.avg >= 3;
+      },
+      build: () => ({
+        id: 'temperature_night_drop',
+        metric: 'Temperatur',
+        severity: 'warning',
+        tone: 'elevated',
+        title: 'Temperatur fällt nachts stark',
+        summary: 'Nachts sinkt die Temperatur deutlich – Raum verliert Wärme zu schnell.',
+        recommendation: 'Heizkurve oder Nachtabsenkung prüfen, Zugluftquellen abdichten.',
+        tags: ['temperatur', 'nacht']
+      })
+    },
+    {
+      id: 'humidity_repeated_low',
+      metric: 'rel. Feuchte',
+      severity: 'warning',
+      group: 'humidity',
+      when: (context) => {
+        const humidity = getMetricContext(context, 'rel. Feuchte');
+        return humidity?.stats24h?.shareOutsideGood >= 0.4 && (humidity.now?.value ?? 50) < 40;
+      },
+      build: () => ({
+        id: 'humidity_repeated_low',
+        metric: 'rel. Feuchte',
+        severity: 'warning',
+        tone: 'elevated',
+        title: 'Feuchtigkeit wiederholt niedrig',
+        summary: 'Luft ist häufig trocken – wahrscheinlich Heizung/Winterbetrieb.',
+        recommendation: 'Luftbefeuchter oder Schalen mit Wasser einsetzen und kürzer lüften.',
+        tags: ['feuchte', 'trocken']
       })
     },
     {
@@ -5523,7 +5928,7 @@ const METRIC_TO_CHART_KEY = {
               return formatScaleTick(value, definition.yTitle);
             }
           },
-          grid: { color: 'rgba(148, 163, 184, 0.14)', lineWidth: 1, drawBorder: false, drawTicks: false },
+          grid: { color: 'rgba(148, 163, 184, 0.08)', lineWidth: 1, drawBorder: false, drawTicks: false },
           border: { display: false },
           suggestedMin: definition.yBounds?.min,
           suggestedMax: definition.yBounds?.max
