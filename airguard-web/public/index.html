@@ -427,52 +427,6 @@
         </div>
       </section>
 
-      <section class="admin-section" aria-labelledby="admin-network-title">
-        <div class="section-heading">
-          <h2 id="admin-network-title">Admin · Netzwerk</h2>
-          <p>WiFi-Einstellungen für ESP aktualisieren (und Pi vorbereitet).</p>
-        </div>
-        <article class="admin-card" id="admin-network-card">
-          <div class="admin-card__grid">
-            <div class="form-field">
-              <label for="admin-token">Admin-Code (optional)</label>
-              <input id="admin-token" name="admin-token" type="password" autocomplete="off" placeholder="Bei Bedarf hier Token eintragen">
-              <p class="hint">Nur notwendig, wenn der Server ein Admin-Token erwartet.</p>
-            </div>
-            <div class="form-field">
-              <label for="esp-ssid">ESP SSID</label>
-              <input id="esp-ssid" name="esp-ssid" type="text" autocomplete="off" placeholder="Neuer WLAN-Name">
-            </div>
-            <div class="form-field">
-              <label for="esp-password">ESP Passwort</label>
-              <input id="esp-password" name="esp-password" type="password" autocomplete="new-password" placeholder="Mindestens 8 Zeichen">
-            </div>
-            <div class="form-field">
-              <label for="pi-ssid">Pi SSID (optional)</label>
-              <input id="pi-ssid" name="pi-ssid" type="text" autocomplete="off" placeholder="Experimentell – benötigt Root">
-            </div>
-            <div class="form-field">
-              <label for="pi-password">Pi Passwort (optional)</label>
-              <input id="pi-password" name="pi-password" type="password" autocomplete="off" placeholder="Experimentell – benötigt Root">
-            </div>
-            <div class="form-field form-field--checkbox">
-              <label for="esp-flash">
-                <input id="esp-flash" name="esp-flash" type="checkbox" checked>
-                <span>ESP jetzt OTA flashen</span>
-              </label>
-              <p class="hint">Startet einen ESPHome-OTA-Flash mit den neuen Daten.</p>
-            </div>
-          </div>
-          <div class="admin-actions">
-            <div class="admin-status" id="admin-status" role="status" aria-live="polite">Bereit.</div>
-            <div class="admin-buttons">
-              <button type="button" id="admin-load" class="ghost-btn">Einstellungen laden</button>
-              <button type="button" id="admin-save" class="ghost-btn ghost-btn--filled">Speichern</button>
-            </div>
-          </div>
-        </article>
-      </section>
-
     </main>
 
     <footer class="app-footer">

@@ -2,7 +2,6 @@
 
 const fs = require('fs');
 const path = require('path');
-const { spawn } = require('child_process');
 const express = require('express');
 const compression = require('compression');
 const helmet = require('helmet');
@@ -142,14 +141,6 @@ const PORT = Number.parseInt(process.env.PORT || '', 10) || 8088;
 const PROM_URL = (process.env.PROM_URL || 'http://127.0.0.1:9090').replace(/\/+$/, '');
 const PROM_TIMEOUT_MS = Number.parseInt(process.env.PROM_TIMEOUT_MS || '', 10) || 8000;
 const MAX_RANGE_SECONDS = Number.parseInt(process.env.MAX_RANGE_SECONDS || '', 10) || 30 * 24 * 60 * 60;
-const ESPHOME_CONFIG_PATH =
-  process.env.AIRGUARD_ESPHOME_CONFIG && process.env.AIRGUARD_ESPHOME_CONFIG.trim()
-    ? process.env.AIRGUARD_ESPHOME_CONFIG.trim()
-    : path.join(__dirname, 'airguard.yaml');
-const ENABLE_WIFI_ADMIN = envEnabled(process.env.AIRGUARD_ENABLE_WIFI_ADMIN ?? 'true');
-const ADMIN_TOKEN = typeof process.env.AIRGUARD_ADMIN_TOKEN === 'string'
-  ? process.env.AIRGUARD_ADMIN_TOKEN.trim()
-  : '';
 const isProduction = process.env.NODE_ENV === 'production';
 const RANGE_PRESETS = {
   '24h': {
@@ -526,63 +517,6 @@ app.get('/api/series', async (req, res, next) => {
   }
 });
 
-app.get('/api/admin/wifi', async (req, res, next) => {
-  try {
-    assertAdminAccess(req);
-    const config = await readEspWifiConfig();
-    sendJSON(res, {
-      ok: true,
-      esp: {
-        ssid: config.ssid || '',
-        hasPassword: Boolean(config.password)
-      }
-    });
-  } catch (error) {
-    if (error?.status) {
-      return sendJSON(res, { ok: false, error: error.code || error.message }, error.status);
-    }
-    next(error);
-  }
-});
-
-app.post('/api/admin/wifi', async (req, res, next) => {
-  try {
-    assertAdminAccess(req);
-    const espSsid = typeof req.body?.espSsid === 'string' ? req.body.espSsid.trim() : '';
-    const espPassword = typeof req.body?.espPassword === 'string' ? req.body.espPassword : '';
-    const flashEsp = Boolean(req.body?.flashEsp);
-    const piSsid = typeof req.body?.piSsid === 'string' ? req.body.piSsid.trim() : '';
-    const piPassword = typeof req.body?.piPassword === 'string' ? req.body.piPassword : '';
-
-    if (!espSsid) {
-      return sendJSON(res, { ok: false, error: 'SSID erforderlich' }, 400);
-    }
-    if (espPassword.length < 8) {
-      return sendJSON(res, { ok: false, error: 'Passwort muss mindestens 8 Zeichen haben' }, 400);
-    }
-
-    await updateEspWifiConfig(espSsid, espPassword);
-
-    if (piSsid || piPassword) {
-      console.info('[airguard-web] Pi WiFi-Update angefragt (erfordert Root & Systemintegration).');
-    }
-
-    let flashed = false;
-    if (flashEsp) {
-      await runEsphomeOtaFlash(ESPHOME_CONFIG_PATH);
-      flashed = true;
-    }
-
-    sendJSON(res, { ok: true, flashed });
-  } catch (error) {
-    if (error?.status) {
-      return sendJSON(res, { ok: false, error: error.code || error.message, flashed: false }, error.status);
-    }
-    console.warn('[airguard-web] Admin WiFi Update fehlgeschlagen:', error);
-    sendJSON(res, { ok: false, error: error?.message || 'Unbekannter Fehler', flashed: false }, 500);
-  }
-});
-
 app.use('/api', (req, res) => {
   sendJSON(res, { ok: false, error: 'Nicht gefunden' }, 404);
 });
@@ -908,142 +842,6 @@ function envEnabled(value) {
     return false;
   }
   return !['0', 'false', 'off', 'no'].includes(normalized);
-}
-
-function assertAdminAccess(req) {
-  if (!ENABLE_WIFI_ADMIN) {
-    throw createHttpError(404, 'admin_disabled', 'Admin API deaktiviert');
-  }
-  if (!ADMIN_TOKEN) {
-    return;
-  }
-  const header = req.get('x-admin-token') || '';
-  if (header !== ADMIN_TOKEN) {
-    throw createHttpError(401, 'unauthorized', 'Admin Token ungültig');
-  }
-}
-
-async function readEspWifiConfig() {
-  const content = await fs.promises.readFile(ESPHOME_CONFIG_PATH, 'utf8');
-  const { ssid, password } = extractWifiSubstitutions(content);
-  return { ssid, password };
-}
-
-async function updateEspWifiConfig(ssid, password) {
-  const content = await fs.promises.readFile(ESPHOME_CONFIG_PATH, 'utf8');
-  const updated = replaceWifiSubstitutions(content, ssid, password);
-  await fs.promises.writeFile(ESPHOME_CONFIG_PATH, updated, 'utf8');
-}
-
-async function runEsphomeOtaFlash(configPath) {
-  return new Promise((resolve, reject) => {
-    const proc = spawn('esphome', ['run', configPath, '--device', 'OTA'], {
-      env: process.env
-    });
-    let stdout = '';
-    let stderr = '';
-    proc.stdout.on('data', (chunk) => {
-      stdout += chunk.toString();
-    });
-    proc.stderr.on('data', (chunk) => {
-      stderr += chunk.toString();
-    });
-    proc.on('error', (error) => {
-      reject(createHttpError(500, 'ota_failed', error.message || 'OTA fehlgeschlagen'));
-    });
-    proc.on('close', (code) => {
-      if (code === 0) {
-        resolve({ stdout, stderr });
-      } else {
-        const message = stderr || stdout || `ESPHome beendete sich mit Code ${code}`;
-        reject(createHttpError(500, 'ota_failed', message.trim()));
-      }
-    });
-  });
-}
-
-function extractWifiSubstitutions(content) {
-  const lines = content.split(/\r?\n/);
-  const bounds = findSubstitutionBounds(lines);
-  if (!bounds) {
-    throw new Error('substitutions Abschnitt nicht gefunden');
-  }
-  let ssid = null;
-  let password = null;
-  for (let index = bounds.start + 1; index < bounds.end; index++) {
-    const line = lines[index];
-    const stripped = line.split('#')[0].trim();
-    const ssidMatch = stripped.match(/wifi_ssid:\s*['"]?([^'"]*)['"]?/);
-    if (ssidMatch) {
-      ssid = ssidMatch[1];
-    }
-    const passMatch = stripped.match(/wifi_pass:\s*['"]?([^'"]*)['"]?/);
-    if (passMatch) {
-      password = passMatch[1];
-    }
-  }
-  return { ssid, password };
-}
-
-function replaceWifiSubstitutions(content, ssid, password) {
-  const lines = content.split(/\r?\n/);
-  const bounds = findSubstitutionBounds(lines);
-  if (!bounds) {
-    throw new Error('substitutions Abschnitt nicht gefunden');
-  }
-  let ssidUpdated = false;
-  let passUpdated = false;
-  const fallbackIndent = ' '.repeat(bounds.baseIndent + 2);
-  for (let index = bounds.start + 1; index < bounds.end; index++) {
-    const line = lines[index];
-    const indent = (line.match(/^(\s*)/) || [fallbackIndent, fallbackIndent])[1];
-    const stripped = line.split('#')[0].trim();
-    if (/^wifi_ssid:\s*/.test(stripped)) {
-      lines[index] = `${indent}wifi_ssid: "${ssid}"`;
-      ssidUpdated = true;
-    }
-    if (/^wifi_pass:\s*/.test(stripped)) {
-      lines[index] = `${indent}wifi_pass: "${password}"`;
-      passUpdated = true;
-    }
-  }
-
-  const insertionPoint = bounds.end;
-  if (!ssidUpdated) {
-    lines.splice(insertionPoint, 0, `${fallbackIndent}wifi_ssid: "${ssid}"`);
-  }
-  if (!passUpdated) {
-    lines.splice(insertionPoint + (ssidUpdated ? 0 : 1), 0, `${fallbackIndent}wifi_pass: "${password}"`);
-  }
-
-  return lines.join('\n');
-}
-
-function findSubstitutionBounds(lines) {
-  let start = -1;
-  let baseIndent = 0;
-  for (let index = 0; index < lines.length; index++) {
-    const match = lines[index].match(/^(\s*)substitutions\s*:/);
-    if (match) {
-      start = index;
-      baseIndent = match[1].length;
-      break;
-    }
-  }
-  if (start < 0) {
-    return null;
-  }
-  let end = lines.length;
-  for (let index = start + 1; index < lines.length; index++) {
-    const line = lines[index];
-    const indent = (line.match(/^(\s*)/) || [''])[1].length;
-    const trimmed = line.trim();
-    if (trimmed && indent <= baseIndent) {
-      end = index;
-      break;
-    }
-  }
-  return { start, end, baseIndent };
 }
 
 function createHttpError(status, code, message, meta = {}) {
