@@ -1099,6 +1099,7 @@ const METRIC_TO_CHART_KEY = {
   const SPARKLINE_METRICS = KEY_METRICS;
   const SWIPE_CLOSE_THRESHOLD = 80;
   const SWIPE_CLOSE_MAX_WIDTH = 768;
+  const ADMIN_TOKEN_KEY = 'airguardAdminToken';
 
   const state = {
     range: TIME_RANGES['24h'],
@@ -1125,7 +1126,8 @@ const METRIC_TO_CHART_KEY = {
     bodyScrollLock: null,
     circadianCharts: { lux: null, cct: null },
     modalRequestToken: 0,
-    modalAbortController: null
+    modalAbortController: null,
+    adminLoading: false
   };
 
   const ui = {
@@ -1198,7 +1200,17 @@ const METRIC_TO_CHART_KEY = {
     circadianScaleCctCaption: null,
     circadianScaleLuxValue: null,
     circadianScaleCctValue: null,
-    circadianModalCloseButtons: []
+    circadianModalCloseButtons: [],
+    adminCard: null,
+    adminToken: null,
+    adminSsid: null,
+    adminPassword: null,
+    adminPiSsid: null,
+    adminPiPassword: null,
+    adminFlash: null,
+    adminLoadBtn: null,
+    adminSaveBtn: null,
+    adminStatus: null
   };
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -1256,6 +1268,16 @@ const METRIC_TO_CHART_KEY = {
     ui.installBtn = document.getElementById('install-btn');
     ui.notifyBtn = document.getElementById('notify-btn');
     ui.pwaStatusBadge = document.getElementById('pwa-status-badge');
+    ui.adminCard = document.getElementById('admin-network-card');
+    ui.adminToken = document.getElementById('admin-token');
+    ui.adminSsid = document.getElementById('esp-ssid');
+    ui.adminPassword = document.getElementById('esp-password');
+    ui.adminPiSsid = document.getElementById('pi-ssid');
+    ui.adminPiPassword = document.getElementById('pi-password');
+    ui.adminFlash = document.getElementById('esp-flash');
+    ui.adminLoadBtn = document.getElementById('admin-load');
+    ui.adminSaveBtn = document.getElementById('admin-save');
+    ui.adminStatus = document.getElementById('admin-status');
 
     if (ui.circadianCard) {
       ui.circadianCard.tabIndex = 0;
@@ -1275,6 +1297,8 @@ const METRIC_TO_CHART_KEY = {
         renderInsights();
       });
     }
+
+    setupAdminPanel();
 
     const coreCards = document.querySelectorAll('.core-card');
     coreCards.forEach((card) => {
@@ -1380,6 +1404,160 @@ const METRIC_TO_CHART_KEY = {
     }
 
     updateCircadianCycle(resolveCircadianPhase());
+  }
+
+  function setupAdminPanel() {
+    if (!ui.adminCard) return;
+    const storedToken = readAdminToken();
+    if (storedToken && ui.adminToken) {
+      ui.adminToken.value = storedToken;
+    }
+    if (ui.adminToken) {
+      ui.adminToken.addEventListener('input', () => persistAdminToken(ui.adminToken.value.trim()));
+    }
+    if (ui.adminLoadBtn) {
+      ui.adminLoadBtn.addEventListener('click', loadAdminWifi);
+    }
+    if (ui.adminSaveBtn) {
+      ui.adminSaveBtn.addEventListener('click', saveAdminWifi);
+    }
+  }
+
+  function setAdminStatus(message, tone = 'info') {
+    if (!ui.adminStatus) return;
+    ui.adminStatus.textContent = message;
+    ui.adminStatus.dataset.tone = tone;
+  }
+
+  function setAdminLoading(active) {
+    state.adminLoading = Boolean(active);
+    const controls = [
+      ui.adminToken,
+      ui.adminSsid,
+      ui.adminPassword,
+      ui.adminPiSsid,
+      ui.adminPiPassword,
+      ui.adminFlash,
+      ui.adminLoadBtn,
+      ui.adminSaveBtn
+    ];
+    controls.forEach((el) => {
+      if (el) {
+        el.disabled = active;
+      }
+    });
+    if (ui.adminSaveBtn) {
+      ui.adminSaveBtn.textContent = active ? 'Wird angewendet…' : 'Speichern';
+    }
+    if (ui.adminLoadBtn) {
+      ui.adminLoadBtn.textContent = active ? 'Lädt…' : 'Einstellungen laden';
+    }
+  }
+
+  function getAdminHeaders() {
+    const headers = {};
+    const token = getAdminToken();
+    if (token) {
+      headers['x-admin-token'] = token;
+    }
+    return headers;
+  }
+
+  function getAdminToken() {
+    return (ui.adminToken?.value || '').trim();
+  }
+
+  function persistAdminToken(value) {
+    try {
+      if (!window.localStorage) return;
+      if (value) {
+        window.localStorage.setItem(ADMIN_TOKEN_KEY, value);
+      } else {
+        window.localStorage.removeItem(ADMIN_TOKEN_KEY);
+      }
+    } catch (error) {
+      console.warn('Admin-Token konnte nicht gespeichert werden', error);
+    }
+  }
+
+  function readAdminToken() {
+    try {
+      if (!window.localStorage) return '';
+      return window.localStorage.getItem(ADMIN_TOKEN_KEY) || '';
+    } catch (_error) {
+      return '';
+    }
+  }
+
+  async function loadAdminWifi() {
+    if (state.adminLoading) return;
+    setAdminLoading(true);
+    setAdminStatus('Lade aktuelle Einstellungen …', 'info');
+    try {
+      const response = await fetch('/api/admin/wifi', {
+        headers: getAdminHeaders()
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        const errorMessage = payload?.error || response.statusText || 'Unbekannter Fehler';
+        throw new Error(errorMessage);
+      }
+      if (ui.adminSsid) {
+        ui.adminSsid.value = payload?.esp?.ssid || '';
+      }
+      if (ui.adminPassword) {
+        ui.adminPassword.value = '';
+        ui.adminPassword.placeholder = payload?.esp?.hasPassword ? 'Passwort bleibt unverändert' : 'Mindestens 8 Zeichen';
+      }
+      setAdminStatus('Einstellungen geladen.', 'success');
+    } catch (error) {
+      setAdminStatus(`Fehler: ${error?.message || error}`, 'error');
+    } finally {
+      setAdminLoading(false);
+    }
+  }
+
+  async function saveAdminWifi() {
+    if (state.adminLoading) return;
+    const ssid = (ui.adminSsid?.value || '').trim();
+    const password = ui.adminPassword?.value || '';
+    const flashEsp = ui.adminFlash ? Boolean(ui.adminFlash.checked) : true;
+    const piSsid = (ui.adminPiSsid?.value || '').trim();
+    const piPassword = ui.adminPiPassword?.value || '';
+
+    if (!ssid) {
+      setAdminStatus('Bitte eine SSID eintragen.', 'error');
+      return;
+    }
+    if (!password || password.length < 8) {
+      setAdminStatus('Passwort mindestens 8 Zeichen setzen.', 'error');
+      return;
+    }
+
+    setAdminLoading(true);
+    setAdminStatus('Wird gespeichert …', 'info');
+
+    try {
+      const response = await fetch('/api/admin/wifi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAdminHeaders() },
+        body: JSON.stringify({ espSsid: ssid, espPassword: password, flashEsp, piSsid, piPassword })
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.ok) {
+        const errorMessage = payload?.error || response.statusText || 'Fehler beim Speichern';
+        throw new Error(errorMessage);
+      }
+      const flashed = payload?.flashed ? ' OTA-Flash angestoßen.' : '';
+      setAdminStatus(`WiFi-Konfiguration gespeichert.${flashed}`, 'success');
+      if (ui.adminPassword) {
+        ui.adminPassword.value = '';
+      }
+    } catch (error) {
+      setAdminStatus(`Fehler: ${error?.message || error}`, 'error');
+    } finally {
+      setAdminLoading(false);
+    }
   }
 
   function updateOfflineState() {
