@@ -318,6 +318,7 @@ a {
   gap: 0.5rem;
   font-size: 0.95rem;
   color: var(--text-muted);
+  min-height: 2.2rem;
 }
 
 .hero-highlights li::before {
@@ -1591,6 +1592,10 @@ a {
   margin-right: auto;
   --tab-tone-bg: rgba(14, 165, 233, 0.16);
   --tab-tone-color: #0ea5e9;
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 3;
 }
 
 .modal-range-tabs::-webkit-scrollbar {
@@ -1631,8 +1636,8 @@ a {
 .chart-modal__canvas {
   position: relative;
   width: 100%;
-  height: clamp(340px, 55vh, 520px);
-  padding: 18px 16px 18px;
+  height: clamp(360px, 58vh, 540px);
+  padding: 22px 18px 22px;
   max-width: 880px;
   margin: 0 auto;
 }
@@ -1781,7 +1786,7 @@ a {
   position: relative;
   display: flex;
   width: 100%;
-  height: 16px;
+  height: 22px;
   align-items: stretch;
   border-radius: 999px;
   overflow: hidden;
@@ -1814,25 +1819,36 @@ a {
   line-height: 1.35;
   color: var(--text-strong);
   white-space: nowrap;
-  margin-top: 0.35rem;
+  margin-bottom: 0.4rem;
 }
 
 .metric-scale-label-row span {
   display: block;
   padding: 0.25rem 0.15rem 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.metric-scale {
+  display: flex;
+  flex-direction: column;
+}
+
+.metric-scale .metric-scale-label-row {
+  order: -1;
 }
 
 .metric-scale-marker {
   position: absolute;
-  top: 50%;
+  top: 100%;
   left: 50%;
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border-radius: 999px;
   background: #fff;
   border: 3px solid var(--marker-color, #0ea5e9);
   box-shadow: 0 10px 20px rgba(15, 23, 42, 0.18);
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -35%);
   transition: left 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
   pointer-events: none;
   z-index: 1;
