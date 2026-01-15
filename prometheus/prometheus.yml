@@ -1,0 +1,16 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'esp32_sensors'
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - esp32.local:80
+        labels:
+          room: living_room
+    metric_relabel_configs:
+      - source_labels: [name]
+        regex: ""
+        action: drop
