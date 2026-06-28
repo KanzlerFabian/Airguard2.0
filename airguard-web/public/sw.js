@@ -1,5 +1,5 @@
-const SHELL_CACHE = 'airguard-shell-v4';
-const DATA_CACHE = 'airguard-data-v1';
+const SHELL_CACHE = 'airguard-shell-v5';
+const DATA_CACHE = 'airguard-data-v2';
 
 const SHELL_ASSETS = [
   '/',
@@ -16,6 +16,9 @@ const DATA_ENDPOINTS = new Set([
   '/data.json',
   '/data_24h.json',
   '/data_7d.json',
+  '/demo-data/latest.json',
+  '/demo-data/history-24h.json',
+  '/demo-data/history-7d.json',
   '/ai/eval',
   '/api/now',
   '/api/series'

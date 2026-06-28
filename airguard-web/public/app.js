@@ -298,9 +298,7 @@
     let flushScheduled = false;
     const DEV_ASSERTS = (() => {
       try {
-        if (window?.AIRGUARD_DISABLE_ASSERTS) return false;
-        const host = window?.location?.hostname || '';
-        return host === 'localhost' || host.endsWith('.local') || host === '';
+        return window?.AIRGUARD_ENABLE_ASSERTS === true;
       } catch (error) {
         return false;
       }
@@ -503,6 +501,21 @@
 
   const SPARKLINE_RANGE_KEY = '24h';
   const FETCH_RETRY_DELAYS = [500, 1000];
+
+  const DATA_MODE = (() => {
+    try {
+      const param = new URLSearchParams(window.location.search).get('mode');
+      const stored = window.localStorage?.getItem('airguard:dataMode');
+      return (param || stored || 'demo').toLowerCase() === 'live' ? 'live' : 'demo';
+    } catch (error) {
+      return 'demo';
+    }
+  })();
+  const DEMO_ENDPOINTS = {
+    latest: '/demo-data/latest.json',
+    history24h: '/demo-data/history-24h.json',
+    history7d: '/demo-data/history-7d.json'
+  };
   const EMPTY_SERIES_RETRY_DELAYS = [500, 1000];
   const RANGE_RULES = {
     '24h': { stepMin: 120, stepMax: 300, windowMin: 240 },
@@ -1771,33 +1784,71 @@ const METRIC_TO_CHART_KEY = {
     await Promise.all([refreshNow(), preloadSeries(true), refreshPressureTrend()]);
   }
 
+  async function fetchJson(url, init = {}) {
+    const response = await fetch(url, { headers: { Accept: 'application/json', ...(init.headers || {}) }, ...init });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} für ${url}`);
+    }
+    return response.json();
+  }
+
+  async function loadDemoLatest() {
+    const payload = await fetchJson(DEMO_ENDPOINTS.latest, { cache: 'no-store' });
+    if (!payload?.ok || !payload.data) {
+      throw new Error('Demo-Livedaten sind ungültig');
+    }
+    return payload;
+  }
+
+  async function loadDemoSeries(metric, range) {
+    const endpoint = range?.range === '7d' || range?.range === '30d'
+      ? DEMO_ENDPOINTS.history7d
+      : DEMO_ENDPOINTS.history24h;
+    const payload = await fetchJson(endpoint);
+    const points = payload?.metrics?.[metric];
+    if (!Array.isArray(points)) {
+      const err = new Error(`Demo-Serie fehlt: ${metric}`);
+      err.code = 'unknown_metric';
+      throw err;
+    }
+    const normalizedPoints = points
+      .map((point) => ({ x: Number(point.x), y: Number(point.y) }))
+      .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y));
+    return limitPoints(dedupePoints(normalizedPoints));
+  }
+
+  async function loadLiveLatest() {
+    const response = await fetch('/api/now', { headers: { 'Accept': 'application/json' } });
+    if (!response.ok) {
+      let payload = null;
+      try {
+        payload = await response.clone().json();
+      } catch (error) {
+        payload = null;
+      }
+      const err = new Error(payload?.error || 'Fehler beim Laden der Live-Daten');
+      err.code = payload?.error;
+      throw err;
+    }
+    const payload = await response.json();
+    if (!payload || !payload.ok) {
+      const err = new Error(payload?.error || 'API Antwort fehlerhaft');
+      err.code = payload?.error;
+      throw err;
+    }
+    return payload;
+  }
+
   async function refreshNow() {
     try {
-      const response = await fetch('/api/now', { headers: { 'Accept': 'application/json' } });
-      if (!response.ok) {
-        let payload = null;
-        try {
-          payload = await response.clone().json();
-        } catch (error) {
-          payload = null;
-        }
-        if (payload?.error === 'backend_unreachable') {
-          const err = new Error('Backend nicht erreichbar. Bitte erneut laden.');
-          err.code = 'backend_unreachable';
-          throw err;
-        }
-        throw new Error(payload?.error || 'Fehler beim Laden der Live-Daten');
+      let payload;
+      try {
+        payload = DATA_MODE === 'live' ? await loadLiveLatest() : await loadDemoLatest();
+      } catch (error) {
+        if (DATA_MODE !== 'live') throw error;
+        console.warn('Live-Daten nicht verfügbar, wechsle auf Demo-Daten.', error);
+        payload = await loadDemoLatest();
       }
-      const payload = await response.json();
-      if (!payload || !payload.ok) {
-        if (payload?.error === 'backend_unreachable') {
-          const err = new Error('Backend nicht erreichbar. Bitte erneut laden.');
-          err.code = 'backend_unreachable';
-          throw err;
-        }
-        throw new Error(payload?.error || 'API Antwort fehlerhaft');
-      }
-
       const data = normalizeNowData(payload.data || {});
       const merged = { ...(state.now || {}) };
       for (const [metric, sample] of Object.entries(data)) {
@@ -1819,7 +1870,7 @@ const METRIC_TO_CHART_KEY = {
       }
       refreshInsights();
     } catch (error) {
-      console.error('Live-Daten konnten nicht geladen werden', error);
+      console.error('Messdaten konnten nicht geladen werden', error);
       throw error;
     }
   }
@@ -5095,6 +5146,9 @@ const METRIC_TO_CHART_KEY = {
   }
 
   async function requestSeries(metric, queryName, range, options = {}) {
+    if (DATA_MODE !== 'live') {
+      return loadDemoSeries(metric, range);
+    }
     try {
       const params = new URLSearchParams({
         name: queryName,
@@ -5173,8 +5227,8 @@ const METRIC_TO_CHART_KEY = {
       }
       return [];
     } catch (error) {
-      console.error('Zeitreihendaten konnten nicht geladen werden', error);
-      throw error;
+      console.warn('Live-Zeitreihe nicht verfügbar, nutze Demo-Daten.', error);
+      return loadDemoSeries(metric, range);
     }
   }
 
@@ -6216,11 +6270,18 @@ const METRIC_TO_CHART_KEY = {
     if (Date.now() - state.lastPressureFetch < PRESSURE_REFRESH_MS) return;
     state.lastPressureFetch = Date.now();
     try {
-      const params = new URLSearchParams({ name: 'Luftdruck', range: '3h', step: '15m', win: '30m' });
-      const response = await fetch(`/api/series?${params.toString()}`);
-      if (!response.ok) return;
-      const payload = await response.json();
-      const values = normalizeSeriesValues(payload?.data);
+      let values;
+      if (DATA_MODE === 'live') {
+        const params = new URLSearchParams({ name: 'Luftdruck', range: '3h', step: '15m', win: '30m' });
+        const response = await fetch(`/api/series?${params.toString()}`);
+        if (!response.ok) return;
+        const payload = await response.json();
+        values = normalizeSeriesValues(payload?.data);
+      } else {
+        values = (await loadDemoSeries('Luftdruck', { range: '24h' }))
+          .slice(-7)
+          .map((point) => [point.x / 1000, point.y]);
+      }
       if (values.length >= 2) {
         const first = Number(values[0][1]);
         const last = Number(values[values.length - 1][1]);
