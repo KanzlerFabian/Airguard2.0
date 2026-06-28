@@ -7,7 +7,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "start:dev": "nodemon server.js --watch server.js --watch public"
+    "start:dev": "nodemon server.js --watch server.js --watch public",
+    "build": "node scripts/sync-vendor-assets.js"
   },
   "dependencies": {
     "chart.js": "^4.4.4",
