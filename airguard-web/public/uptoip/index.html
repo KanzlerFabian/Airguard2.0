@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="AirGuard Analytix: technische Projektfolie für ESP32-Sensorik, Datenpipeline, Dashboard und AWS-Demo."
+      content="AirGuard Analytix: visuelle Projektpräsentation zu ESP32-Sensorik, MQTT, lokaler Weiterentwicklung und AWS-Demo."
     />
-    <title>AirGuard Analytix | Technische Projektfolie</title>
+    <title>AirGuard Analytix | Projektpräsentation</title>
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
@@ -17,142 +17,186 @@
         <div class="container hero__content">
           <p class="eyebrow">IoT · Raumluft · Dashboard</p>
           <h1 id="page-title">AirGuard Analytix</h1>
-          <p class="hero__subtitle">Raumluft-Monitoring von ESP32-Sensorik bis Web-Dashboard</p>
-          <p class="hero__note">Diplomarbeit → lokale Weiterentwicklung → AWS-Demo</p>
+          <p class="hero__subtitle">Von der technischen Diplomarbeit zur lokalen Dashboard-Version</p>
+          <p class="hero__stack">ESP32-Sensorik · MQTT-Datenfluss · Web-Dashboard · AWS-Demo</p>
+          <p class="hero__note">
+            Ursprünglich als skalierbares IoT-/Fullstack-System entwickelt, später lokal weitergedacht und für die Präsentation als stabile Cloud-Demo bereitgestellt.
+          </p>
           <div class="hero__actions">
             <a class="button" href="/">Dashboard öffnen</a>
+            <a class="button button--ghost" href="#architektur">Architektur ansehen</a>
           </div>
         </div>
       </section>
 
-      <section class="section" aria-labelledby="architecture-title">
+      <section class="section" aria-labelledby="idea-title">
+        <div class="container presentation-slide">
+          <div class="section-heading">
+            <p class="eyebrow">Grundidee</p>
+            <h2 id="idea-title">Raumluft sichtbar machen.</h2>
+          </div>
+          <div class="card-grid card-grid--three">
+            <article class="concept-card"><span>Messen</span><p>Sensorwerte aus echten Raumluftparametern erfassen.</p></article>
+            <article class="concept-card"><span>Übertragen</span><p>Daten strukturiert über Netzwerk/MQTT weitergeben.</p></article>
+            <article class="concept-card"><span>Verstehen</span><p>Werte im Dashboard bewerten und als Verlauf anzeigen.</p></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section section--muted" aria-labelledby="fullstack-title">
         <div class="container">
           <div class="section-heading section-heading--compact">
-            <p class="eyebrow">Systemarchitektur</p>
-            <h2 id="architecture-title">Messwert → Pipeline → Dashboard</h2>
+            <p class="eyebrow">Systemvergleich</p>
+            <h2 id="fullstack-title">Fullstack-System</h2>
           </div>
-
-          <div class="architecture" aria-label="Systemarchitektur AirGuard Analytix">
-            <article class="architecture__node architecture__node--sensors">
-              <span class="node-index">01</span>
-              <h3>Sensoren</h3>
-              <div class="sensor-cloud">
-                <span>CO₂</span>
-                <span>Temperatur</span>
-                <span>Feuchte</span>
-                <span>Luftdruck</span>
-                <span>Feinstaub</span>
-                <span>VOC</span>
-                <span>Licht</span>
+          <div class="compare-diagram">
+            <article class="compare-panel">
+              <h3>Klassisches Fullstack</h3>
+              <div class="stack-list">
+                <span>Frontend</span><span>Backend</span><span>Datenbank</span><span>Deployment</span>
               </div>
             </article>
-
-            <div class="architecture__arrow" aria-hidden="true">↓</div>
-
-            <article class="architecture__node">
-              <span class="node-index">02</span>
-              <h3>ESP32</h3>
-              <ul class="node-tags">
-                <li>Messung</li>
-                <li>Strukturierung</li>
-                <li>WLAN</li>
-              </ul>
-            </article>
-
-            <div class="architecture__arrow" aria-hidden="true">↓</div>
-
-            <article class="architecture__node">
-              <span class="node-index">03</span>
-              <h3>Datenpipeline</h3>
-              <ul class="node-tags">
-                <li>MQTT</li>
-                <li>Raspberry Pi</li>
-                <li>Zeitreihen</li>
-              </ul>
-            </article>
-
-            <div class="architecture__arrow" aria-hidden="true">↓</div>
-
-            <article class="architecture__node architecture__node--accent">
-              <span class="node-index">04</span>
-              <h3>Dashboard</h3>
-              <ul class="node-tags">
-                <li>Status</li>
-                <li>Verläufe</li>
-                <li>Detailansichten</li>
-                <li>Bewertung</li>
-              </ul>
+            <article class="compare-panel compare-panel--accent">
+              <h3>AirGuard Fullstack</h3>
+              <div class="stack-list">
+                <span>Sensorik</span><span>ESP32/Firmware</span><span>MQTT-Kommunikation</span><span>Backend/Datenhaltung</span><span>Dashboard/PWA</span><span>Cloud oder lokale Infrastruktur</span>
+              </div>
             </article>
           </div>
+          <p class="section-note">AirGuard erweitert klassisches Fullstack-Denken um Hardware, Firmware und IoT-Kommunikation.</p>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="metrics-title">
+        <div class="container">
+          <div class="section-heading section-heading--compact">
+            <p class="eyebrow">Messwerte</p>
+            <h2 id="metrics-title">Relevante Raumklimafaktoren</h2>
+          </div>
+          <div class="metric-grid">
+            <article class="metric-card"><span>CO₂</span></article>
+            <article class="metric-card"><span>VOC / eCO₂</span></article>
+            <article class="metric-card"><span>Feinstaub<br />PM1 / PM2.5 / PM10</span></article>
+            <article class="metric-card"><span>Temperatur</span></article>
+            <article class="metric-card"><span>Luftfeuchtigkeit</span></article>
+            <article class="metric-card"><span>Luftdruck</span></article>
+            <article class="metric-card"><span>Helligkeit</span></article>
+            <article class="metric-card"><span>Farbtemperatur</span></article>
+          </div>
+          <p class="section-note">Diese Werte bilden die Grundlage für die Bewertung der Raumluftqualität.</p>
         </div>
       </section>
 
       <section class="section section--muted" aria-labelledby="hardware-title">
         <div class="container">
           <div class="section-heading section-heading--compact">
-            <p class="eyebrow">Sensor-Grid</p>
-            <h2 id="hardware-title">Hardware-Bausteine</h2>
+            <p class="eyebrow">Hardware-Auswahl</p>
+            <h2 id="hardware-title">Technische Auswahl</h2>
+            <p>Sensoren wurden nach Messwert, Schnittstelle, Kosten, Verfügbarkeit und Integrationsaufwand ausgewählt.</p>
           </div>
           <div class="card-grid card-grid--hardware">
-            <article class="card"><h3>ESP32 DevKitC V4</h3><p>WLAN · Sensorlogik</p></article>
-            <article class="card"><h3>MH-Z19B</h3><p>CO₂</p></article>
-            <article class="card"><h3>BME280</h3><p>Temperatur · Feuchte · Luftdruck</p></article>
-            <article class="card"><h3>PMS5003</h3><p>PM1 · PM2.5 · PM10</p></article>
-            <article class="card"><h3>CCS811</h3><p>VOC · eCO₂</p></article>
-            <article class="card"><h3>TCS34725</h3><p>Lux · Farbtemperatur</p></article>
+            <article class="sensor-card"><h3>ESP32 DevKitC V4</h3><p>WLAN · Mikrocontroller · Sensorlogik</p></article>
+            <article class="sensor-card"><h3>MH-Z19B</h3><p>CO₂ · NDIR · UART/PWM</p></article>
+            <article class="sensor-card"><h3>CCS811</h3><p>VOC · eCO₂ · I²C</p></article>
+            <article class="sensor-card"><h3>PMS5003</h3><p>PM1 · PM2.5 · PM10 · UART</p></article>
+            <article class="sensor-card"><h3>BME280</h3><p>Temperatur · Feuchte · Luftdruck · I²C</p></article>
+            <article class="sensor-card"><h3>TCS34725</h3><p>Lux · Farbtemperatur · RGB · I²C</p></article>
           </div>
         </div>
       </section>
 
-      <section class="section" aria-labelledby="stages-title">
+      <section id="architektur" class="section" aria-labelledby="thesis-architecture-title">
+        <div class="container">
+          <div class="section-heading section-heading--compact">
+            <p class="eyebrow">Diplomarbeit</p>
+            <h2 id="thesis-architecture-title">Architektur der Diplomarbeit</h2>
+          </div>
+          <div class="flow-diagram flow-diagram--large" aria-label="Architektur der Diplomarbeit">
+            <article class="flow-node"><h3>Sensoren</h3><p>CO₂ · VOC · Feinstaub · Klima · Licht</p></article>
+            <div class="flow-arrow" aria-hidden="true">↓</div>
+            <article class="flow-node"><h3>ESP32</h3><p>Sensor-Auslesung · Fehlerbehandlung · WLAN</p></article>
+            <div class="flow-arrow" aria-hidden="true">↓</div>
+            <article class="flow-node"><h3>MQTT-Broker</h3><p>Topics · Publish/Subscribe · skalierbarer Datenfluss</p></article>
+            <div class="flow-arrow" aria-hidden="true">↓</div>
+            <article class="flow-node"><h3>Backend / API</h3><p>Verarbeitung · Datenbank · Schnittstellen</p></article>
+            <div class="flow-arrow" aria-hidden="true">↓</div>
+            <article class="flow-node flow-node--accent"><h3>PWA / Dashboard</h3><p>Visualisierung · Benutzerinteraktion · responsive Oberfläche</p></article>
+          </div>
+          <p class="section-note">Ziel: skalierbares System für mehrere Geräte, Nutzer und Räume.</p>
+        </div>
+      </section>
+
+      <section class="section section--muted" aria-labelledby="local-architecture-title">
+        <div class="container split-section">
+          <div class="section-heading section-heading--compact">
+            <p class="eyebrow">Lokale Version</p>
+            <h2 id="local-architecture-title">Lokale Weiterentwicklung</h2>
+            <p>Die lokale Version war kleiner, aber stärker auf eine moderne private Dashboard-Erfahrung ausgelegt.</p>
+          </div>
+          <div class="flow-diagram">
+            <article class="flow-node"><h3>Sensor-/Zeitreihendaten</h3></article>
+            <div class="flow-arrow" aria-hidden="true">↓</div>
+            <article class="flow-node"><h3>Raspberry Pi Zero</h3><p>lokaler Webserver · lokale Umgebung</p></article>
+            <div class="flow-arrow" aria-hidden="true">↓</div>
+            <article class="flow-node"><h3>Prometheus</h3><p>Datensammler · Zeitreihen-Konzept</p></article>
+            <div class="flow-arrow" aria-hidden="true">↓</div>
+            <article class="flow-node flow-node--accent"><h3>Apple-Health-artiges Dashboard</h3><p>Cards · Verläufe · Detailansichten · Bewertungen</p></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="demo-architecture-title">
+        <div class="container split-section split-section--reverse">
+          <div class="section-heading section-heading--compact">
+            <p class="eyebrow">AWS-Demo</p>
+            <h2 id="demo-architecture-title">Aktuelle Präsentationsdemo</h2>
+            <p>Die Demo ist bewusst von Hardware und lokaler Infrastruktur entkoppelt, damit sie im Gespräch zuverlässig funktioniert.</p>
+          </div>
+          <div class="flow-diagram flow-diagram--compact">
+            <article class="flow-node"><h3>JSON-Beispieldaten</h3></article>
+            <div class="flow-arrow" aria-hidden="true">↓</div>
+            <article class="flow-node"><h3>AWS Amplify</h3></article>
+            <div class="flow-arrow" aria-hidden="true">↓</div>
+            <article class="flow-node flow-node--accent"><h3>Dashboard im Browser</h3></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section section--muted" aria-labelledby="stages-title">
         <div class="container">
           <div class="section-heading section-heading--compact">
             <p class="eyebrow">Projektstände</p>
-            <h2 id="stages-title">Drei technische Zustände</h2>
+            <h2 id="stages-title">Drei Entwicklungsstände</h2>
           </div>
           <div class="stage-grid">
             <article class="stage-card">
               <span>01</span>
               <h3>Diplomarbeit</h3>
-              <ul>
-                <li>ESP32 + Sensoren</li>
-                <li>WLAN/MQTT-Konzept = extreme Skalierbarkeit</li>
-                <li>Dashboard-Prototyp</li>
-              </ul>
+              <ul><li>ESP32 + echte Sensorik</li><li>MQTT-Broker</li><li>Backend / API</li><li>Datenbank-Konzept</li><li>PWA / Dashboard</li><li>auf Skalierbarkeit ausgelegt</li></ul>
             </article>
             <article class="stage-card">
               <span>02</span>
-              <h3>Lokale Weiterentwicklung</h3>
-              <ul>
-                <li>Raspberry Pi Zero als lokaler Webserver</li>
-                <li>Prometheus als Datensammler</li>
-                <li>Apple-Health-artiges Dashboard</li>
-              </ul>
+              <h3>Lokale Version</h3>
+              <ul><li>Raspberry Pi Zero</li><li>Prometheus als Datensammler</li><li>lokaler Webserver</li><li>Apple-Health-artiges Dashboard</li><li>Fokus auf private Nutzung</li></ul>
             </article>
             <article class="stage-card stage-card--accent">
               <span>03</span>
               <h3>AWS-Demo</h3>
-              <ul>
-                <li>AWS Amplify Hosting</li>
-                <li>JSON-Beispieldaten</li>
-                <li>Stabil vorführbar ohne Hardware</li>
-              </ul>
+              <ul><li>AWS Amplify</li><li>statisches Hosting</li><li>JSON-Beispieldaten</li><li>keine Hardware nötig</li><li>stabil vorführbar</li></ul>
             </article>
           </div>
         </div>
       </section>
 
-      <section class="section section--muted section--tight" aria-labelledby="demo-data-title">
+      <section class="section section--tight" aria-labelledby="demo-data-title">
         <div class="container">
           <aside class="note-box">
             <div>
-              <p class="eyebrow">Demo-Daten</p>
-              <h2 id="demo-data-title">Warum Demo-Daten?</h2>
+              <p class="eyebrow">Demo-Hinweis</p>
+              <h2 id="demo-data-title">Warum Beispieldaten?</h2>
             </div>
             <p>
-              Die AWS-Demo nutzt realistische Beispieldaten, damit das Dashboard unabhängig von ESP32,
-              Raspberry Pi und lokalen Diensten zuverlässig gezeigt werden kann. Die Live-Anbindung
-              bleibt als Architekturidee erhalten.
+              Die AWS-Demo nutzt realistische Beispieldaten, damit das Dashboard unabhängig von ESP32, Raspberry Pi, Prometheus und lokalen Netzwerkdiensten zuverlässig gezeigt werden kann. Die Demo ersetzt nicht die Live-Anbindung, sondern macht das Projekt präsentierbar.
             </p>
           </aside>
         </div>
