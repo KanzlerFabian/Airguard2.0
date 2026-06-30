@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="AirGuard Analytix: technische Projektseite für IoT-basiertes Raumluft-Monitoring mit ESP32, Sensorik und Web-Dashboard."
+      content="AirGuard Analytix: technische Case-Study für Raumluft-Monitoring von ESP32-Sensorik bis Web-Dashboard und AWS-Amplify-Demo."
     />
-    <title>AirGuard Analytix | IoT Raumluft-Monitoring</title>
+    <title>AirGuard Analytix | Technische Case-Study</title>
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
@@ -15,100 +15,39 @@
       <section class="hero section" aria-labelledby="page-title">
         <div class="hero__grid"></div>
         <div class="container hero__content">
-          <p class="eyebrow">IoT · Sensorik · Dashboard · Cloud-Demo</p>
+          <p class="eyebrow">Technische Case-Study · IoT · Dashboard</p>
           <h1 id="page-title">AirGuard Analytix</h1>
           <p class="hero__subtitle">
-            IoT-basiertes Raumluft-Monitoring mit ESP32, Sensorik und Web-Dashboard
+            Raumluft-Monitoring von ESP32-Sensorik bis Web-Dashboard
           </p>
           <p class="hero__copy">
-            AirGuard Analytix ist ein System zur Erfassung, Übertragung und Visualisierung von
-            Raumluftdaten. Es kombiniert Sensorik, Mikrocontroller, Datenpipeline und Dashboard.
+            AirGuard Analytix ist ein Raumluft-Monitoring-Projekt, das ursprünglich als
+            Diplomarbeit entstanden ist und später zu einer moderneren lokalen Dashboard-Version
+            weiterentwickelt wurde. Die aktuelle Version läuft als stabile Präsentationsdemo über
+            AWS Amplify.
           </p>
-          <div class="hero__actions" aria-label="Projekt-Kernpunkte">
-            <a class="button" href="#architektur">Architektur ansehen</a>
-            <a class="button button--ghost" href="#vergleich">Demo-Konzept</a>
+          <div class="hero__actions">
+            <a class="button" href="/">Dashboard öffnen</a>
           </div>
         </div>
       </section>
 
-      <section class="section" id="architektur" aria-labelledby="architecture-title">
-        <div class="container">
-          <div class="section-heading">
-            <p class="eyebrow">Systemarchitektur</p>
-            <h2 id="architecture-title">Vom Messwert zur stabilen Präsentationsdemo</h2>
-            <p>
-              Die Architektur trennt Erfassung, Übertragung, Speicherung und Visualisierung klar in
-              Schichten. Dadurch bleibt nachvollziehbar, wo Messdaten entstehen, wie sie transportiert
-              werden und warum die Cloud-Demo unabhängig von lokaler Hardware funktioniert.
-            </p>
-          </div>
-
-          <div class="architecture" role="img" aria-label="Sensoren zu ESP32 zu WLAN MQTT zu Raspberry Pi Prometheus zu Dashboard zu AWS Amplify Demo">
-            <div class="architecture__node">
-              <span>01</span>
-              <strong>Sensoren</strong>
-              <small>CO₂ · Klima · Feinstaub · VOC · Licht</small>
-            </div>
-            <div class="architecture__arrow" aria-hidden="true">→</div>
-            <div class="architecture__node">
-              <span>02</span>
-              <strong>ESP32</strong>
-              <small>zyklisches Auslesen & Strukturieren</small>
-            </div>
-            <div class="architecture__arrow" aria-hidden="true">→</div>
-            <div class="architecture__node">
-              <span>03</span>
-              <strong>WLAN / MQTT</strong>
-              <small>Übertragung als Zeitreihen-Konzept</small>
-            </div>
-            <div class="architecture__arrow" aria-hidden="true">→</div>
-            <div class="architecture__node">
-              <span>04</span>
-              <strong>Raspberry Pi / Prometheus</strong>
-              <small>lokale Verarbeitung & Monitoring-Konzept</small>
-            </div>
-            <div class="architecture__arrow" aria-hidden="true">→</div>
-            <div class="architecture__node">
-              <span>05</span>
-              <strong>Dashboard</strong>
-              <small>Visualisierung, Grenzwerte, Verlauf</small>
-            </div>
-            <div class="architecture__arrow" aria-hidden="true">→</div>
-            <div class="architecture__node architecture__node--accent">
-              <span>06</span>
-              <strong>AWS Amplify Demo</strong>
-              <small>statische, robuste Präsentationsversion</small>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="section section--muted" aria-labelledby="hardware-title">
-        <div class="container">
-          <div class="section-heading">
-            <p class="eyebrow">Hardware / Sensoren</p>
-            <h2 id="hardware-title">Messsystem mit mehreren Sensordomänen</h2>
-          </div>
-          <div class="card-grid card-grid--hardware">
-            <article class="card"><h3>ESP32 DevKitC V4</h3><p>Mikrocontroller-Plattform für Sensoranbindung, WLAN und Firmware-Logik.</p></article>
-            <article class="card"><h3>MH-Z19B</h3><p>CO₂-Messung als zentrale Kenngröße für Raumluftqualität.</p></article>
-            <article class="card"><h3>BME280</h3><p>Temperatur, Luftfeuchtigkeit und Luftdruck als Umgebungsdaten.</p></article>
-            <article class="card"><h3>PMS5003</h3><p>Feinstaubmessung für PM1, PM2.5 und PM10.</p></article>
-            <article class="card"><h3>CCS811</h3><p>VOC- und eCO₂-Werte zur ergänzenden Bewertung der Luftqualität.</p></article>
-            <article class="card"><h3>TCS34725</h3><p>Lichtfarbe, Lux und Farbtemperatur für Kontextdaten im Raum.</p></article>
-          </div>
-        </div>
-      </section>
-
-      <section class="section" aria-labelledby="data-title">
+      <section class="section" id="diplomarbeit" aria-labelledby="diploma-title">
         <div class="container split">
           <div>
-            <p class="eyebrow">Datenfluss</p>
-            <h2 id="data-title">Zyklisch messen, strukturiert übertragen, verständlich darstellen</h2>
+            <p class="eyebrow">01 · Ursprung als Diplomarbeit</p>
+            <h2 id="diploma-title">Eigenes Raumluft-Monitoring-System mit echter Sensorik</h2>
             <p>
-              Sensorwerte werden zyklisch ausgelesen, strukturiert, übertragen und anschließend im
-              Dashboard visualisiert. Die Präsentationsversion nutzt realistische Beispieldaten, damit
-              die Demo unabhängig von Hardware, Raspberry Pi, Prometheus oder Netzwerk stabil läuft.
+              Ziel der ursprünglichen Diplomarbeit war ein eigenes System, das Raumluftdaten nicht
+              nur anzeigt, sondern die komplette technische Kette abbildet: Hardware, Firmware,
+              Datenübertragung und Dashboard. Die Messwerte wurden mit einem ESP32 zyklisch
+              ausgelesen, strukturiert und über WLAN weitergegeben.
+            </p>
+            <p>
+              Erfasst wurden unter anderem CO₂, Temperatur, Luftfeuchtigkeit, Luftdruck,
+              Feinstaub, VOC-Werte sowie Lichtdaten. Damit entstand ein praktischer Prototyp, an
+              dem Messwerterfassung, Übertragungslogik und Visualisierung gemeinsam geprüft werden
+              konnten.
             </p>
           </div>
           <div class="signal-panel" aria-hidden="true">
@@ -119,46 +58,118 @@
         </div>
       </section>
 
-      <section class="section section--muted" id="vergleich" aria-labelledby="compare-title">
+      <section class="section section--muted" aria-labelledby="hardware-title">
         <div class="container">
           <div class="section-heading">
-            <p class="eyebrow">Originalsystem vs. Cloud-Demo</p>
-            <h2 id="compare-title">Gleiche Projektlogik, anderer Betriebsmodus</h2>
+            <p class="eyebrow">Hardware / Sensoren</p>
+            <h2 id="hardware-title">Sensoraufbau der Diplomarbeit</h2>
+            <p>
+              Die Hardware bestand aus einem ESP32 als zentrale Mikrocontroller-Plattform und
+              mehreren Sensoren für unterschiedliche Messdomänen der Raumluft.
+            </p>
           </div>
-          <div class="compare">
-            <article class="compare__panel">
-              <h3>Ursprüngliche Diplomarbeit</h3>
-              <p>
-                Die ursprüngliche Version entstand als Schul-/Diplomprojekt mit echter Hardware,
-                ESP32, Sensorik, MQTT-Konzept und Dashboard. Im Fokus standen Messwerterfassung,
-                Datenübertragung und die technische Nachvollziehbarkeit des Gesamtsystems.
-              </p>
-            </article>
-            <article class="compare__panel compare__panel--accent">
-              <h3>Weiterentwicklung / AWS Amplify</h3>
-              <p>
-                Später wurde das Projekt privat zu einem moderneren Dashboard weiterentwickelt und
-                für die Präsentation auf AWS Amplify deployed. Die Demo priorisiert Stabilität,
-                verständliche Visualisierung und einen reproduzierbaren Eindruck im Gespräch.
-              </p>
-            </article>
+          <div class="card-grid card-grid--hardware">
+            <article class="card"><h3>ESP32 DevKitC V4</h3><p>Mikrocontroller-Plattform für Sensoranbindung, Firmware-Logik und WLAN-Kommunikation.</p></article>
+            <article class="card"><h3>MH-Z19B</h3><p>CO₂-Messung als wichtige Kenngröße für die Bewertung der Raumluft.</p></article>
+            <article class="card"><h3>BME280</h3><p>Temperatur, Luftfeuchtigkeit und Luftdruck als Umgebungsdaten.</p></article>
+            <article class="card"><h3>PMS5003</h3><p>Feinstaubmessung für PM1, PM2.5 und PM10.</p></article>
+            <article class="card"><h3>CCS811</h3><p>VOC- und eCO₂-Werte als ergänzende Indikatoren für Luftqualität.</p></article>
+            <article class="card"><h3>TCS34725</h3><p>Lichtdaten, Lux und Farbtemperatur als Kontextinformationen im Raum.</p></article>
           </div>
         </div>
       </section>
 
-      <section class="section" aria-labelledby="tech-title">
+      <section class="section" id="lokal" aria-labelledby="local-title">
         <div class="container">
           <div class="section-heading">
-            <p class="eyebrow">Technologien</p>
-            <h2 id="tech-title">Technischer Stack</h2>
+            <p class="eyebrow">02 · Lokale Weiterentwicklung</p>
+            <h2 id="local-title">Modernere Dashboard-Version für eine Raspberry-Pi-Umgebung</h2>
+            <p>
+              Nach der Diplomarbeit wurde das Projekt privat weiterentwickelt. Der Fokus lag auf
+              einem moderneren Dashboard im Apple-Health-Stil: klarere Detailansichten, Verläufe,
+              Bewertungen und eine verständlichere Darstellung der Raumluft statt reiner Rohwerte.
+            </p>
+            <p>
+              Die lokale Version war auf eine Raspberry-Pi-Umgebung ausgelegt. Sensordaten sollten
+              als Zeitreihen nutzbar sein, damit Entwicklungen über Stunden oder Tage sichtbar
+              werden. Prometheus wurde dabei als Konzept für Zeitreihendaten betrachtet; Caddy als
+              lokale Bereitstellungs- beziehungsweise Proxy-Komponente. Der Anspruch war kein
+              großes Produktionssystem, sondern eine nachvollziehbare lokale Architektur für Demo
+              und Weiterentwicklung.
+            </p>
           </div>
           <div class="card-grid">
-            <article class="card"><h3>Hardware</h3><p>ESP32, Sensoren</p></article>
-            <article class="card"><h3>Firmware / IoT</h3><p>ESPHome, MQTT-Konzept</p></article>
-            <article class="card"><h3>Daten</h3><p>JSON, Zeitreihen, Prometheus-Konzept</p></article>
-            <article class="card"><h3>Frontend</h3><p>HTML, CSS, JavaScript, Charts</p></article>
-            <article class="card"><h3>Hosting</h3><p>AWS Amplify</p></article>
-            <article class="card"><h3>Tools</h3><p>GitHub, Codex, KI-gestützte Entwicklung</p></article>
+            <article class="card"><h3>Ziel: bessere Lesbarkeit</h3><p>Messwerte sollten nicht isoliert stehen, sondern mit Status, Verlauf und kurzer Einordnung angezeigt werden.</p></article>
+            <article class="card"><h3>Ziel: Zeitverläufe</h3><p>Aus Momentaufnahmen wurden nutzbare Reihen, damit Trends über Stunden oder Tage sichtbar werden.</p></article>
+            <article class="card"><h3>Ziel: lokaler Betrieb</h3><p>Die Raspberry-Pi-Umgebung diente als kompakte Basis für Webserver, Datenabfrage und lokale Oberfläche.</p></article>
+          </div>
+
+          <div class="section-heading section-heading--nested">
+            <p class="eyebrow">Struktur der lokalen Version</p>
+            <h3>Vom Messwert zur Weboberfläche</h3>
+            <p>
+              Die Weiterentwicklung trennte die Anwendung bewusst in Schichten. So ließ sich besser
+              erkennen, ob ein Problem bei Sensorik, Datenabfrage, lokalem Server oder Frontend lag.
+            </p>
+          </div>
+          <div class="card-grid card-grid--technical">
+            <article class="card"><h3>Raspberry Pi</h3><p>Geplante lokale Laufzeitumgebung für Dashboard, Backend-Prozess und Netzwerkzugriff im eigenen LAN.</p></article>
+            <article class="card"><h3>Node.js / Express</h3><p>Lokaler Webserver für statische Dateien und API-Endpunkte wie aktuelle Werte und Zeitreihen.</p></article>
+            <article class="card"><h3>Prometheus-Konzept</h3><p>Zeitreihendaten sollten über Prometheus-nahe Abfragen auswertbar werden, ohne daraus ein großes Produktionssystem zu machen.</p></article>
+            <article class="card"><h3>Lokaler Cache</h3><p>Snapshots und Serien konnten zwischengespeichert werden, damit die Oberfläche robuster auf Datenlücken reagiert.</p></article>
+            <article class="card"><h3>Chart.js-Frontend</h3><p>Diagramme, Statuskarten und Detailansichten machten Rohwerte als Verlauf und Bewertung verständlicher.</p></article>
+            <article class="card"><h3>Caddy</h3><p>Als lokale Bereitstellungs- und Proxy-Komponente gedacht, um die Weboberfläche sauber im LAN auszuliefern.</p></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section section--muted" id="demo" aria-labelledby="demo-title">
+        <div class="container split">
+          <div>
+            <p class="eyebrow">03 · Aktuelle Präsentationsdemo</p>
+            <h2 id="demo-title">Statisch gehostete Demo über AWS Amplify</h2>
+            <p>
+              Die aktuelle Demo läuft über AWS Amplify und ist statisch gehostet. Sie nutzt
+              realistische Beispieldaten aus JSON-Dateien und funktioniert dadurch ohne ESP32,
+              Raspberry Pi, Prometheus, Caddy oder lokale Netzwerkabhängigkeiten.
+            </p>
+            <p>
+              Die Demo ersetzt nicht die Live-Anbindung an echte Sensorik. Sie macht das Dashboard
+              aber stabil vorführbar und reduziert im Bewerbungsgespräch bewusst die Fehlerquellen,
+              die bei lokaler Hardware, WLAN oder Hintergrunddiensten entstehen können.
+            </p>
+          </div>
+          <div class="demo-card">
+            <span>Demo-Modus</span>
+            <strong>JSON-Beispieldaten</strong>
+            <p>Reproduzierbare Datengrundlage für eine stabile Browser-Demo.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="datenfluss" aria-labelledby="flow-title">
+        <div class="container">
+          <div class="section-heading">
+            <p class="eyebrow">Technischer Datenfluss</p>
+            <h2 id="flow-title">Drei Projektstände im Vergleich</h2>
+            <p>
+              Die Projektlogik blieb vergleichbar: Daten entstehen, werden transportiert und im
+              Dashboard verständlich visualisiert. Geändert hat sich vor allem der Betriebsmodus.
+            </p>
+          </div>
+          <div class="flow-list">
+            <article class="flow-row">
+              <h3>Diplomarbeit</h3>
+              <p>Sensoren <span>→</span> ESP32 <span>→</span> WLAN/MQTT <span>→</span> Dashboard</p>
+            </article>
+            <article class="flow-row">
+              <h3>Lokale Weiterentwicklung</h3>
+              <p>Sensor-/Zeitreihendaten <span>→</span> Raspberry Pi <span>→</span> lokale Weboberfläche <span>→</span> Dashboard</p>
+            </article>
+            <article class="flow-row flow-row--accent">
+              <h3>Aktuelle Demo</h3>
+              <p>JSON-Beispieldaten <span>→</span> AWS Amplify <span>→</span> Dashboard im Browser</p>
+            </article>
           </div>
         </div>
       </section>
@@ -170,10 +181,10 @@
             <h2 id="timeline-title">Vom Hardware-Prototyp zur Gesprächsdemo</h2>
           </div>
           <ol class="timeline">
-            <li><span>01</span><strong>Konzept</strong><p>Raumluftdaten erfassen und als technische Systemkette denken.</p></li>
-            <li><span>02</span><strong>Hardware</strong><p>ESP32 und Sensoren verbinden, Messwerte prüfen, Fehlerquellen eingrenzen.</p></li>
-            <li><span>03</span><strong>Dashboard</strong><p>Sensordaten verständlich visualisieren und Zustände interpretierbar machen.</p></li>
-            <li><span>04</span><strong>Cloud-Demo</strong><p>Lokale Abhängigkeiten entfernen und statisch auf AWS Amplify präsentieren.</p></li>
+            <li><span>01</span><strong>Diplomarbeit</strong><p>ESP32 und Sensorik verbinden, Messwerte auslesen und an ein Dashboard weitergeben.</p></li>
+            <li><span>02</span><strong>Lokale Version</strong><p>Dashboard-Struktur modernisieren und Raumluftdaten als Verläufe verständlicher machen.</p></li>
+            <li><span>03</span><strong>Demo-Modus</strong><p>Lokale Abhängigkeiten entfernen und mit JSON-Daten eine stabile Präsentation ermöglichen.</p></li>
+            <li><span>04</span><strong>AWS Amplify</strong><p>Die statische Demo im Browser bereitstellen, ohne Hardware vor Ort vorauszusetzen.</p></li>
           </ol>
         </div>
       </section>
@@ -186,7 +197,8 @@
           </div>
           <ul class="learning-list">
             <li>technische Systeme in Schichten denken</li>
-            <li>Fehlerquellen über Hardware, Netzwerk und Frontend eingrenzen</li>
+            <li>Hardware, Datenfluss und Frontend verbinden</li>
+            <li>Fehlerquellen systematisch eingrenzen</li>
             <li>Sensordaten verständlich visualisieren</li>
             <li>eine lokale Anwendung in eine stabile Cloud-Demo überführen</li>
           </ul>
