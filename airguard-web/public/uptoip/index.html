@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="AirGuard Analytix: technische Projektseite für IoT-basiertes Raumluft-Monitoring mit ESP32, Sensorik und Web-Dashboard."
+    />
+    <title>AirGuard Analytix | IoT Raumluft-Monitoring</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main>
+      <section class="hero section" aria-labelledby="page-title">
+        <div class="hero__grid"></div>
+        <div class="container hero__content">
+          <p class="eyebrow">IoT · Sensorik · Dashboard · Cloud-Demo</p>
+          <h1 id="page-title">AirGuard Analytix</h1>
+          <p class="hero__subtitle">
+            IoT-basiertes Raumluft-Monitoring mit ESP32, Sensorik und Web-Dashboard
+          </p>
+          <p class="hero__copy">
+            AirGuard Analytix ist ein System zur Erfassung, Übertragung und Visualisierung von
+            Raumluftdaten. Es kombiniert Sensorik, Mikrocontroller, Datenpipeline und Dashboard.
+          </p>
+          <div class="hero__actions" aria-label="Projekt-Kernpunkte">
+            <a class="button" href="#architektur">Architektur ansehen</a>
+            <a class="button button--ghost" href="#vergleich">Demo-Konzept</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="architektur" aria-labelledby="architecture-title">
+        <div class="container">
+          <div class="section-heading">
+            <p class="eyebrow">Systemarchitektur</p>
+            <h2 id="architecture-title">Vom Messwert zur stabilen Präsentationsdemo</h2>
+            <p>
+              Die Architektur trennt Erfassung, Übertragung, Speicherung und Visualisierung klar in
+              Schichten. Dadurch bleibt nachvollziehbar, wo Messdaten entstehen, wie sie transportiert
+              werden und warum die Cloud-Demo unabhängig von lokaler Hardware funktioniert.
+            </p>
+          </div>
+
+          <div class="architecture" role="img" aria-label="Sensoren zu ESP32 zu WLAN MQTT zu Raspberry Pi Prometheus zu Dashboard zu AWS Amplify Demo">
+            <div class="architecture__node">
+              <span>01</span>
+              <strong>Sensoren</strong>
+              <small>CO₂ · Klima · Feinstaub · VOC · Licht</small>
+            </div>
+            <div class="architecture__arrow" aria-hidden="true">→</div>
+            <div class="architecture__node">
+              <span>02</span>
+              <strong>ESP32</strong>
+              <small>zyklisches Auslesen & Strukturieren</small>
+            </div>
+            <div class="architecture__arrow" aria-hidden="true">→</div>
+            <div class="architecture__node">
+              <span>03</span>
+              <strong>WLAN / MQTT</strong>
+              <small>Übertragung als Zeitreihen-Konzept</small>
+            </div>
+            <div class="architecture__arrow" aria-hidden="true">→</div>
+            <div class="architecture__node">
+              <span>04</span>
+              <strong>Raspberry Pi / Prometheus</strong>
+              <small>lokale Verarbeitung & Monitoring-Konzept</small>
+            </div>
+            <div class="architecture__arrow" aria-hidden="true">→</div>
+            <div class="architecture__node">
+              <span>05</span>
+              <strong>Dashboard</strong>
+              <small>Visualisierung, Grenzwerte, Verlauf</small>
+            </div>
+            <div class="architecture__arrow" aria-hidden="true">→</div>
+            <div class="architecture__node architecture__node--accent">
+              <span>06</span>
+              <strong>AWS Amplify Demo</strong>
+              <small>statische, robuste Präsentationsversion</small>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section section--muted" aria-labelledby="hardware-title">
+        <div class="container">
+          <div class="section-heading">
+            <p class="eyebrow">Hardware / Sensoren</p>
+            <h2 id="hardware-title">Messsystem mit mehreren Sensordomänen</h2>
+          </div>
+          <div class="card-grid card-grid--hardware">
+            <article class="card"><h3>ESP32 DevKitC V4</h3><p>Mikrocontroller-Plattform für Sensoranbindung, WLAN und Firmware-Logik.</p></article>
+            <article class="card"><h3>MH-Z19B</h3><p>CO₂-Messung als zentrale Kenngröße für Raumluftqualität.</p></article>
+            <article class="card"><h3>BME280</h3><p>Temperatur, Luftfeuchtigkeit und Luftdruck als Umgebungsdaten.</p></article>
+            <article class="card"><h3>PMS5003</h3><p>Feinstaubmessung für PM1, PM2.5 und PM10.</p></article>
+            <article class="card"><h3>CCS811</h3><p>VOC- und eCO₂-Werte zur ergänzenden Bewertung der Luftqualität.</p></article>
+            <article class="card"><h3>TCS34725</h3><p>Lichtfarbe, Lux und Farbtemperatur für Kontextdaten im Raum.</p></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="data-title">
+        <div class="container split">
+          <div>
+            <p class="eyebrow">Datenfluss</p>
+            <h2 id="data-title">Zyklisch messen, strukturiert übertragen, verständlich darstellen</h2>
+            <p>
+              Sensorwerte werden zyklisch ausgelesen, strukturiert, übertragen und anschließend im
+              Dashboard visualisiert. Die Präsentationsversion nutzt realistische Beispieldaten, damit
+              die Demo unabhängig von Hardware, Raspberry Pi, Prometheus oder Netzwerk stabil läuft.
+            </p>
+          </div>
+          <div class="signal-panel" aria-hidden="true">
+            <span style="--height: 44%"></span><span style="--height: 70%"></span><span style="--height: 52%"></span>
+            <span style="--height: 86%"></span><span style="--height: 64%"></span><span style="--height: 76%"></span>
+            <span style="--height: 58%"></span><span style="--height: 91%"></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="section section--muted" id="vergleich" aria-labelledby="compare-title">
+        <div class="container">
+          <div class="section-heading">
+            <p class="eyebrow">Originalsystem vs. Cloud-Demo</p>
+            <h2 id="compare-title">Gleiche Projektlogik, anderer Betriebsmodus</h2>
+          </div>
+          <div class="compare">
+            <article class="compare__panel">
+              <h3>Ursprüngliche Diplomarbeit</h3>
+              <p>
+                Die ursprüngliche Version entstand als Schul-/Diplomprojekt mit echter Hardware,
+                ESP32, Sensorik, MQTT-Konzept und Dashboard. Im Fokus standen Messwerterfassung,
+                Datenübertragung und die technische Nachvollziehbarkeit des Gesamtsystems.
+              </p>
+            </article>
+            <article class="compare__panel compare__panel--accent">
+              <h3>Weiterentwicklung / AWS Amplify</h3>
+              <p>
+                Später wurde das Projekt privat zu einem moderneren Dashboard weiterentwickelt und
+                für die Präsentation auf AWS Amplify deployed. Die Demo priorisiert Stabilität,
+                verständliche Visualisierung und einen reproduzierbaren Eindruck im Gespräch.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="tech-title">
+        <div class="container">
+          <div class="section-heading">
+            <p class="eyebrow">Technologien</p>
+            <h2 id="tech-title">Technischer Stack</h2>
+          </div>
+          <div class="card-grid">
+            <article class="card"><h3>Hardware</h3><p>ESP32, Sensoren</p></article>
+            <article class="card"><h3>Firmware / IoT</h3><p>ESPHome, MQTT-Konzept</p></article>
+            <article class="card"><h3>Daten</h3><p>JSON, Zeitreihen, Prometheus-Konzept</p></article>
+            <article class="card"><h3>Frontend</h3><p>HTML, CSS, JavaScript, Charts</p></article>
+            <article class="card"><h3>Hosting</h3><p>AWS Amplify</p></article>
+            <article class="card"><h3>Tools</h3><p>GitHub, Codex, KI-gestützte Entwicklung</p></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section section--muted" aria-labelledby="timeline-title">
+        <div class="container timeline-wrap">
+          <div>
+            <p class="eyebrow">Projektzeitstrahl</p>
+            <h2 id="timeline-title">Vom Hardware-Prototyp zur Gesprächsdemo</h2>
+          </div>
+          <ol class="timeline">
+            <li><span>01</span><strong>Konzept</strong><p>Raumluftdaten erfassen und als technische Systemkette denken.</p></li>
+            <li><span>02</span><strong>Hardware</strong><p>ESP32 und Sensoren verbinden, Messwerte prüfen, Fehlerquellen eingrenzen.</p></li>
+            <li><span>03</span><strong>Dashboard</strong><p>Sensordaten verständlich visualisieren und Zustände interpretierbar machen.</p></li>
+            <li><span>04</span><strong>Cloud-Demo</strong><p>Lokale Abhängigkeiten entfernen und statisch auf AWS Amplify präsentieren.</p></li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="learnings-title">
+        <div class="container learnings">
+          <div>
+            <p class="eyebrow">Learnings</p>
+            <h2 id="learnings-title">Was das Projekt technisch trainiert hat</h2>
+          </div>
+          <ul class="learning-list">
+            <li>technische Systeme in Schichten denken</li>
+            <li>Fehlerquellen über Hardware, Netzwerk und Frontend eingrenzen</li>
+            <li>Sensordaten verständlich visualisieren</li>
+            <li>eine lokale Anwendung in eine stabile Cloud-Demo überführen</li>
+          </ul>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
