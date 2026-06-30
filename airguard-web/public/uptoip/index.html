@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="AirGuard Analytix: visuelle technische Projektfolie für ESP32-Sensorik, MQTT-Datenfluss, Web-Dashboard und AWS-Demo."
+      content="AirGuard Analytix: technische Projektfolie für ESP32-Sensorik, Datenpipeline, Dashboard und AWS-Demo."
     />
     <title>AirGuard Analytix | Technische Projektfolie</title>
     <link rel="stylesheet" href="./style.css" />
@@ -13,21 +13,12 @@
   <body>
     <main>
       <section class="hero section" aria-labelledby="page-title">
-        <div class="hero__grid"></div>
+        <div class="hero__grid" aria-hidden="true"></div>
         <div class="container hero__content">
           <p class="eyebrow">IoT · Raumluft · Dashboard</p>
           <h1 id="page-title">AirGuard Analytix</h1>
-          <p class="hero__subtitle">
-            Technische Diplomarbeit: ESP32-Sensorbox, MQTT-Datenfluss und Web-Dashboard
-          </p>
-          <p class="hero__note">Echte Raumluftsensorik → lokale Weiterentwicklung → stabile AWS-Demo</p>
-          <div class="tech-badges" aria-label="Technologien">
-            <span>ESP32</span>
-            <span>Sensorik</span>
-            <span>MQTT</span>
-            <span>PWA/Dashboard</span>
-            <span>AWS Amplify</span>
-          </div>
+          <p class="hero__subtitle">Raumluft-Monitoring von ESP32-Sensorik bis Web-Dashboard</p>
+          <p class="hero__note">Diplomarbeit → lokale Weiterentwicklung → AWS-Demo</p>
           <div class="hero__actions">
             <a class="button" href="/">Dashboard öffnen</a>
           </div>
@@ -38,7 +29,7 @@
         <div class="container">
           <div class="section-heading section-heading--compact">
             <p class="eyebrow">Systemarchitektur</p>
-            <h2 id="architecture-title">Vom Messwert zur browserfähigen Oberfläche</h2>
+            <h2 id="architecture-title">Messwert → Pipeline → Dashboard</h2>
           </div>
 
           <div class="architecture" aria-label="Systemarchitektur AirGuard Analytix">
@@ -100,7 +91,7 @@
         <div class="container">
           <div class="section-heading section-heading--compact">
             <p class="eyebrow">Sensor-Grid</p>
-            <h2 id="hardware-title">Hardware der Diplomarbeit</h2>
+            <h2 id="hardware-title">Hardware-Bausteine</h2>
           </div>
           <div class="card-grid card-grid--hardware">
             <article class="card"><h3>ESP32 DevKitC V4</h3><p>WLAN · Sensorlogik</p></article>
@@ -125,7 +116,7 @@
               <h3>Diplomarbeit</h3>
               <ul>
                 <li>ESP32 + Sensoren</li>
-                <li>WLAN/MQTT-Konzept = hohe Skalierbarkeit</li>
+                <li>WLAN/MQTT-Konzept = extreme Skalierbarkeit</li>
                 <li>Dashboard-Prototyp</li>
               </ul>
             </article>
@@ -156,7 +147,7 @@
           <aside class="note-box">
             <div>
               <p class="eyebrow">Demo-Daten</p>
-              <h2 id="demo-data-title">Warum Beispieldaten?</h2>
+              <h2 id="demo-data-title">Warum Demo-Daten?</h2>
             </div>
             <p>
               Die AWS-Demo nutzt realistische Beispieldaten, damit das Dashboard unabhängig von ESP32,
