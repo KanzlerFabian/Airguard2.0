@@ -99,9 +99,26 @@
             </p>
           </div>
           <div class="card-grid">
-            <article class="card"><h3>Detailansichten</h3><p>Messwerte sollten nicht isoliert stehen, sondern in Kontext, Verlauf und Bewertung angezeigt werden.</p></article>
-            <article class="card"><h3>Zeitreihen</h3><p>Verläufe über Stunden oder Tage machen Trends und Veränderungen der Raumluft nachvollziehbar.</p></article>
-            <article class="card"><h3>Lokaler Betrieb</h3><p>Die Raspberry-Pi-Umgebung diente als praktische Basis für lokale Weboberfläche und Datenhaltung.</p></article>
+            <article class="card"><h3>Ziel: bessere Lesbarkeit</h3><p>Messwerte sollten nicht isoliert stehen, sondern mit Status, Verlauf und kurzer Einordnung angezeigt werden.</p></article>
+            <article class="card"><h3>Ziel: Zeitverläufe</h3><p>Aus Momentaufnahmen wurden nutzbare Reihen, damit Trends über Stunden oder Tage sichtbar werden.</p></article>
+            <article class="card"><h3>Ziel: lokaler Betrieb</h3><p>Die Raspberry-Pi-Umgebung diente als kompakte Basis für Webserver, Datenabfrage und lokale Oberfläche.</p></article>
+          </div>
+
+          <div class="section-heading section-heading--nested">
+            <p class="eyebrow">Struktur der lokalen Version</p>
+            <h3>Vom Messwert zur Weboberfläche</h3>
+            <p>
+              Die Weiterentwicklung trennte die Anwendung bewusst in Schichten. So ließ sich besser
+              erkennen, ob ein Problem bei Sensorik, Datenabfrage, lokalem Server oder Frontend lag.
+            </p>
+          </div>
+          <div class="card-grid card-grid--technical">
+            <article class="card"><h3>Raspberry Pi</h3><p>Geplante lokale Laufzeitumgebung für Dashboard, Backend-Prozess und Netzwerkzugriff im eigenen LAN.</p></article>
+            <article class="card"><h3>Node.js / Express</h3><p>Lokaler Webserver für statische Dateien und API-Endpunkte wie aktuelle Werte und Zeitreihen.</p></article>
+            <article class="card"><h3>Prometheus-Konzept</h3><p>Zeitreihendaten sollten über Prometheus-nahe Abfragen auswertbar werden, ohne daraus ein großes Produktionssystem zu machen.</p></article>
+            <article class="card"><h3>Lokaler Cache</h3><p>Snapshots und Serien konnten zwischengespeichert werden, damit die Oberfläche robuster auf Datenlücken reagiert.</p></article>
+            <article class="card"><h3>Chart.js-Frontend</h3><p>Diagramme, Statuskarten und Detailansichten machten Rohwerte als Verlauf und Bewertung verständlicher.</p></article>
+            <article class="card"><h3>Caddy</h3><p>Als lokale Bereitstellungs- und Proxy-Komponente gedacht, um die Weboberfläche sauber im LAN auszuliefern.</p></article>
           </div>
         </div>
       </section>
